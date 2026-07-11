@@ -1,0 +1,86 @@
+import SpoonCore
+import SwiftUI
+
+/// Detail column for a commit selected in History.
+@MainActor
+struct CommitDetailView: View {
+  let model: RepositoryModel
+  let oid: ObjectID
+
+  @State private var detail: CommitDetail?
+  @State private var errorMessage: String?
+
+  init(model: RepositoryModel, oid: ObjectID) {
+    self.model = model
+    self.oid = oid
+  }
+
+  var body: some View {
+    Group {
+      if let detail {
+        VStack(spacing: 0) {
+          header(detail)
+          Divider()
+          FileDiffListView(diffs: detail.diffs)
+        }
+      } else if let errorMessage {
+        ContentUnavailableView(
+          "Could Not Load Commit",
+          systemImage: "exclamationmark.triangle",
+          description: Text(errorMessage)
+        )
+      } else {
+        ProgressView()
+      }
+    }
+    .task(id: oid) {
+      do {
+        errorMessage = nil
+        detail = try await model.commitDetail(oid)
+      } catch {
+        detail = nil
+        errorMessage = error.localizedDescription
+      }
+    }
+  }
+
+  private func header(_ detail: CommitDetail) -> some View {
+    VStack(alignment: .leading, spacing: 6) {
+      Text(detail.commit.subject)
+        .font(.headline)
+        .textSelection(.enabled)
+
+      HStack(spacing: 8) {
+        Text(detail.commit.oid.shortened)
+          .font(.caption.monospaced())
+          .padding(.horizontal, 5)
+          .padding(.vertical, 1)
+          .background(.quaternary, in: RoundedRectangle(cornerRadius: 4))
+        Text(detail.commit.authorName)
+        Text(detail.commit.committedAt, format: .dateTime)
+        if detail.commit.isMerge {
+          Label("Merge", systemImage: "arrow.triangle.merge")
+        }
+      }
+      .font(.caption)
+      .foregroundStyle(.secondary)
+
+      let body = messageBody(detail)
+      if !body.isEmpty {
+        Text(body)
+          .font(.callout)
+          .foregroundStyle(.secondary)
+          .textSelection(.enabled)
+          .lineLimit(12)
+      }
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .padding(12)
+  }
+
+  private func messageBody(_ detail: CommitDetail) -> String {
+    detail.fullMessage
+      .dropFirst(detail.commit.subject.count)
+      .trimmingCharacters(in: .whitespacesAndNewlines)
+  }
+}
