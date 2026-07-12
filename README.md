@@ -45,7 +45,7 @@ available, to our knowledge).
 | Fetch / pull / push | ✅ | ✅ |
 | Commit & amend | ✅ | ✅ |
 | Stage / unstage line-by-line | ✅ | ✅ |
-| Discard selected lines | — | ✅ |
+| Discard selected lines | ✅ | ✅ |
 | Commit graph / history | ✅ | ✅ |
 | Clone / add / recent repositories | ✅ | ✅ |
 | Branches: create / delete | ✅ | ✅ |
