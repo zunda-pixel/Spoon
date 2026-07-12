@@ -77,10 +77,21 @@ struct ChangesView: View {
   }
 
   private func changeList(_ status: WorkingTreeStatus) -> some View {
-    List(selection: $selection) {
+    let hasUnstagedContent =
+      !status.unstagedEntries.isEmpty || !status.untrackedEntries.isEmpty
+      || !status.conflictedEntries.isEmpty
+    let hasStagedContent = !status.stagedEntries.isEmpty
+
+    return List(selection: $selection) {
       section("Conflicts", entries: status.conflictedEntries, area: .conflicted)
-      section("Staged", entries: status.stagedEntries, area: .staged)
-      section("Modified", entries: status.unstagedEntries, area: .unstaged)
+      section(
+        "Staged", entries: status.stagedEntries, area: .staged,
+        emptyDropHint: hasUnstagedContent ? "Drop files here to stage" : nil
+      )
+      section(
+        "Modified", entries: status.unstagedEntries, area: .unstaged,
+        emptyDropHint: hasStagedContent ? "Drop files here to unstage" : nil
+      )
       section("Untracked", entries: status.untrackedEntries, area: .untracked)
     }
     // Return mirrors double-click: stage/unstage everything selected.
@@ -95,10 +106,18 @@ struct ChangesView: View {
   private func section(
     _ title: String,
     entries: [FileStatusEntry],
-    area: RepositoryModel.ChangeArea
+    area: RepositoryModel.ChangeArea,
+    emptyDropHint: String? = nil
   ) -> some View {
-    if !entries.isEmpty {
+    if !entries.isEmpty || emptyDropHint != nil {
       Section(title) {
+        if entries.isEmpty, let emptyDropHint {
+          Label(emptyDropHint, systemImage: "tray.and.arrow.down")
+            .foregroundStyle(.tertiary)
+            .dropDestination(for: String.self) { items, _ in
+              _ = handleDrop(items, into: area)
+            }
+        }
         ForEach(entries) { entry in
           FileStatusRow(entry: entry)
             .tag(RepositoryModel.FileSelection(path: entry.path, area: area))
@@ -111,9 +130,45 @@ struct ChangesView: View {
             .contextMenu {
               contextMenu(for: entry, area: area)
             }
+            .draggable(dragPayload(for: entry, area: area))
+            .dropDestination(for: String.self) { items, _ in
+              _ = handleDrop(items, into: area)
+            }
         }
       }
     }
+  }
+
+  // MARK: - Drag & drop between areas
+
+  /// Dragging a selected row carries the whole selection.
+  private func dragPayload(for entry: FileStatusEntry, area: RepositoryModel.ChangeArea) -> String {
+    let paths = actionTargets(for: entry, area: area).map(\.path).sorted()
+    let encoded = try? JSONEncoder().encode(paths)
+    return encoded.map { String(decoding: $0, as: UTF8.self) } ?? entry.path
+  }
+
+  /// Dropping decides the action by target section: Staged stages,
+  /// everything else unstages. Payloads are validated against paths git
+  /// actually reported, so stray text drags are ignored.
+  private func handleDrop(_ items: [String], into area: RepositoryModel.ChangeArea) -> Bool {
+    guard !model.isBusy, let status = model.status else { return false }
+    let knownPaths = Set(status.entries.map(\.path))
+    let paths = items
+      .flatMap { item -> [String] in
+        (try? JSONDecoder().decode([String].self, from: Data(item.utf8))) ?? [item]
+      }
+      .filter(knownPaths.contains)
+    guard !paths.isEmpty else { return false }
+
+    Task {
+      if area == .staged {
+        await model.stage(paths: paths)
+      } else {
+        await model.unstage(paths: paths)
+      }
+    }
+    return true
   }
 
   /// The rows an action applies to: the whole selection when the clicked
