@@ -49,9 +49,7 @@ public struct SubprocessCommandRunner: CommandRunning {
           environment: subprocessEnvironment(for: command),
           workingDirectory: command.workingDirectory.map { FilePath($0.path(percentEncoded: false)) },
           platformOptions: platformOptions(),
-          // .array, not .data: DataInput escapes Data's inline storage
-          // pointer (upstream FIXME) and corrupts short payloads.
-          input: .array(Array(stdin)),
+          input: .data(stdin),
           output: .data(limit: Self.outputLimit),
           error: .data(limit: Self.outputLimit)
         )
@@ -107,7 +105,7 @@ public struct SubprocessCommandRunner: CommandRunning {
           environment: subprocessEnvironment(for: command),
           workingDirectory: command.workingDirectory.map { FilePath($0.path(percentEncoded: false)) },
           platformOptions: platformOptions(),
-          input: .array(Array(stdin)),
+          input: .data(stdin),
           output: .sequence,
           error: .sequence
         ) { execution in

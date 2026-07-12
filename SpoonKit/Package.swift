@@ -32,7 +32,7 @@ let package = Package(
     .package(url: "https://github.com/gohanlon/swift-memberwise-init-macro.git", from: "0.6.0"),
     .package(url: "https://github.com/vapor/multipart-kit.git", exact: "5.0.0-alpha.5"),
     .package(url: "https://github.com/apple/swift-http-types.git", from: "1.0.0"),
-    .package(url: "https://github.com/swiftlang/swift-subprocess.git", from: "0.1.0"),
+    .package(url: "https://github.com/swiftlang/swift-subprocess.git", from: "1.0.0-beta.1"),
     .package(url: "https://github.com/apple/swift-async-algorithms.git", from: "1.0.0"),
   ],
   targets: [
