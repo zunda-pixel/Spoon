@@ -6,25 +6,65 @@ An AI-first git client for macOS, built with SwiftUI for macOS 27 (Golden Gate).
 
 ## Features
 
-- **Changes** — stage / unstage whole files, hunks, or individually selected
-  lines. Multi-select with ⌘/⇧, double-click or press Return to move files,
-  drag & drop between areas, discard selected lines, right-click to open a
-  file or reveal it in Finder.
+- **Changes** — files shown as a directory tree (collapsible, single-child
+  chains folded). Stage / unstage whole files, hunks, or individually
+  selected lines — in both directions (line-level unstage on staged diffs).
+  Multi-select with ⌘/⇧, double-click or press Return to move files, drag &
+  drop between areas, discard selected lines, right-click to open a file or
+  reveal it in Finder.
 - **History** — commit graph with infinite scroll; commit details show the
   full patch with selectable, copyable lines.
 - **Interactive rebase** — pick / squash / drop / edit from a commit's
   context menu, plus cherry-pick and revert. Conflicts and edit stops show a
   banner with Continue / Skip / Abort.
-- **Branches** — create, delete, and check out branches; link a branch to
-  its own worktree (add / open in a new window / remove).
+- **Branches** — create (from HEAD or any branch), delete, rename, and check
+  out branches; check out a remote branch as a local tracking branch; link a
+  branch to its own worktree (add / open in a new window / remove).
 - **Stashes** — save (including untracked files), browse a stash's diff,
   apply, pop, or drop it.
+- **Clone** — clone over https / ssh from the Welcome screen with live
+  progress.
 - **Pull requests** — branches display their open GitHub PR with review and
   CI status; a PR list and detail view come from the GitHub GraphQL API.
 - **AI** — generate commit messages and review branches with Claude Code or
   Codex, running the CLIs you already have installed.
 - **Shortcuts** — App Intents for “Open Repository” and “Stash Changes”.
 - Auto-refresh via FSEvents, repository-titled windows and tabs.
+
+## Spoon vs Fork
+
+How Spoon compares to [Fork](https://git-fork.com) (“—” means not
+available, to our knowledge).
+
+| Feature | Fork | Spoon |
+|---|:-:|:-:|
+| Fetch / pull / push | ✅ | ✅ |
+| Commit & amend | ✅ | ✅ |
+| Stage / unstage line-by-line | ✅ | ✅ |
+| Discard selected lines | — | ✅ |
+| Commit graph / history | ✅ | ✅ |
+| Clone / add / recent repositories | ✅ | ✅ |
+| Branches: create / delete | ✅ | ✅ |
+| Branch rename / branch from branch | ✅ | ✅ |
+| Checkout branch or revision | ✅ | ✅ (branches) |
+| Tags | ✅ | — |
+| Worktrees linked to branches | ✅ | ✅ |
+| Interactive rebase | ✅ (edit, reorder, squash) | ✅ (pick / squash / drop / edit) |
+| Cherry-pick / revert | ✅ | ✅ |
+| Merge | ✅ | — |
+| Merge conflict resolving | ✅ built-in resolver | partial (conflict banner + mark resolved) |
+| Stashes | ✅ | ✅ (incl. diff browsing) |
+| Submodules | ✅ | — |
+| Git-flow | ✅ | — |
+| Git LFS | ✅ | — |
+| GPG signing | ✅ | — |
+| Blame / file history | ✅ | — |
+| Reflog | ✅ | — |
+| Image diffs / side-by-side diff | ✅ | — |
+| GitHub integration | Notifications | PR badges on branches, PR list & details (CI + reviews) |
+| AI commit messages (Claude Code / Codex) | ✅ | ✅ |
+| AI branch review (Claude Code / Codex) | ✅ | ✅ |
+| Shortcuts / App Intents | — | ✅ |
 
 ## Requirements
 
@@ -38,21 +78,6 @@ An AI-first git client for macOS, built with SwiftUI for macOS 27 (Golden Gate).
 ## Building
 
 Open `Spoon.xcodeproj` with Xcode 27 and run the **Spoon** scheme.
-
-Tests live in the SpoonKit package:
-
-```sh
-cd SpoonKit
-swift test
-```
-
-## Architecture
-
-- `SpoonKit/Sources/SpoonCore` — process runner, git engine (system git
-  CLI), models, GitHub sync, AI providers, session state
-- `SpoonKit/Sources/SpoonUI` — all SwiftUI views
-- `SpoonKit/Sources/SpoonIntent` — App Intents
-- `Spoon/` — the thin app target
 
 ## License
 
