@@ -322,12 +322,28 @@ public final class RepositoryModel {
 
   public func stageHunk(_ hunkID: Hunk.ID, of diff: FileDiff) async {
     guard let patch = DiffPatchBuilder.patch(for: diff, including: [hunkID]) else { return }
-    await perform { try await $0.applyPatch(patch, reverse: false) }
+    await perform { try await $0.applyPatch(patch, reverse: false, toIndex: true) }
   }
 
   public func unstageHunk(_ hunkID: Hunk.ID, of diff: FileDiff) async {
     guard let patch = DiffPatchBuilder.patch(for: diff, including: [hunkID]) else { return }
-    await perform { try await $0.applyPatch(patch, reverse: true) }
+    await perform { try await $0.applyPatch(patch, reverse: true, toIndex: true) }
+  }
+
+  /// Destructive: reverts only the selected changed lines of one hunk in
+  /// the working tree.
+  public func discardLines(_ offsets: Set<Int>, of hunkID: Hunk.ID, in diff: FileDiff) async {
+    guard
+      let patch = DiffPatchBuilder.discardPatch(
+        for: diff, hunkID: hunkID, selectedOffsets: offsets)
+    else { return }
+    await perform { try await $0.applyPatch(patch, reverse: true, toIndex: false) }
+  }
+
+  /// Destructive: reverts one whole hunk in the working tree.
+  public func discardHunk(_ hunkID: Hunk.ID, of diff: FileDiff) async {
+    guard let hunk = diff.hunks.first(where: { $0.id == hunkID }) else { return }
+    await discardLines(DiffPatchBuilder.changedLineOffsets(of: hunk), of: hunkID, in: diff)
   }
 
   public func commit(message: String, amend: Bool = false) async -> Bool {

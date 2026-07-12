@@ -42,4 +42,78 @@ public enum DiffPatchBuilder {
     }
     return text
   }
+
+  /// Builds a patch that removes only the selected changed lines from the
+  /// working tree when applied with `git apply -R` (no `--cached`).
+  ///
+  /// The synthetic hunk's new side must match the current worktree exactly,
+  /// so unselected additions demote to context (they exist and stay) and
+  /// unselected deletions are omitted (absent and staying absent).
+  ///
+  /// `selectedOffsets` are indices into `hunk.lines`; only `.addition` and
+  /// `.deletion` offsets count. Returns nil for empty/invalid selections,
+  /// binary or non-`.modified` diffs, and hunks containing
+  /// `\ No newline` markers (end-of-file reverse-apply is too error-prone).
+  public static func discardPatch(
+    for diff: FileDiff,
+    hunkID: Hunk.ID,
+    selectedOffsets: Set<Int>
+  ) -> String? {
+    guard
+      !diff.isBinary,
+      diff.kind == .modified,
+      let hunk = diff.hunks.first(where: { $0.id == hunkID }),
+      !hunk.lines.contains(where: { $0.kind == .noNewlineMarker })
+    else { return nil }
+
+    let selection = selectedOffsets.filter { offset in
+      hunk.lines.indices.contains(offset) && hunk.lines[offset].kind != .context
+    }
+    guard !selection.isEmpty else { return nil }
+
+    var body = ""
+    var resultCount = 0    // a side: worktree after the discard
+    var worktreeCount = 0  // b side: worktree as it is now (matched by -R)
+    for (offset, line) in hunk.lines.enumerated() {
+      switch line.kind {
+      case .context:
+        body += " \(line.text)\n"
+        resultCount += 1
+        worktreeCount += 1
+      case .addition:
+        if selection.contains(offset) {
+          body += "+\(line.text)\n"
+          worktreeCount += 1
+        } else {
+          body += " \(line.text)\n"
+          resultCount += 1
+          worktreeCount += 1
+        }
+      case .deletion:
+        if selection.contains(offset) {
+          body += "-\(line.text)\n"
+          resultCount += 1
+        }
+      case .noNewlineMarker:
+        return nil  // unreachable (guarded above)
+      }
+    }
+
+    var text = "diff --git a/\(diff.path) b/\(diff.path)\n"
+    text += "--- a/\(diff.path)\n"
+    text += "+++ b/\(diff.path)\n"
+    text += "@@ -\(hunk.newStart),\(resultCount) +\(hunk.newStart),\(worktreeCount) @@\n"
+    text += body
+    return text
+  }
+
+  /// All selectable (changed) line offsets of a hunk — the "discard whole
+  /// hunk" selection.
+  public static func changedLineOffsets(of hunk: Hunk) -> Set<Int> {
+    Set(
+      hunk.lines.indices.filter {
+        hunk.lines[$0].kind == .addition || hunk.lines[$0].kind == .deletion
+      }
+    )
+  }
 }

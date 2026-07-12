@@ -176,8 +176,11 @@ public actor SystemGitClient: GitClient {
     }
   }
 
-  public func applyPatch(_ patch: String, reverse: Bool) async throws {
-    var arguments = ["apply", "--cached", "--whitespace=nowarn"]
+  public func applyPatch(_ patch: String, reverse: Bool, toIndex: Bool) async throws {
+    var arguments = ["apply", "--whitespace=nowarn"]
+    if toIndex {
+      arguments.append("--cached")
+    }
     if reverse {
       arguments.append("-R")
     }

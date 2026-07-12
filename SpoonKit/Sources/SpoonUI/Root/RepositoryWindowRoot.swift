@@ -56,7 +56,7 @@ struct RepositorySplitView: View {
   let model: RepositoryModel
   @State private var selection: SidebarItem? = .changes
   @State private var selectedCommitID: String?
-  @State private var fileSelection: RepositoryModel.FileSelection?
+  @State private var fileSelections: Set<RepositoryModel.FileSelection> = []
   @State private var selectedPRNumber: Int?
   @State private var showingNewBranchSheet = false
 
@@ -218,7 +218,7 @@ struct RepositorySplitView: View {
   private var contentColumn: some View {
     switch selection {
     case .changes, nil:
-      ChangesView(model: model, selection: $fileSelection)
+      ChangesView(model: model, selection: $fileSelections)
     case .history, .branch:
       HistoryListView(model: model, selectedCommitID: $selectedCommitID)
     case .pullRequests:
@@ -230,8 +230,10 @@ struct RepositorySplitView: View {
   private var detailColumn: some View {
     switch selection {
     case .changes, nil:
-      if let fileSelection {
-        DiffDetailView(model: model, selection: fileSelection)
+      if fileSelections.count == 1, let single = fileSelections.first {
+        DiffDetailView(model: model, selection: single)
+      } else if fileSelections.count > 1 {
+        MultiSelectionActionsView(model: model, selections: fileSelections)
       } else {
         noSelectionPlaceholder
       }
@@ -266,6 +268,40 @@ struct RepositorySplitView: View {
       systemImage: "arrow.trianglehead.branch"
     )
     .labelStyle(.titleAndIcon)
+  }
+}
+
+/// Detail column for a multi-file selection: bulk stage/unstage actions.
+@MainActor
+private struct MultiSelectionActionsView: View {
+  let model: RepositoryModel
+  let selections: Set<RepositoryModel.FileSelection>
+
+  var body: some View {
+    let stageable = selections.filter { $0.area != .staged }
+    let staged = selections.filter { $0.area == .staged }
+
+    VStack(spacing: 14) {
+      Image(systemName: "doc.on.doc")
+        .font(.system(size: 40))
+        .foregroundStyle(.secondary)
+      Text("\(selections.count) files selected")
+        .font(.title3)
+      HStack {
+        if !stageable.isEmpty {
+          Button("Stage \(stageable.count) File(s)") {
+            Task { await model.stage(paths: stageable.map(\.path)) }
+          }
+        }
+        if !staged.isEmpty {
+          Button("Unstage \(staged.count) File(s)") {
+            Task { await model.unstage(paths: staged.map(\.path)) }
+          }
+        }
+      }
+      .disabled(model.isBusy)
+    }
+    .frame(maxWidth: .infinity, maxHeight: .infinity)
   }
 }
 

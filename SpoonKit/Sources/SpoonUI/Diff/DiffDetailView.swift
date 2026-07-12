@@ -9,6 +9,20 @@ struct DiffDetailView: View {
 
   @State private var diffs: [FileDiff]?
   @State private var errorMessage: String?
+  @State private var lineSelection: DiffLineSelection?
+  @State private var pendingDiscard: PendingDiscard?
+
+  private enum PendingDiscard {
+    case lines(FileDiff, Hunk.ID, Set<Int>)
+    case hunk(FileDiff, Hunk)
+
+    var lineCount: Int {
+      switch self {
+      case .lines(_, _, let offsets): offsets.count
+      case .hunk(_, let hunk): DiffPatchBuilder.changedLineOffsets(of: hunk).count
+      }
+    }
+  }
 
   init(model: RepositoryModel, selection: RepositoryModel.FileSelection) {
     self.model = model
@@ -25,7 +39,20 @@ struct DiffDetailView: View {
             description: Text("This file has no changes in this area anymore.")
           )
         } else {
-          FileDiffListView(diffs: diffs, hunkAction: hunkAction)
+          VStack(spacing: 0) {
+            if let lineSelection, selection.area == .unstaged {
+              selectionBar(lineSelection, diffs: diffs)
+              Divider()
+            }
+            FileDiffListView(
+              diffs: diffs,
+              hunkAction: hunkAction,
+              lineSelection: selection.area == .unstaged ? $lineSelection : nil,
+              onDiscardHunk: selection.area == .unstaged
+                ? { diff, hunk in pendingDiscard = .hunk(diff, hunk) }
+                : nil
+            )
+          }
         }
       } else if let errorMessage {
         ContentUnavailableView(
@@ -41,9 +68,58 @@ struct DiffDetailView: View {
       do {
         errorMessage = nil
         diffs = try await model.diff(for: selection)
+        lineSelection = nil  // stale offsets after any reload
       } catch {
         diffs = nil
         errorMessage = error.localizedDescription
+      }
+    }
+    .confirmationDialog(
+      "Discard \(pendingDiscard?.lineCount ?? 0) changed line(s)?",
+      isPresented: .init(
+        get: { pendingDiscard != nil },
+        set: { if !$0 { pendingDiscard = nil } }
+      )
+    ) {
+      Button("Discard Changes", role: .destructive) {
+        confirmPendingDiscard()
+      }
+    } message: {
+      Text("The selected changes will be reverted in the working tree. This cannot be undone.")
+    }
+  }
+
+  private func selectionBar(_ lineSelection: DiffLineSelection, diffs: [FileDiff]) -> some View {
+    HStack(spacing: 10) {
+      Text("\(lineSelection.offsets.count) line(s) selected")
+        .font(.callout)
+        .foregroundStyle(.secondary)
+      Button("Discard Selected Lines…", role: .destructive) {
+        guard let diff = diffs.first(where: { $0.id == lineSelection.fileID }) else { return }
+        pendingDiscard = .lines(diff, lineSelection.hunkID, lineSelection.offsets)
+      }
+      .controlSize(.small)
+      Button("Deselect") {
+        self.lineSelection = nil
+      }
+      .controlSize(.small)
+      Spacer()
+    }
+    .padding(.horizontal, 12)
+    .padding(.vertical, 6)
+    .background(.bar)
+  }
+
+  private func confirmPendingDiscard() {
+    guard let pendingDiscard else { return }
+    self.pendingDiscard = nil
+    lineSelection = nil
+    Task {
+      switch pendingDiscard {
+      case .lines(let diff, let hunkID, let offsets):
+        await model.discardLines(offsets, of: hunkID, in: diff)
+      case .hunk(let diff, let hunk):
+        await model.discardHunk(hunk.id, of: diff)
       }
     }
   }

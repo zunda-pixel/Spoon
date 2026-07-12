@@ -119,7 +119,7 @@ struct LiveGitTests {
 
     // Stage ONLY the second hunk.
     let patch = try #require(DiffPatchBuilder.patch(for: diff, including: [diff.hunks[1].id]))
-    try await client.applyPatch(patch, reverse: false)
+    try await client.applyPatch(patch, reverse: false, toIndex: true)
 
     let staged = try #require(try await client.diffWorkingTree(path: "file.txt", staged: true).first)
     #expect(staged.hunks.count == 1)
@@ -131,7 +131,7 @@ struct LiveGitTests {
     #expect(unstaged.hunks[0].lines.contains { $0.text == "THREE" })
 
     // Unstage it again — the index returns to HEAD.
-    try await client.applyPatch(patch, reverse: true)
+    try await client.applyPatch(patch, reverse: true, toIndex: true)
     let afterUnstage = try await client.diffWorkingTree(path: "file.txt", staged: true)
     #expect(afterUnstage.isEmpty)
   }
@@ -162,6 +162,49 @@ struct LiveGitTests {
     let first = try await client.commitDetail(page.commits[1].oid)
     #expect(first.fullMessage.contains("Body line."))
     #expect(first.diffs[0].kind == .added)
+  }
+
+  @Test func lineDiscardRevertsOnlySelectedLines() async throws {
+    let root = try await makeTemporaryRepo()
+    defer { try? FileManager.default.removeItem(at: root) }
+
+    let file = root.appending(path: "file.txt")
+    let numbers = (1...9).map(String.init)
+    try Data((numbers.joined(separator: "\n") + "\n").utf8).write(to: file)
+    try await runGit(["add", "."], in: root)
+    try await runGit(["commit", "-m", "base"], in: root)
+
+    // Two edits inside one hunk: line 4 and line 6.
+    var edited = numbers
+    edited[3] = "FOUR"
+    edited[5] = "SIX"
+    try Data((edited.joined(separator: "\n") + "\n").utf8).write(to: file)
+
+    let client = SystemGitClient(repositoryRoot: root, git: git, runner: runner)
+    let diff = try #require(try await client.diffWorkingTree(path: "file.txt", staged: false).first)
+    let hunk = try #require(diff.hunks.first)
+    #expect(diff.hunks.count == 1)
+
+    // Select ONLY the -4/+FOUR pair.
+    let fourOffsets = Set(
+      hunk.lines.indices.filter { hunk.lines[$0].text == "4" || hunk.lines[$0].text == "FOUR" }
+    )
+    #expect(fourOffsets.count == 2)
+    let patch = try #require(
+      DiffPatchBuilder.discardPatch(for: diff, hunkID: hunk.id, selectedOffsets: fourOffsets)
+    )
+    try await client.applyPatch(patch, reverse: true, toIndex: false)
+
+    // Line 4 reverted; line 6 still edited.
+    var expected = numbers
+    expected[5] = "SIX"
+    let contents = try String(contentsOf: file, encoding: .utf8)
+    #expect(contents == expected.joined(separator: "\n") + "\n")
+
+    // Remaining diff shows only the SIX edit.
+    let after = try #require(try await client.diffWorkingTree(path: "file.txt", staged: false).first)
+    let changed = after.hunks.flatMap(\.lines).filter { $0.kind != .context }.map(\.text)
+    #expect(changed.sorted() == ["6", "SIX"])
   }
 
   @Test func renameDetectionRoundTrip() async throws {

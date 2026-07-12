@@ -4,14 +4,18 @@ import SwiftUI
 @MainActor
 struct ChangesView: View {
   let model: RepositoryModel
-  @Binding var selection: RepositoryModel.FileSelection?
+  @Binding var selection: Set<RepositoryModel.FileSelection>
 
-  init(model: RepositoryModel, selection: Binding<RepositoryModel.FileSelection?>) {
+  init(model: RepositoryModel, selection: Binding<Set<RepositoryModel.FileSelection>>) {
     self.model = model
     self._selection = selection
   }
 
   @State private var confirmingDiscard: RepositoryModel.FileSelection?
+  /// The first click of a double-click collapses a multi-selection to the
+  /// clicked row (List behavior), so remember the just-collapsed selection
+  /// long enough for the double-click handler to act on all of it.
+  @State private var recentMultiSelection: (rows: Set<RepositoryModel.FileSelection>, at: ContinuousClock.Instant)?
 
   var body: some View {
     VStack(spacing: 0) {
@@ -41,6 +45,11 @@ struct ChangesView: View {
       CommitComposerView(model: model)
     }
     .navigationTitle("Changes")
+    .onChange(of: selection) { previous, _ in
+      if previous.count > 1 {
+        recentMultiSelection = (previous, .now)
+      }
+    }
     .confirmationDialog(
       confirmingDiscard?.area == .untracked
         ? "Delete \(confirmingDiscard?.path ?? "")?"
@@ -75,6 +84,12 @@ struct ChangesView: View {
       section("Modified", entries: status.unstagedEntries, area: .unstaged)
       section("Untracked", entries: status.untrackedEntries, area: .untracked)
     }
+    // Return mirrors double-click: stage/unstage everything selected.
+    .onKeyPress(.return) {
+      guard !selection.isEmpty, !model.isBusy else { return .ignored }
+      performPrimaryAction(on: selection)
+      return .handled
+    }
   }
 
   @ViewBuilder
@@ -88,6 +103,12 @@ struct ChangesView: View {
         ForEach(entries) { entry in
           FileStatusRow(entry: entry)
             .tag(RepositoryModel.FileSelection(path: entry.path, area: area))
+            // simultaneousGesture keeps single-click selection instant.
+            .simultaneousGesture(
+              TapGesture(count: 2).onEnded {
+                doubleClickAction(for: entry, area: area)
+              }
+            )
             .contextMenu {
               contextMenu(for: entry, area: area)
             }
@@ -96,8 +117,78 @@ struct ChangesView: View {
     }
   }
 
+  /// The rows an action applies to: the whole selection when the clicked
+  /// row is part of it (Finder convention), else just the clicked row.
+  /// Falls back to a multi-selection collapsed moments ago by the
+  /// double-click's own first click.
+  private func actionTargets(
+    for entry: FileStatusEntry,
+    area: RepositoryModel.ChangeArea
+  ) -> Set<RepositoryModel.FileSelection> {
+    let clicked = RepositoryModel.FileSelection(path: entry.path, area: area)
+    if selection.count > 1, selection.contains(clicked) {
+      return selection
+    }
+    if let recent = recentMultiSelection,
+      recent.rows.contains(clicked),
+      ContinuousClock.now - recent.at < .milliseconds(700)
+    {
+      return recent.rows
+    }
+    return selection.contains(clicked) ? selection : [clicked]
+  }
+
+  /// Double-click moves files across the index: stage from
+  /// Modified/Untracked/Conflicts, unstage from Staged. Applies to the
+  /// whole selection when the clicked row belongs to it.
+  private func doubleClickAction(for entry: FileStatusEntry, area: RepositoryModel.ChangeArea) {
+    guard !model.isBusy else { return }
+    performPrimaryAction(on: actionTargets(for: entry, area: area))
+  }
+
+  /// Stage the non-staged targets and unstage the staged ones — shared by
+  /// double-click and the Return key.
+  private func performPrimaryAction(on targets: Set<RepositoryModel.FileSelection>) {
+    let stagePaths = targets.filter { $0.area != .staged }.map(\.path)
+    let unstagePaths = targets.filter { $0.area == .staged }.map(\.path)
+    Task {
+      if !stagePaths.isEmpty {
+        await model.stage(paths: stagePaths)
+      }
+      if !unstagePaths.isEmpty {
+        await model.unstage(paths: unstagePaths)
+      }
+    }
+  }
+
   @ViewBuilder
   private func contextMenu(for entry: FileStatusEntry, area: RepositoryModel.ChangeArea) -> some View {
+    let targets = actionTargets(for: entry, area: area)
+    if targets.count > 1 {
+      multiTargetMenu(targets)
+    } else {
+      singleTargetMenu(for: entry, area: area)
+    }
+  }
+
+  @ViewBuilder
+  private func multiTargetMenu(_ targets: Set<RepositoryModel.FileSelection>) -> some View {
+    let stageable = targets.filter { $0.area != .staged }
+    let staged = targets.filter { $0.area == .staged }
+    if !stageable.isEmpty {
+      Button("Stage (\(stageable.count))") {
+        Task { await model.stage(paths: stageable.map(\.path)) }
+      }
+    }
+    if !staged.isEmpty {
+      Button("Unstage (\(staged.count))") {
+        Task { await model.unstage(paths: staged.map(\.path)) }
+      }
+    }
+  }
+
+  @ViewBuilder
+  private func singleTargetMenu(for entry: FileStatusEntry, area: RepositoryModel.ChangeArea) -> some View {
     switch area {
     case .staged:
       Button("Unstage") {

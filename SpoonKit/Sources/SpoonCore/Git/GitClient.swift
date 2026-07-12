@@ -22,8 +22,10 @@ public protocol GitClient: Sendable {
   func stage(paths: [String]) async throws
   /// Removes paths from the index, keeping working-tree contents.
   func unstage(paths: [String]) async throws
-  /// Applies a patch (from `DiffPatchBuilder`) to the index.
-  func applyPatch(_ patch: String, reverse: Bool) async throws
+  /// Applies a patch (from `DiffPatchBuilder`). `toIndex` targets the index
+  /// (`--cached`, hunk stage/unstage); false targets the working tree
+  /// (line/hunk discard via reverse apply).
+  func applyPatch(_ patch: String, reverse: Bool, toIndex: Bool) async throws
   /// Restores paths from the index, discarding working-tree edits.
   func discardWorkingTree(paths: [String]) async throws
   /// Deletes untracked files.
