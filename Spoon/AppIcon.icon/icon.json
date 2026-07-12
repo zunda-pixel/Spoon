@@ -13,34 +13,10 @@
           "image-name" : "spoon.png",
           "name" : "Spoon",
           "position" : {
-            "scale" : 1.05,
+            "scale" : 2,
             "translation-in-points" : [
-              -280,
-              35
-            ]
-          }
-        },
-        {
-          "glass" : true,
-          "image-name" : "spoon.png",
-          "name" : "Spoon",
-          "position" : {
-            "scale" : 1.05,
-            "translation-in-points" : [
-              280,
-              35
-            ]
-          }
-        },
-        {
-          "glass" : true,
-          "image-name" : "spoon.png",
-          "name" : "Spoon",
-          "position" : {
-            "scale" : 1.05,
-            "translation-in-points" : [
-              0,
-              35
+              1,
+              480.80859375
             ]
           }
         }
