@@ -1,5 +1,18 @@
 import SpoonCore
 import SwiftUI
+import UniformTypeIdentifiers
+
+/// App-private drag payload for moving files between index areas.
+/// A dedicated UTType keeps foreign text drags from matching the targets.
+private struct ChangePathsPayload: Codable, Transferable {
+  var paths: [String]
+
+  static let contentType = UTType(exportedAs: "com.spoon.app.change-paths")
+
+  static var transferRepresentation: some TransferRepresentation {
+    CodableRepresentation(contentType: contentType)
+  }
+}
 
 @MainActor
 struct ChangesView: View {
@@ -77,22 +90,23 @@ struct ChangesView: View {
   }
 
   private func changeList(_ status: WorkingTreeStatus) -> some View {
-    let hasUnstagedContent =
-      !status.unstagedEntries.isEmpty || !status.untrackedEntries.isEmpty
-      || !status.conflictedEntries.isEmpty
-    let hasStagedContent = !status.stagedEntries.isEmpty
+    // The section lists are computed filters over all entries; bind them
+    // once per render instead of re-filtering on every access.
+    let conflicted = status.conflictedEntries
+    let staged = status.stagedEntries
+    let unstaged = status.unstagedEntries
+    let untracked = status.untrackedEntries
 
     return List(selection: $selection) {
-      section("Conflicts", entries: status.conflictedEntries, area: .conflicted)
+      section("Conflicts", entries: conflicted, area: .conflicted)
+      // A visible Changes list always has unstaged content when Staged is
+      // empty, so the stage drop target needs no further condition.
+      section("Staged", entries: staged, area: .staged, showsEmptyDropTarget: true)
       section(
-        "Staged", entries: status.stagedEntries, area: .staged,
-        emptyDropHint: hasUnstagedContent ? "Drop files here to stage" : nil
+        "Modified", entries: unstaged, area: .unstaged,
+        showsEmptyDropTarget: !staged.isEmpty
       )
-      section(
-        "Modified", entries: status.unstagedEntries, area: .unstaged,
-        emptyDropHint: hasStagedContent ? "Drop files here to unstage" : nil
-      )
-      section("Untracked", entries: status.untrackedEntries, area: .untracked)
+      section("Untracked", entries: untracked, area: .untracked)
     }
     // Return mirrors double-click: stage/unstage everything selected.
     .onKeyPress(.return) {
@@ -107,16 +121,19 @@ struct ChangesView: View {
     _ title: String,
     entries: [FileStatusEntry],
     area: RepositoryModel.ChangeArea,
-    emptyDropHint: String? = nil
+    showsEmptyDropTarget: Bool = false
   ) -> some View {
-    if !entries.isEmpty || emptyDropHint != nil {
+    if !entries.isEmpty || showsEmptyDropTarget {
       Section(title) {
-        if entries.isEmpty, let emptyDropHint {
-          Label(emptyDropHint, systemImage: "tray.and.arrow.down")
-            .foregroundStyle(.tertiary)
-            .dropDestination(for: String.self) { items, _ in
-              _ = handleDrop(items, into: area)
-            }
+        if entries.isEmpty {
+          Label(
+            area == .staged ? "Drop files here to stage" : "Drop files here to unstage",
+            systemImage: "tray.and.arrow.down"
+          )
+          .foregroundStyle(.tertiary)
+          .dropDestination(for: ChangePathsPayload.self) { items, _ in
+            handleDrop(items, into: area)
+          }
         }
         ForEach(entries) { entry in
           FileStatusRow(entry: entry)
@@ -131,8 +148,8 @@ struct ChangesView: View {
               contextMenu(for: entry, area: area)
             }
             .draggable(dragPayload(for: entry, area: area))
-            .dropDestination(for: String.self) { items, _ in
-              _ = handleDrop(items, into: area)
+            .dropDestination(for: ChangePathsPayload.self) { items, _ in
+              handleDrop(items, into: area)
             }
         }
       }
@@ -142,33 +159,29 @@ struct ChangesView: View {
   // MARK: - Drag & drop between areas
 
   /// Dragging a selected row carries the whole selection.
-  private func dragPayload(for entry: FileStatusEntry, area: RepositoryModel.ChangeArea) -> String {
-    let paths = actionTargets(for: entry, area: area).map(\.path).sorted()
-    let encoded = try? JSONEncoder().encode(paths)
-    return encoded.map { String(decoding: $0, as: UTF8.self) } ?? entry.path
+  private func dragPayload(for entry: FileStatusEntry, area: RepositoryModel.ChangeArea) -> ChangePathsPayload {
+    ChangePathsPayload(paths: actionTargets(for: entry, area: area).map(\.path).sorted())
   }
 
-  /// Dropping decides the action by target section: Staged stages,
-  /// everything else unstages. Payloads are validated against paths git
-  /// actually reported, so stray text drags are ignored.
-  private func handleDrop(_ items: [String], into area: RepositoryModel.ChangeArea) -> Bool {
-    guard !model.isBusy, let status = model.status else { return false }
-    let knownPaths = Set(status.entries.map(\.path))
-    let paths = items
-      .flatMap { item -> [String] in
-        (try? JSONDecoder().decode([String].self, from: Data(item.utf8))) ?? [item]
-      }
-      .filter(knownPaths.contains)
-    guard !paths.isEmpty else { return false }
-
-    Task {
-      if area == .staged {
-        await model.stage(paths: paths)
-      } else {
-        await model.unstage(paths: paths)
-      }
+  /// Dropping on Staged stages; dropping anywhere else unstages. Only paths
+  /// currently on the other side count, so same-section drops and payloads
+  /// gone stale mid-drag are no-ops.
+  private func handleDrop(_ items: [ChangePathsPayload], into area: RepositoryModel.ChangeArea) {
+    guard let status = model.status else { return }
+    let movable: Set<String>
+    if area == .staged {
+      movable = Set(
+        (status.unstagedEntries + status.untrackedEntries + status.conflictedEntries).map(\.path)
+      )
+    } else {
+      movable = Set(status.stagedEntries.map(\.path))
     }
-    return true
+    let paths = items.flatMap(\.paths).filter(movable.contains)
+    if area == .staged {
+      moveFiles(stage: paths, unstage: [])
+    } else {
+      moveFiles(stage: [], unstage: paths)
+    }
   }
 
   /// The rows an action applies to: the whole selection when the clicked
@@ -189,22 +202,32 @@ struct ChangesView: View {
     {
       return recent.rows
     }
-    return selection.contains(clicked) ? selection : [clicked]
+    // Not in the current selection (a single-item selection containing the
+    // clicked row was already handled above).
+    return [clicked]
   }
 
   /// Double-click moves files across the index: stage from
   /// Modified/Untracked/Conflicts, unstage from Staged. Applies to the
   /// whole selection when the clicked row belongs to it.
   private func doubleClickAction(for entry: FileStatusEntry, area: RepositoryModel.ChangeArea) {
-    guard !model.isBusy else { return }
     performPrimaryAction(on: actionTargets(for: entry, area: area))
   }
 
   /// Stage the non-staged targets and unstage the staged ones — shared by
   /// double-click and the Return key.
   private func performPrimaryAction(on targets: Set<RepositoryModel.FileSelection>) {
-    let stagePaths = targets.filter { $0.area != .staged }.map(\.path)
-    let unstagePaths = targets.filter { $0.area == .staged }.map(\.path)
+    moveFiles(
+      stage: targets.filter { $0.area != .staged }.map(\.path),
+      unstage: targets.filter { $0.area == .staged }.map(\.path)
+    )
+  }
+
+  /// The single dispatch point behind every stage/unstage entry point
+  /// (double-click, Return, context menus, drag & drop): one busy guard,
+  /// one Task.
+  private func moveFiles(stage stagePaths: [String], unstage unstagePaths: [String]) {
+    guard !model.isBusy, !(stagePaths.isEmpty && unstagePaths.isEmpty) else { return }
     Task {
       if !stagePaths.isEmpty {
         await model.stage(paths: stagePaths)
@@ -231,12 +254,12 @@ struct ChangesView: View {
     let staged = targets.filter { $0.area == .staged }
     if !stageable.isEmpty {
       Button("Stage (\(stageable.count))") {
-        Task { await model.stage(paths: stageable.map(\.path)) }
+        moveFiles(stage: stageable.map(\.path), unstage: [])
       }
     }
     if !staged.isEmpty {
       Button("Unstage (\(staged.count))") {
-        Task { await model.unstage(paths: staged.map(\.path)) }
+        moveFiles(stage: [], unstage: staged.map(\.path))
       }
     }
   }
@@ -246,25 +269,25 @@ struct ChangesView: View {
     switch area {
     case .staged:
       Button("Unstage") {
-        Task { await model.unstage(paths: [entry.path]) }
+        moveFiles(stage: [], unstage: [entry.path])
       }
     case .unstaged:
       Button("Stage") {
-        Task { await model.stage(paths: [entry.path]) }
+        moveFiles(stage: [entry.path], unstage: [])
       }
       Button("Discard Changes…", role: .destructive) {
         confirmingDiscard = RepositoryModel.FileSelection(path: entry.path, area: area)
       }
     case .untracked:
       Button("Stage") {
-        Task { await model.stage(paths: [entry.path]) }
+        moveFiles(stage: [entry.path], unstage: [])
       }
       Button("Delete File…", role: .destructive) {
         confirmingDiscard = RepositoryModel.FileSelection(path: entry.path, area: area)
       }
     case .conflicted:
       Button("Mark Resolved (Stage)") {
-        Task { await model.stage(paths: [entry.path]) }
+        moveFiles(stage: [entry.path], unstage: [])
       }
     }
   }
