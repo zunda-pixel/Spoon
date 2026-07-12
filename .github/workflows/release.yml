@@ -1,0 +1,52 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v7.0.0
+
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: "26.6"
+
+      - name: Build Spoon
+        run: |
+          DERIVED_DATA_PATH="$RUNNER_TEMP/DerivedData"
+          echo "DERIVED_DATA_PATH=$DERIVED_DATA_PATH" >> "$GITHUB_ENV"
+
+          xcodebuild \
+            -project Spoon.xcodeproj \
+            -scheme Spoon \
+            -configuration Release \
+            -destination 'generic/platform=macOS' \
+            -derivedDataPath "$DERIVED_DATA_PATH" \
+            CODE_SIGNING_ALLOWED=NO \
+            -skipMacroValidation \
+            build
+
+      - name: Package app
+        run: |
+          APP_PATH="$DERIVED_DATA_PATH/Build/Products/Release/Spoon.app"
+          TAG="${{ github.ref_name }}"
+          ditto -c -k --sequesterRsrc --keepParent \
+            "$APP_PATH" \
+            "Spoon-${TAG}-macOS.zip"
+
+      - name: Create release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ github.ref_name }}"
+          gh release create "$TAG" \
+            --title "$TAG" \
+            --generate-notes \
+            "Spoon-${TAG}-macOS.zip"
