@@ -12,6 +12,7 @@
 
 /* Begin PBXFileReference section */
 		000000000000000000000120 /* Spoon.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Spoon.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		2E96D6DA300346AD00AAD68B /* Spoon.xctestplan */ = {isa = PBXFileReference; lastKnownFileType = text; path = Spoon.xctestplan; sourceTree = "<group>"; };
 		2EC680F23001401900151B68 /* SpoonKit */ = {isa = PBXFileReference; lastKnownFileType = wrapper; path = SpoonKit; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -36,6 +37,7 @@
 		000000000000000000000001 = {
 			isa = PBXGroup;
 			children = (
+				2E96D6DA300346AD00AAD68B /* Spoon.xctestplan */,
 				2EC680F23001401900151B68 /* SpoonKit */,
 				000000000000000000000010 /* Spoon */,
 				2EBF7F8A300141CD007721E6 /* Frameworks */,
