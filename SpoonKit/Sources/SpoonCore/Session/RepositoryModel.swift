@@ -14,6 +14,7 @@ public final class RepositoryModel {
   public private(set) var branches: [Branch] = []
   public private(set) var remotes: [Remote] = []
   public private(set) var stashes: [Stash] = []
+  public private(set) var tags: [Tag] = []
   public private(set) var worktrees: [Worktree] = []
   /// An in-progress rebase / cherry-pick / revert (conflict or edit pause).
   public private(set) var sequencerState: SequencerState?
@@ -181,12 +182,14 @@ public final class RepositoryModel {
       async let branches = gitClient.branches()
       async let remotes = gitClient.remotes()
       async let stashes = gitClient.stashes()
+      async let tags = gitClient.tags()
       async let worktrees = gitClient.worktrees()
       async let sequencerState = gitClient.sequencerState()
       self.status = try await status
       self.branches = try await branches
       self.remotes = try await remotes
       self.stashes = try await stashes
+      self.tags = try await tags
       self.worktrees = try await worktrees
       self.sequencerState = try await sequencerState
       changeTrees = self.status.map(ChangeTrees.init) ?? .empty
@@ -391,6 +394,27 @@ public final class RepositoryModel {
     await perform { try await $0.checkout(branch: branch) }
   }
 
+  /// Checks out a commit directly (detached HEAD).
+  public func checkoutRevision(_ oid: ObjectID) async {
+    await perform { try await $0.checkoutRevision(oid) }
+  }
+
+  /// Merges `branch` into the current branch; `squash` stages the combined
+  /// changes for a separate commit.
+  public func merge(branch: String, squash: Bool = false) async {
+    await perform { try await $0.merge(branch: branch, squash: squash) }
+  }
+
+  // MARK: - Tags
+
+  public func createTag(name: String, at target: ObjectID?, message: String?) async {
+    await perform { try await $0.createTag(name: name, at: target, message: message) }
+  }
+
+  public func deleteTag(name: String) async {
+    await perform { try await $0.deleteTag(name: name) }
+  }
+
   public func createBranch(
     name: String, from startPoint: String? = nil, checkout: Bool = true
   ) async {
@@ -471,7 +495,8 @@ public final class RepositoryModel {
   }
 
   public func skipSequencer() async {
-    guard let kind = sequencerState?.kind else { return }
+    // `git merge` has no --skip.
+    guard let kind = sequencerState?.kind, kind != .merge else { return }
     await perform { try await $0.skipSequencer(kind) }
   }
 

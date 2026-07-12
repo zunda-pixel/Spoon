@@ -51,27 +51,36 @@ struct RebaseSheet: View {
   private func planEditor(_ plan: Binding<RebasePlan>) -> some View {
     let value = plan.wrappedValue
     return VStack(alignment: .leading, spacing: 10) {
-      List(plan.steps) { $step in
-        HStack(spacing: 8) {
-          Picker("Action", selection: $step.action) {
-            ForEach(RebaseAction.allCases, id: \.self) { action in
-              Text(action.rawValue.capitalized)
-                .tag(action)
+      List {
+        ForEach(plan.steps) { $step in
+          HStack(spacing: 8) {
+            Picker("Action", selection: $step.action) {
+              ForEach(RebaseAction.allCases, id: \.self) { action in
+                Text(action.rawValue.capitalized)
+                  .tag(action)
+              }
             }
+            .labelsHidden()
+            .frame(width: 96)
+            Text(step.commit.oid.shortened)
+              .font(.caption.monospaced())
+              .foregroundStyle(.secondary)
+            Text(step.commit.subject)
+              .lineLimit(1)
+              .truncationMode(.tail)
           }
-          .labelsHidden()
-          .frame(width: 96)
-          Text(step.commit.oid.shortened)
-            .font(.caption.monospaced())
-            .foregroundStyle(.secondary)
-          Text(step.commit.subject)
-            .lineLimit(1)
-            .truncationMode(.tail)
+          .listRowSeparator(.hidden)
         }
-        .listRowSeparator(.hidden)
+        .onMove { source, destination in
+          plan.wrappedValue.steps.move(fromOffsets: source, toOffset: destination)
+        }
       }
       .listStyle(.bordered)
       .frame(width: 480, height: min(320, CGFloat(value.steps.count) * 34 + 16))
+
+      Text("Drag rows to reorder commits.")
+        .font(.caption)
+        .foregroundStyle(.secondary)
 
       if let validationMessage = validationMessage(for: value) {
         Text(validationMessage)

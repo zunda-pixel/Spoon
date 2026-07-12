@@ -14,12 +14,16 @@ An AI-first git client for macOS, built with SwiftUI for macOS 27 (Golden Gate).
   reveal it in Finder.
 - **History** — commit graph with infinite scroll; commit details show the
   full patch with selectable, copyable lines.
-- **Interactive rebase** — pick / squash / drop / edit from a commit's
-  context menu, plus cherry-pick and revert. Conflicts and edit stops show a
-  banner with Continue / Skip / Abort.
+- **Interactive rebase** — pick / squash / drop / edit with drag-to-reorder,
+  from a commit's context menu; plus cherry-pick and revert. Conflicts and
+  edit stops show a banner with Continue / Skip / Abort.
 - **Branches** — create (from HEAD or any branch), delete, rename, and check
-  out branches; check out a remote branch as a local tracking branch; link a
-  branch to its own worktree (add / open in a new window / remove).
+  out branches (or any commit, detached); merge or squash-merge a branch
+  into the current one; check out a remote branch as a local tracking
+  branch; link a branch to its own worktree (add / open in a new window /
+  remove).
+- **Tags** — list in the sidebar, tag any commit (lightweight or annotated),
+  delete.
 - **Stashes** — save (including untracked files), browse a stash's diff,
   apply, pop, or drop it.
 - **Clone** — clone over https / ssh from the Welcome screen with live
@@ -46,12 +50,12 @@ available, to our knowledge).
 | Clone / add / recent repositories | ✅ | ✅ |
 | Branches: create / delete | ✅ | ✅ |
 | Branch rename / branch from branch | ✅ | ✅ |
-| Checkout branch or revision | ✅ | ✅ (branches) |
-| Tags | ✅ | — |
+| Checkout branch or revision | ✅ | ✅ |
+| Tags | ✅ | ✅ |
 | Worktrees linked to branches | ✅ | ✅ |
-| Interactive rebase | ✅ (edit, reorder, squash) | ✅ (pick / squash / drop / edit) |
+| Interactive rebase | ✅ | ✅ |
 | Cherry-pick / revert | ✅ | ✅ |
-| Merge | ✅ | — |
+| Merge | ✅ | ✅ |
 | Merge conflict resolving | ✅ built-in resolver | partial (conflict banner + mark resolved) |
 | Stashes | ✅ | ✅ (incl. diff browsing) |
 | Submodules | ✅ | — |

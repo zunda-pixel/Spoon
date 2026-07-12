@@ -39,12 +39,24 @@ public protocol GitClient: Sendable {
   func removeRemote(name: String) async throws
 
   func checkout(branch: String) async throws
+  /// Checks out a commit directly (detached HEAD).
+  func checkoutRevision(_ oid: ObjectID) async throws
   /// Creates a branch at `startPoint` (HEAD when nil), optionally checking
   /// it out.
   func createBranch(name: String, from startPoint: String?, checkout: Bool) async throws
   /// Creates and checks out a local tracking branch for a remote-tracking
   /// branch like `origin/feature`.
   func checkoutRemoteBranch(_ remoteBranch: String) async throws
+
+  /// Merges `branch` into the current branch. `squash` stages the combined
+  /// changes without committing (commit separately afterwards).
+  func merge(branch: String, squash: Bool) async throws
+
+  func tags() async throws -> [Tag]
+  /// Creates a tag at `target` (HEAD when nil); a non-empty `message` makes
+  /// it an annotated tag.
+  func createTag(name: String, at target: ObjectID?, message: String?) async throws
+  func deleteTag(name: String) async throws
   /// Deletes a local branch (`-d`, or `-D` when `force`).
   func deleteBranch(name: String, force: Bool) async throws
   /// Renames a local branch (`branch -m`); works on the current branch too.

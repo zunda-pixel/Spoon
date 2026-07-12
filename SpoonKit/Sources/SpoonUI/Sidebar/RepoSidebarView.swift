@@ -15,6 +15,7 @@ struct RepoSidebarView: View {
   @State private var deletingBranch: Branch?
   @State private var renamingBranch: Branch?
   @State private var branchingFrom: Branch?
+  @State private var deletingTag: Tag?
   @State private var openWorktreeErrorMessage: String?
 
   init(model: RepositoryModel, selection: Binding<SidebarItem?>) {
@@ -51,6 +52,15 @@ struct RepoSidebarView: View {
               Task { await model.checkout(branch: branch.name) }
             }
             .disabled(branch.isCurrent || model.isBusy || worktree != nil)
+            Divider()
+            Button("Merge into \(model.currentBranch?.name ?? "HEAD")") {
+              Task { await model.merge(branch: branch.name) }
+            }
+            .disabled(branch.isCurrent || model.isBusy || model.isSequencing)
+            Button("Squash Merge into \(model.currentBranch?.name ?? "HEAD")") {
+              Task { await model.merge(branch: branch.name, squash: true) }
+            }
+            .disabled(branch.isCurrent || model.isBusy || model.isSequencing)
             Divider()
             if let worktree {
               Button("Open Worktree") {
@@ -106,6 +116,33 @@ struct RepoSidebarView: View {
               Button("Drop…", role: .destructive) {
                 Task { await model.dropStash(stash) }
               }
+            }
+          }
+        }
+      }
+
+      if !model.tags.isEmpty {
+        Section("Tags") {
+          ForEach(model.tags) { tag in
+            Label {
+              HStack {
+                Text(tag.name)
+                  .lineLimit(1)
+                  .truncationMode(.middle)
+                Spacer(minLength: 4)
+                Text(tag.target.shortened)
+                  .font(.caption.monospaced())
+                  .foregroundStyle(.secondary)
+              }
+            } icon: {
+              Image(systemName: "tag")
+            }
+            .help(tag.isAnnotated ? "Annotated tag at \(tag.target.shortened)" : "Tag at \(tag.target.shortened)")
+            .contextMenu {
+              Button("Delete Tag…", role: .destructive) {
+                deletingTag = tag
+              }
+              .disabled(model.isBusy)
             }
           }
         }
@@ -179,6 +216,20 @@ struct RepoSidebarView: View {
       Text(
         "The worktree folder at \(removingWorktree?.path.path ?? "") will be deleted. Remove refuses worktrees with local changes; Force Remove deletes them anyway."
       )
+    }
+    .confirmationDialog(
+      "Delete tag \"\(deletingTag?.name ?? "")\"?",
+      isPresented: .init(
+        get: { deletingTag != nil },
+        set: { if !$0 { deletingTag = nil } }
+      )
+    ) {
+      Button("Delete Tag", role: .destructive) {
+        guard let tag = deletingTag else { return }
+        Task { await model.deleteTag(name: tag.name) }
+      }
+    } message: {
+      Text("The tag will be removed locally. Remote copies are not affected.")
     }
     .confirmationDialog(
       "Delete branch \"\(deletingBranch?.name ?? "")\"?",

@@ -190,6 +190,132 @@ struct LiveSequencerTests {
     #expect(try String(contentsOf: root.appending(path: "file.txt"), encoding: .utf8) == "one\n")
   }
 
+  @Test func reorderedRebasePlanSwapsCommitOrder() async throws {
+    let root = try await makeThreeCommitRepo()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let client = makeClient(root)
+
+    let commits = try await client.log(LogQuery()).commits
+    let second = try #require(commits.first { $0.subject == "second" })
+    let third = try #require(commits.first { $0.subject == "third" })
+    // Reordered oldest-first todo: third applies before second.
+    let plan = RebasePlan(
+      steps: [RebaseStep(action: .pick, commit: third), RebaseStep(action: .pick, commit: second)],
+      baseOID: second.parents.first
+    )
+    try await client.interactiveRebase(plan)
+
+    let after = try await client.log(LogQuery()).commits
+    #expect(after.map(\.subject) == ["second", "third", "base"])
+  }
+
+  // MARK: - Merge
+
+  /// main and side diverge with independent files.
+  private func makeDivergedRepo() async throws -> URL {
+    let root = try await LiveRepoFixture.makeTemporaryRepo(runner: runner)
+    try await commitFile("base.txt", "base\n", message: "base", in: root)
+    try await arrange(["switch", "-c", "side"], in: root)
+    try await commitFile("side.txt", "side\n", message: "side commit", in: root)
+    try await arrange(["switch", "main"], in: root)
+    try await commitFile("main.txt", "main\n", message: "main commit", in: root)
+    return root
+  }
+
+  @Test func mergeCreatesAMergeCommit() async throws {
+    let root = try await makeDivergedRepo()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let client = makeClient(root)
+
+    try await client.merge(branch: "side", squash: false)
+
+    let head = try #require(try await client.log(LogQuery()).commits.first)
+    #expect(head.isMerge)
+    #expect(FileManager.default.fileExists(atPath: root.appending(path: "side.txt").path))
+    #expect(FileManager.default.fileExists(atPath: root.appending(path: "main.txt").path))
+  }
+
+  @Test func squashMergeStagesWithoutCommitting() async throws {
+    let root = try await makeDivergedRepo()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let client = makeClient(root)
+    let countBefore = try await client.log(LogQuery()).commits.count
+
+    try await client.merge(branch: "side", squash: true)
+
+    let status = try await client.status()
+    #expect(status.stagedEntries.map(\.path) == ["side.txt"])
+    #expect(try await client.log(LogQuery()).commits.count == countBefore)
+
+    try await client.commit(message: "squash side", amend: false)
+    let head = try #require(try await client.log(LogQuery()).commits.first)
+    #expect(head.subject == "squash side")
+    #expect(!head.isMerge)
+  }
+
+  @Test func mergeConflictIsDetectedAndAbortable() async throws {
+    let root = try await LiveRepoFixture.makeTemporaryRepo(runner: runner)
+    defer { try? FileManager.default.removeItem(at: root) }
+    try await commitFile("file.txt", "one\n", message: "base", in: root)
+    try await arrange(["switch", "-c", "side"], in: root)
+    try await commitFile("file.txt", "side\n", message: "side edit", in: root)
+    try await arrange(["switch", "main"], in: root)
+    try await commitFile("file.txt", "main\n", message: "main edit", in: root)
+    let client = makeClient(root)
+
+    await #expect(throws: CommandError.self) {
+      try await client.merge(branch: "side", squash: false)
+    }
+    #expect(try await client.sequencerState()?.kind == .merge)
+    #expect(try await client.status().conflictedEntries.map(\.path) == ["file.txt"])
+
+    try await client.abortSequencer(.merge)
+    #expect(try await client.sequencerState() == nil)
+    #expect(try String(contentsOf: root.appending(path: "file.txt"), encoding: .utf8) == "main\n")
+  }
+
+  // MARK: - Tags / revision checkout
+
+  @Test func tagLifecycleRoundTrip() async throws {
+    let root = try await LiveRepoFixture.makeTemporaryRepo(runner: runner)
+    defer { try? FileManager.default.removeItem(at: root) }
+    try await commitFile("base.txt", "base\n", message: "base", in: root)
+    let client = makeClient(root)
+    let head = try #require(try await client.log(LogQuery()).commits.first)
+
+    try await client.createTag(name: "light", at: nil, message: nil)
+    try await client.createTag(name: "v1.0.0", at: head.oid, message: "first release")
+
+    let tags = try await client.tags()
+    #expect(Set(tags.map(\.name)) == ["light", "v1.0.0"])
+    let annotated = try #require(tags.first { $0.name == "v1.0.0" })
+    // The annotated tag peels to the tagged commit.
+    #expect(annotated.target == head.oid)
+    #expect(annotated.isAnnotated)
+    let lightweight = try #require(tags.first { $0.name == "light" })
+    #expect(lightweight.target == head.oid)
+    #expect(!lightweight.isAnnotated)
+
+    try await client.deleteTag(name: "light")
+    #expect(try await client.tags().map(\.name) == ["v1.0.0"])
+  }
+
+  @Test func checkoutRevisionDetachesHead() async throws {
+    let root = try await LiveRepoFixture.makeTemporaryRepo(runner: runner)
+    defer { try? FileManager.default.removeItem(at: root) }
+    try await commitFile("file.txt", "one\n", message: "c1", in: root)
+    try await commitFile("file.txt", "two\n", message: "c2", in: root)
+    let client = makeClient(root)
+    let first = try #require(try await client.log(LogQuery()).commits.last)
+
+    try await client.checkoutRevision(first.oid)
+
+    let status = try await client.status()
+    #expect(status.headBranch == nil)
+    #expect(status.headOID == first.oid)
+    #expect(try String(contentsOf: root.appending(path: "file.txt"), encoding: .utf8) == "one\n")
+  }
+
   // MARK: - Branches / worktrees
 
   @Test func deleteBranchRefusesUnmergedUnlessForced() async throws {

@@ -30,11 +30,14 @@ struct SequencerBannerView: View {
       }
       .disabled(hasConflicts || model.isBusy)
       .help(hasConflicts ? "Resolve and stage all conflicts first" : "Resume the operation")
-      Button("Skip") {
-        Task { await model.skipSequencer() }
+      if state.kind != .merge {
+        // `git merge` has no --skip.
+        Button("Skip") {
+          Task { await model.skipSequencer() }
+        }
+        .disabled(model.isBusy)
+        .help("Skip the current commit and resume")
       }
-      .disabled(model.isBusy)
-      .help("Skip the current commit and resume")
       Button("Abort…", role: .destructive) {
         confirmingAbort = true
       }
@@ -60,6 +63,7 @@ struct SequencerBannerView: View {
     case .rebase: "Rebase"
     case .cherryPick: "Cherry-Pick"
     case .revert: "Revert"
+    case .merge: "Merge"
     }
   }
 
@@ -78,6 +82,8 @@ struct SequencerBannerView: View {
       return "Cherry-pick in progress"
     case .revert:
       return "Revert in progress"
+    case .merge:
+      return "Merge in progress"
     }
   }
 

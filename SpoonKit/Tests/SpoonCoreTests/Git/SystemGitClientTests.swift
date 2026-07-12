@@ -177,6 +177,57 @@ struct SystemGitClientTests {
     #expect(runner.invocations.count == 1)
   }
 
+  @Test func checkoutRevisionSendsExactArgv() async throws {
+    let runner = FakeCommandRunner()
+    runner.stub(arguments: baseFlags + ["switch", "--detach", "aaaa1111"])
+    try await makeClient(runner).checkoutRevision(ObjectID(rawValue: "aaaa1111")!)
+    #expect(runner.invocations.count == 1)
+  }
+
+  @Test func mergeSendsExactArgv() async throws {
+    let runner = FakeCommandRunner()
+    runner.stub(arguments: baseFlags + ["merge", "--no-edit", "feature"])
+    runner.stub(arguments: baseFlags + ["merge", "--squash", "feature"])
+    let client = makeClient(runner)
+    try await client.merge(branch: "feature", squash: false)
+    try await client.merge(branch: "feature", squash: true)
+    #expect(runner.invocations.count == 2)
+  }
+
+  @Test func mergeSequencerControlsSendExactArgv() async throws {
+    let runner = FakeCommandRunner()
+    runner.stub(arguments: baseFlags + ["merge", "--continue"])
+    runner.stub(arguments: baseFlags + ["merge", "--abort"])
+    let client = makeClient(runner)
+    try await client.continueSequencer(.merge)
+    try await client.abortSequencer(.merge)
+    #expect(runner.invocations.count == 2)
+  }
+
+  @Test func tagOperationsSendExactArgv() async throws {
+    let runner = FakeCommandRunner()
+    runner.stub(
+      arguments: baseFlags + [
+        "for-each-ref", "refs/tags",
+        "--sort=-creatordate",
+        "--format=\(GitTagParser.tagFormat)",
+      ],
+      stdout: "v1\u{0}aaaa1111\u{0}\u{0}1720000000\n"
+    )
+    runner.stub(arguments: baseFlags + ["tag", "v1"])
+    runner.stub(arguments: baseFlags + ["tag", "-a", "-m", "release", "v2", "aaaa1111"])
+    runner.stub(arguments: baseFlags + ["tag", "-d", "v1"])
+
+    let client = makeClient(runner)
+    let tags = try await client.tags()
+    #expect(tags.map(\.name) == ["v1"])
+    try await client.createTag(name: "v1", at: nil, message: nil)
+    try await client.createTag(
+      name: "v2", at: ObjectID(rawValue: "aaaa1111"), message: "release")
+    try await client.deleteTag(name: "v1")
+    #expect(runner.invocations.count == 4)
+  }
+
   @Test func renameBranchSendsExactArgv() async throws {
     let runner = FakeCommandRunner()
     runner.stub(arguments: baseFlags + ["branch", "-m", "old-name", "new-name"])
@@ -274,8 +325,10 @@ struct SystemGitClientTests {
         "--git-path", "rebase-apply",
         "--git-path", "CHERRY_PICK_HEAD",
         "--git-path", "REVERT_HEAD",
+        "--git-path", "MERGE_HEAD",
       ],
-      stdout: ".git/rebase-merge\n.git/rebase-apply\n.git/CHERRY_PICK_HEAD\n.git/REVERT_HEAD\n"
+      stdout:
+        ".git/rebase-merge\n.git/rebase-apply\n.git/CHERRY_PICK_HEAD\n.git/REVERT_HEAD\n.git/MERGE_HEAD\n"
     )
     let state = try await makeClient(runner).sequencerState()
     #expect(state == nil)

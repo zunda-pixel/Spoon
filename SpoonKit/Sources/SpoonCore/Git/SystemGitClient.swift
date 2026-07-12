@@ -270,6 +270,45 @@ public actor SystemGitClient: GitClient {
     try await runVoid(["switch", branch])
   }
 
+  public func checkoutRevision(_ oid: ObjectID) async throws {
+    try await runVoid(["switch", "--detach", oid.rawValue])
+  }
+
+  public func merge(branch: String, squash: Bool) async throws {
+    if squash {
+      try await runVoid(["merge", "--squash", branch], timeout: .seconds(120))
+    } else {
+      try await runVoid(["merge", "--no-edit", branch], timeout: .seconds(120))
+    }
+  }
+
+  // MARK: - Tags
+
+  public func tags() async throws -> [Tag] {
+    let result = try await run([
+      "for-each-ref", "refs/tags",
+      "--sort=-creatordate",
+      "--format=\(GitTagParser.tagFormat)",
+    ])
+    return try GitTagParser.parse(result.standardOutput)
+  }
+
+  public func createTag(name: String, at target: ObjectID?, message: String?) async throws {
+    var arguments = ["tag"]
+    if let message, !message.isEmpty {
+      arguments.append(contentsOf: ["-a", "-m", message])
+    }
+    arguments.append(name)
+    if let target {
+      arguments.append(target.rawValue)
+    }
+    try await runVoid(arguments)
+  }
+
+  public func deleteTag(name: String) async throws {
+    try await runVoid(["tag", "-d", name])
+  }
+
   public func createBranch(name: String, from startPoint: String?, checkout: Bool) async throws {
     var arguments = checkout ? ["switch", "-c", name] : ["branch", name]
     if let startPoint {
@@ -354,13 +393,14 @@ public actor SystemGitClient: GitClient {
         "--git-path", "rebase-apply",
         "--git-path", "CHERRY_PICK_HEAD",
         "--git-path", "REVERT_HEAD",
+        "--git-path", "MERGE_HEAD",
       ],
       timeout: .seconds(10)
     )
     let paths = result.standardOutputText
       .split(separator: "\n")
       .map { resolveGitPath(String($0)) }
-    guard paths.count == 4 else { return nil }
+    guard paths.count == 5 else { return nil }
     let exists = paths.map { FileManager.default.fileExists(atPath: $0.path) }
     // A conflicted rebase pick also writes CHERRY_PICK_HEAD, so rebase wins.
     if exists[0] || exists[1] {
@@ -371,6 +411,9 @@ public actor SystemGitClient: GitClient {
     }
     if exists[3] {
       return SequencerState(kind: .revert)
+    }
+    if exists[4] {
+      return SequencerState(kind: .merge)
     }
     return nil
   }
@@ -401,6 +444,7 @@ public actor SystemGitClient: GitClient {
     case .rebase: "rebase"
     case .cherryPick: "cherry-pick"
     case .revert: "revert"
+    case .merge: "merge"
     }
   }
 

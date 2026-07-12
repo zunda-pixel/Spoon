@@ -9,6 +9,7 @@ public struct SequencerState: Sendable, Hashable {
     case rebase
     case cherryPick
     case revert
+    case merge
   }
 
   public var kind: Kind

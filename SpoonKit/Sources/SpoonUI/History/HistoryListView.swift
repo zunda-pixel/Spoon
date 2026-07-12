@@ -6,6 +6,7 @@ struct HistoryListView: View {
   let model: RepositoryModel
   @Binding var selectedCommitID: String?
   @State private var rebaseSheetCommit: Commit?
+  @State private var taggingCommit: Commit?
 
   init(model: RepositoryModel, selectedCommitID: Binding<String?>) {
     self.model = model
@@ -58,10 +59,22 @@ struct HistoryListView: View {
     .sheet(item: $rebaseSheetCommit) { commit in
       RebaseSheet(model: model, fromCommit: commit)
     }
+    .sheet(item: $taggingCommit) { commit in
+      TagCommitSheet(model: model, commit: commit)
+    }
   }
 
   @ViewBuilder
   private func commitMenu(_ commit: Commit) -> some View {
+    Button("Checkout Commit (Detached)") {
+      Task { await model.checkoutRevision(commit.oid) }
+    }
+    .disabled(model.isBusy || model.isSequencing)
+    Button("Tag Commit…") {
+      taggingCommit = commit
+    }
+    .disabled(model.isBusy)
+    Divider()
     Button("Interactive Rebase from Here…") {
       rebaseSheetCommit = commit
     }
@@ -75,5 +88,65 @@ struct HistoryListView: View {
       Task { await model.revert(commit.oid) }
     }
     .disabled(commit.isMerge || model.isBusy || model.isSequencing)
+  }
+}
+
+@MainActor
+struct TagCommitSheet: View {
+  let model: RepositoryModel
+  let commit: Commit
+  @Environment(\.dismiss) private var dismiss
+  @State private var name = ""
+  @State private var message = ""
+
+  init(model: RepositoryModel, commit: Commit) {
+    self.model = model
+    self.commit = commit
+  }
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 12) {
+      Text("Tag \(commit.oid.shortened) — \(commit.subject)")
+        .font(.headline)
+        .lineLimit(1)
+        .truncationMode(.tail)
+      Form {
+        TextField("Tag name", text: $name, prompt: Text("v1.0.0"))
+          .onSubmit(create)
+        TextField("Message (optional; makes the tag annotated)", text: $message)
+      }
+      .textFieldStyle(.roundedBorder)
+      .frame(width: 380)
+      HStack {
+        Spacer()
+        Button("Cancel", role: .cancel) {
+          dismiss()
+        }
+        Button("Create Tag", action: create)
+          .keyboardShortcut(.defaultAction)
+          .disabled(!isValid)
+      }
+    }
+    .padding(20)
+  }
+
+  private var isValid: Bool {
+    let trimmed = name.trimmingCharacters(in: .whitespaces)
+    return !trimmed.isEmpty && !trimmed.contains(" ")
+      && !model.tags.contains { $0.name == trimmed }
+  }
+
+  private func create() {
+    guard isValid else { return }
+    let tagName = name.trimmingCharacters(in: .whitespaces)
+    let trimmedMessage = message.trimmingCharacters(in: .whitespacesAndNewlines)
+    dismiss()
+    Task {
+      await model.createTag(
+        name: tagName,
+        at: commit.oid,
+        message: trimmedMessage.isEmpty ? nil : trimmedMessage
+      )
+    }
   }
 }
