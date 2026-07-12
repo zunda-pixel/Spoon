@@ -1,3 +1,4 @@
+import AppKit
 import SpoonCore
 import SwiftUI
 import UniformTypeIdentifiers
@@ -29,6 +30,8 @@ struct ChangesView: View {
   /// clicked row (List behavior), so remember the just-collapsed selection
   /// long enough for the double-click handler to act on all of it.
   @State private var recentMultiSelection: (rows: Set<RepositoryModel.FileSelection>, at: ContinuousClock.Instant)?
+  /// Anchor row for shift-click range selection.
+  @State private var selectionAnchor: RepositoryModel.FileSelection?
 
   var body: some View {
     VStack(spacing: 0) {
@@ -97,16 +100,25 @@ struct ChangesView: View {
     let unstaged = status.unstagedEntries
     let untracked = status.untrackedEntries
 
+    // Flat display order, for shift-click range selection.
+    let order =
+      conflicted.map { RepositoryModel.FileSelection(path: $0.path, area: .conflicted) }
+      + staged.map { RepositoryModel.FileSelection(path: $0.path, area: .staged) }
+      + unstaged.map { RepositoryModel.FileSelection(path: $0.path, area: .unstaged) }
+      + untracked.map { RepositoryModel.FileSelection(path: $0.path, area: .untracked) }
+
     return List(selection: $selection) {
-      section("Conflicts", entries: conflicted, area: .conflicted)
+      section("Conflicts", entries: conflicted, area: .conflicted, order: order)
       // A visible Changes list always has unstaged content when Staged is
       // empty, so the stage drop target needs no further condition.
-      section("Staged", entries: staged, area: .staged, showsEmptyDropTarget: true)
       section(
-        "Modified", entries: unstaged, area: .unstaged,
+        "Staged", entries: staged, area: .staged, order: order, showsEmptyDropTarget: true
+      )
+      section(
+        "Modified", entries: unstaged, area: .unstaged, order: order,
         showsEmptyDropTarget: !staged.isEmpty
       )
-      section("Untracked", entries: untracked, area: .untracked)
+      section("Untracked", entries: untracked, area: .untracked, order: order)
     }
     // Return mirrors double-click: stage/unstage everything selected.
     .onKeyPress(.return) {
@@ -121,6 +133,7 @@ struct ChangesView: View {
     _ title: String,
     entries: [FileStatusEntry],
     area: RepositoryModel.ChangeArea,
+    order: [RepositoryModel.FileSelection],
     showsEmptyDropTarget: Bool = false
   ) -> some View {
     if !entries.isEmpty || showsEmptyDropTarget {
@@ -138,10 +151,14 @@ struct ChangesView: View {
         ForEach(entries) { entry in
           FileStatusRow(entry: entry)
             .tag(RepositoryModel.FileSelection(path: entry.path, area: area))
-            // simultaneousGesture keeps single-click selection instant.
+            // Any SwiftUI gesture on the row content swallows the click
+            // before the List's AppKit row selection sees it, so this
+            // handler performs selection itself (and the double-click
+            // action via NSEvent.clickCount). Clicks on the row's blank
+            // area still go through the List natively.
             .simultaneousGesture(
-              TapGesture(count: 2).onEnded {
-                doubleClickAction(for: entry, area: area)
+              TapGesture().onEnded {
+                handleRowClick(for: entry, area: area, order: order)
               }
             )
             .contextMenu {
@@ -153,6 +170,39 @@ struct ChangesView: View {
             }
         }
       }
+    }
+  }
+
+  /// Manual selection for clicks landing on row content: plain click
+  /// selects, ⌘ toggles, ⇧ extends the range from the anchor, and the
+  /// second click of a double-click triggers the primary action.
+  private func handleRowClick(
+    for entry: FileStatusEntry,
+    area: RepositoryModel.ChangeArea,
+    order: [RepositoryModel.FileSelection]
+  ) {
+    let clicked = RepositoryModel.FileSelection(path: entry.path, area: area)
+    if NSApp.currentEvent?.clickCount == 2 {
+      doubleClickAction(for: entry, area: area)
+      return
+    }
+    let modifiers = NSEvent.modifierFlags
+    if modifiers.contains(.command) {
+      if selection.contains(clicked) {
+        selection.remove(clicked)
+      } else {
+        selection.insert(clicked)
+      }
+      selectionAnchor = clicked
+    } else if modifiers.contains(.shift),
+      let anchor = selectionAnchor ?? selection.first,
+      let anchorIndex = order.firstIndex(of: anchor),
+      let clickedIndex = order.firstIndex(of: clicked)
+    {
+      selection = Set(order[min(anchorIndex, clickedIndex)...max(anchorIndex, clickedIndex)])
+    } else {
+      selection = [clicked]
+      selectionAnchor = clicked
     }
   }
 
