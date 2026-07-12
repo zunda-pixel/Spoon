@@ -44,7 +44,6 @@ struct ChangesView: View {
       Divider()
       CommitComposerView(model: model)
     }
-    .navigationTitle("Changes")
     .onChange(of: selection) { previous, _ in
       if previous.count > 1 {
         recentMultiSelection = (previous, .now)

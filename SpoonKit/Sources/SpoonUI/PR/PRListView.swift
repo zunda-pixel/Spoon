@@ -59,7 +59,6 @@ struct PRListView: View {
         }
       }
     }
-    .navigationTitle("Pull Requests")
   }
 }
 

@@ -74,6 +74,12 @@ struct RepositorySplitView: View {
     } detail: {
       detailColumn
     }
+    // The window (and tab) title must identify the repository; the
+    // section lives in the subtitle. Column-level navigationTitles would
+    // otherwise take over the titlebar.
+    .navigationTitle(model.repository.name)
+    .navigationSubtitle(sectionTitle)
+    .navigationDocument(model.repository.rootURL)
     .toolbar {
       ToolbarItem(placement: .navigation) {
         branchMenu
@@ -212,6 +218,15 @@ struct RepositorySplitView: View {
       }
     }
     .accessibilityLabel(title)
+  }
+
+  private var sectionTitle: String {
+    switch selection {
+    case .changes, nil: "Changes"
+    case .history: "History"
+    case .branch(let name): name
+    case .pullRequests: "Pull Requests"
+    }
   }
 
   @ViewBuilder

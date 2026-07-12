@@ -48,7 +48,6 @@ struct HistoryListView: View {
         .listStyle(.plain)
       }
     }
-    .navigationTitle("History")
     .task(id: model.repository.id) {
       await model.loadHistoryIfNeeded()
     }
