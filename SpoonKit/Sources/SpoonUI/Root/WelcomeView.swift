@@ -82,6 +82,10 @@ struct WelcomeView: View {
                 .lineLimit(1)
                 .truncationMode(.middle)
             }
+            // Fill the row and make the whole area hit-testable — a plain
+            // button is otherwise only clickable on the text itself.
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
           }
           .buttonStyle(.plain)
           .contextMenu {
