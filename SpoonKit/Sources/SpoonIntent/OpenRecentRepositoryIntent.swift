@@ -18,21 +18,12 @@ public struct OpenRecentRepositoryIntent: AppIntent {
     guard let appModel = AppModel.shared else {
       return .result(dialog: "Spoon is still starting up — try again.")
     }
-    let recents = appModel.recentRepositories
-    guard !recents.isEmpty else {
-      return .result(dialog: "No recent repositories yet.")
+    switch RecentRepositories.resolve(name: name, in: appModel.recentRepositories) {
+    case .failure(let message):
+      return .result(dialog: "\(message)")
+    case .found(let repository):
+      appModel.submitExternalOpenRequest(repository.rootURL)
+      return .result(dialog: "Opening \(repository.name).")
     }
-    let repository: Repository
-    if let name, !name.isEmpty {
-      guard let match = recents.first(where: { $0.name.localizedCaseInsensitiveContains(name) })
-      else {
-        return .result(dialog: "No recent repository named \(name).")
-      }
-      repository = match
-    } else {
-      repository = recents[0]
-    }
-    appModel.submitExternalOpenRequest(repository.rootURL)
-    return .result(dialog: "Opening \(repository.name).")
   }
 }

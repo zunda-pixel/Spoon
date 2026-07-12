@@ -21,6 +21,13 @@ struct RemoteDetailView: View {
     model.remotes.first { $0.name == remoteName }
   }
 
+  /// A local branch matching this remote branch's derived name already exists
+  /// (origin/foo → foo).
+  private func hasLocalBranch(for remoteBranch: Branch) -> Bool {
+    let localName = remoteBranch.name.dropFirst("\(remoteName)/".count)
+    return model.branches.contains { $0.name == localName }
+  }
+
   var body: some View {
     VStack(alignment: .leading, spacing: 0) {
       header
@@ -100,6 +107,13 @@ struct RemoteDetailView: View {
               .foregroundStyle(.secondary)
           }
           .help(branch.subject)
+          .contextMenu {
+            // `switch --track` derives the local name (origin/foo → foo).
+            Button("Checkout as Local Branch") {
+              Task { await model.checkoutRemoteBranch(branch.name) }
+            }
+            .disabled(model.isBusy || model.isSequencing || hasLocalBranch(for: branch))
+          }
         }
         .listStyle(.plain)
       }

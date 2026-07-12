@@ -20,5 +20,14 @@ struct SpoonShortcuts: AppShortcutsProvider {
       shortTitle: "Open Repository",
       systemImageName: "arrow.trianglehead.branch"
     )
+    AppShortcut(
+      intent: StashChangesIntent(),
+      phrases: [
+        "Stash changes in \(.applicationName)",
+        "\(.applicationName)でスタッシュ",
+      ],
+      shortTitle: "Stash Changes",
+      systemImageName: "tray.and.arrow.down"
+    )
   }
 }

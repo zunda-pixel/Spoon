@@ -40,14 +40,14 @@ struct DiffDetailView: View {
           )
         } else {
           VStack(spacing: 0) {
-            if let lineSelection, selection.area == .unstaged {
+            if let lineSelection, supportsLineSelection {
               selectionBar(lineSelection, diffs: diffs)
               Divider()
             }
             FileDiffListView(
               diffs: diffs,
               hunkAction: hunkAction,
-              lineSelection: selection.area == .unstaged ? $lineSelection : nil,
+              lineSelection: supportsLineSelection ? $lineSelection : nil,
               onDiscardHunk: selection.area == .unstaged
                 ? { diff, hunk in pendingDiscard = .hunk(diff, hunk) }
                 : nil
@@ -89,25 +89,27 @@ struct DiffDetailView: View {
     }
   }
 
+  /// Line selection exists where a line-level action does: discard for
+  /// unstaged diffs, unstage for staged diffs.
+  private var supportsLineSelection: Bool {
+    selection.area == .unstaged || selection.area == .staged
+  }
+
   private func selectionBar(_ lineSelection: DiffLineSelection, diffs: [FileDiff]) -> some View {
-    HStack(spacing: 10) {
-      Text("\(lineSelection.offsets.count) line(s) selected")
-        .font(.callout)
-        .foregroundStyle(.secondary)
-      Button("Discard Selected Lines…", role: .destructive) {
-        guard let diff = diffs.first(where: { $0.id == lineSelection.fileID }) else { return }
-        pendingDiscard = .lines(diff, lineSelection.hunkID, lineSelection.offsets)
+    LineSelectionBar(selection: lineSelection, onDeselect: { self.lineSelection = nil }) {
+      if selection.area == .unstaged {
+        Button("Discard Selected Lines…", role: .destructive) {
+          guard let diff = diffs.first(where: { $0.id == lineSelection.fileID }) else { return }
+          pendingDiscard = .lines(diff, lineSelection.hunkID, lineSelection.offsets)
+        }
+      } else {
+        Button("Unstage Selected Lines") {
+          guard let diff = diffs.first(where: { $0.id == lineSelection.fileID }) else { return }
+          self.lineSelection = nil
+          Task { await model.unstageLines(lineSelection.offsets, of: lineSelection.hunkID, in: diff) }
+        }
       }
-      .controlSize(.small)
-      Button("Deselect") {
-        self.lineSelection = nil
-      }
-      .controlSize(.small)
-      Spacer()
     }
-    .padding(.horizontal, 12)
-    .padding(.vertical, 6)
-    .background(.bar)
   }
 
   private func confirmPendingDiscard() {

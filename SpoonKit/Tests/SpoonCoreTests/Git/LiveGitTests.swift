@@ -8,29 +8,15 @@ import Testing
 /// for git output-format drift that fixture tests can't catch.
 @Suite("LiveGit", .serialized)
 struct LiveGitTests {
-  private let git = URL(filePath: "/usr/bin/git")
+  private let git = LiveRepoFixture.git
   private let runner = SubprocessCommandRunner()
 
   private func makeTemporaryRepo() async throws -> URL {
-    let root = URL.temporaryDirectory
-      .appending(path: "spoon-tests-\(UUID().uuidString)")
-    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
-
-    for arguments in [
-      ["init", "--initial-branch=main"],
-      ["config", "user.email", "test@example.com"],
-      ["config", "user.name", "Spoon Tests"],
-      ["config", "commit.gpgsign", "false"],
-    ] {
-      let command = Command(executable: git, arguments: arguments, workingDirectory: root)
-      _ = try await runner.run(command).checkSuccess(of: command)
-    }
-    return root
+    try await LiveRepoFixture.makeTemporaryRepo(runner: runner)
   }
 
   private func runGit(_ arguments: [String], in root: URL) async throws {
-    let command = Command(executable: git, arguments: arguments, workingDirectory: root)
-    _ = try await runner.run(command).checkSuccess(of: command)
+    try await LiveRepoFixture.run(arguments, in: root, runner: runner)
   }
 
   @Test func statusAndBranchesOnRealRepo() async throws {

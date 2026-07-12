@@ -7,6 +7,7 @@ enum SidebarItem: Hashable {
   case branch(String)
   case pullRequests
   case remote(String)
+  case stash(Int)
 }
 
 @MainActor
@@ -75,6 +76,11 @@ struct RepositorySplitView: View {
     } detail: {
       detailColumn
     }
+    .safeAreaInset(edge: .top, spacing: 0) {
+      if let state = model.sequencerState {
+        SequencerBannerView(model: model, state: state)
+      }
+    }
     // The window (and tab) title must identify the repository; the
     // section lives in the subtitle. Column-level navigationTitles would
     // otherwise take over the titlebar.
@@ -100,7 +106,7 @@ struct RepositorySplitView: View {
           remoteCountLabel("Pull", systemImage: "arrow.down.to.line", count: model.currentBranch?.behind)
         }
         .help("Pull (⇧⌘L)")
-        .disabled(model.isBusy)
+        .disabled(model.isBusy || model.isSequencing)
 
         Button {
           Task { await model.push() }
@@ -108,7 +114,7 @@ struct RepositorySplitView: View {
           remoteCountLabel("Push", systemImage: "arrow.up.to.line", count: model.currentBranch?.ahead)
         }
         .help("Push (⇧⌘U)")
-        .disabled(model.isBusy)
+        .disabled(model.isBusy || model.isSequencing)
       }
       ToolbarItemGroup {
         Menu {
@@ -207,7 +213,7 @@ struct RepositorySplitView: View {
     } label: {
       currentBranchLabel
     }
-    .disabled(model.isBusy)
+    .disabled(model.isBusy || model.isSequencing)
   }
 
   private func remoteCountLabel(_ title: String, systemImage: String, count: Int?) -> some View {
@@ -228,6 +234,7 @@ struct RepositorySplitView: View {
     case .branch(let name): name
     case .pullRequests: "Pull Requests"
     case .remote(let name): name
+    case .stash(let index): "stash@{\(index)}"
     }
   }
 
@@ -242,6 +249,8 @@ struct RepositorySplitView: View {
       PRListView(model: model, selectedPRNumber: $selectedPRNumber)
     case .remote(let name):
       RemoteDetailView(model: model, remoteName: name)
+    case .stash(let index):
+      StashDetailView(model: model, stashIndex: index)
     }
   }
 
@@ -270,7 +279,7 @@ struct RepositorySplitView: View {
       } else {
         noSelectionPlaceholder
       }
-    case .remote:
+    case .remote, .stash:
       noSelectionPlaceholder
     }
   }
@@ -329,16 +338,19 @@ private struct MultiSelectionActionsView: View {
 @MainActor
 struct NewBranchSheet: View {
   let model: RepositoryModel
+  /// Branch (or any ref) the new branch starts at; nil means HEAD.
+  let startPoint: String?
   @Environment(\.dismiss) private var dismiss
   @State private var name = ""
 
-  init(model: RepositoryModel) {
+  init(model: RepositoryModel, startPoint: String? = nil) {
     self.model = model
+    self.startPoint = startPoint
   }
 
   var body: some View {
     VStack(alignment: .leading, spacing: 12) {
-      Text("New Branch")
+      Text(startPoint.map { "New Branch from \"\($0)\"" } ?? "New Branch")
         .font(.headline)
       TextField("Branch name", text: $name)
         .textFieldStyle(.roundedBorder)
@@ -366,6 +378,6 @@ struct NewBranchSheet: View {
     guard isValidName else { return }
     let branchName = name.trimmingCharacters(in: .whitespaces)
     dismiss()
-    Task { await model.createBranch(name: branchName, checkout: true) }
+    Task { await model.createBranch(name: branchName, from: startPoint, checkout: true) }
   }
 }

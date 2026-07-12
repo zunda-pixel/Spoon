@@ -1,12 +1,21 @@
 import SpoonCore
 import SwiftUI
+import UniformTypeIdentifiers
 
 @MainActor
 struct RepoSidebarView: View {
   let model: RepositoryModel
   @Binding var selection: SidebarItem?
+  @Environment(AppModel.self) private var appModel
+  @Environment(\.openWindow) private var openWindow
   @State private var showingAddRemoteSheet = false
   @State private var removingRemote: Remote?
+  @State private var addingWorktreeBranch: Branch?
+  @State private var removingWorktree: Worktree?
+  @State private var deletingBranch: Branch?
+  @State private var renamingBranch: Branch?
+  @State private var branchingFrom: Branch?
+  @State private var openWorktreeErrorMessage: String?
 
   init(model: RepositoryModel, selection: Binding<SidebarItem?>) {
     self.model = model
@@ -30,14 +39,47 @@ struct RepoSidebarView: View {
 
       Section("Branches") {
         ForEach(model.branches) { branch in
-          BranchRowView(branch: branch, pullRequest: model.prByBranch[branch.name])
-            .tag(SidebarItem.branch(branch.name))
-            .contextMenu {
-              Button("Checkout") {
-                Task { await model.checkout(branch: branch.name) }
-              }
-              .disabled(branch.isCurrent || model.isBusy)
+          let worktree = model.worktree(for: branch)
+          BranchRowView(
+            branch: branch,
+            pullRequest: model.prByBranch[branch.name],
+            worktree: worktree
+          )
+          .tag(SidebarItem.branch(branch.name))
+          .contextMenu {
+            Button("Checkout") {
+              Task { await model.checkout(branch: branch.name) }
             }
+            .disabled(branch.isCurrent || model.isBusy || worktree != nil)
+            Divider()
+            if let worktree {
+              Button("Open Worktree") {
+                openWorktree(worktree)
+              }
+              Button("Remove Worktree…", role: .destructive) {
+                removingWorktree = worktree
+              }
+              .disabled(model.isBusy)
+            } else if !branch.isCurrent {
+              Button("Add Worktree…") {
+                addingWorktreeBranch = branch
+              }
+              .disabled(model.isBusy)
+            }
+            Divider()
+            Button("New Branch from Here…") {
+              branchingFrom = branch
+            }
+            .disabled(model.isBusy)
+            Button("Rename Branch…") {
+              renamingBranch = branch
+            }
+            .disabled(model.isBusy)
+            Button("Delete Branch…", role: .destructive) {
+              deletingBranch = branch
+            }
+            .disabled(branch.isCurrent || model.isBusy || worktree != nil)
+          }
         }
       }
 
@@ -51,6 +93,7 @@ struct RepoSidebarView: View {
             } icon: {
               Image(systemName: "tray")
             }
+            .tag(SidebarItem.stash(stash.index))
             .help(stash.message)
             .contextMenu {
               Button("Apply") {
@@ -94,6 +137,15 @@ struct RepoSidebarView: View {
     .sheet(isPresented: $showingAddRemoteSheet) {
       AddRemoteSheet(model: model)
     }
+    .sheet(item: $addingWorktreeBranch) { branch in
+      AddWorktreeSheet(model: model, branch: branch)
+    }
+    .sheet(item: $renamingBranch) { branch in
+      RenameBranchSheet(model: model, branch: branch)
+    }
+    .sheet(item: $branchingFrom) { branch in
+      NewBranchSheet(model: model, startPoint: branch.name)
+    }
     .confirmationDialog(
       "Remove remote \"\(removingRemote?.name ?? "")\"?",
       isPresented: .init(
@@ -108,6 +160,55 @@ struct RepoSidebarView: View {
     } message: {
       Text("Remote-tracking branches and settings for this remote will be deleted.")
     }
+    .confirmationDialog(
+      "Remove worktree \"\(removingWorktree?.name ?? "")\"?",
+      isPresented: .init(
+        get: { removingWorktree != nil },
+        set: { if !$0 { removingWorktree = nil } }
+      )
+    ) {
+      Button("Remove Worktree", role: .destructive) {
+        guard let worktree = removingWorktree else { return }
+        Task { await model.removeWorktree(path: worktree.path, force: false) }
+      }
+      Button("Force Remove (Discard Changes)", role: .destructive) {
+        guard let worktree = removingWorktree else { return }
+        Task { await model.removeWorktree(path: worktree.path, force: true) }
+      }
+    } message: {
+      Text(
+        "The worktree folder at \(removingWorktree?.path.path ?? "") will be deleted. Remove refuses worktrees with local changes; Force Remove deletes them anyway."
+      )
+    }
+    .confirmationDialog(
+      "Delete branch \"\(deletingBranch?.name ?? "")\"?",
+      isPresented: .init(
+        get: { deletingBranch != nil },
+        set: { if !$0 { deletingBranch = nil } }
+      )
+    ) {
+      Button("Delete", role: .destructive) {
+        guard let branch = deletingBranch else { return }
+        Task { await model.deleteBranch(name: branch.name, force: false) }
+      }
+      Button("Force Delete", role: .destructive) {
+        guard let branch = deletingBranch else { return }
+        Task { await model.deleteBranch(name: branch.name, force: true) }
+      }
+    } message: {
+      Text("Delete refuses branches that are not fully merged; Force Delete removes them anyway.")
+    }
+    .alert(
+      "Could Not Open Worktree",
+      isPresented: .init(
+        get: { openWorktreeErrorMessage != nil },
+        set: { if !$0 { openWorktreeErrorMessage = nil } }
+      )
+    ) {
+      Button("OK", role: .cancel) {}
+    } message: {
+      Text(openWorktreeErrorMessage ?? "")
+    }
   }
 
   private var addRemoteButton: some View {
@@ -115,6 +216,132 @@ struct RepoSidebarView: View {
       showingAddRemoteSheet = true
     }
     .disabled(model.isBusy)
+  }
+
+  private func openWorktree(_ worktree: Worktree) {
+    Task {
+      do {
+        let repository = try await appModel.openRepository(at: worktree.path)
+        openWindow(value: repository.id)
+      } catch {
+        openWorktreeErrorMessage = error.localizedDescription
+      }
+    }
+  }
+}
+
+@MainActor
+struct RenameBranchSheet: View {
+  let model: RepositoryModel
+  let branch: Branch
+  @Environment(\.dismiss) private var dismiss
+  @State private var name: String
+
+  init(model: RepositoryModel, branch: Branch) {
+    self.model = model
+    self.branch = branch
+    self._name = State(initialValue: branch.name)
+  }
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 12) {
+      Text("Rename Branch \"\(branch.name)\"")
+        .font(.headline)
+      TextField("Branch name", text: $name)
+        .textFieldStyle(.roundedBorder)
+        .frame(width: 280)
+        .onSubmit(rename)
+      HStack {
+        Spacer()
+        Button("Cancel", role: .cancel) {
+          dismiss()
+        }
+        Button("Rename", action: rename)
+          .keyboardShortcut(.defaultAction)
+          .disabled(!isValidName)
+      }
+    }
+    .padding(20)
+  }
+
+  private var isValidName: Bool {
+    let trimmed = name.trimmingCharacters(in: .whitespaces)
+    return !trimmed.isEmpty && !trimmed.contains(" ") && !trimmed.hasPrefix("-")
+      && trimmed != branch.name
+      && !model.branches.contains { $0.name == trimmed }
+  }
+
+  private func rename() {
+    guard isValidName else { return }
+    let newName = name.trimmingCharacters(in: .whitespaces)
+    dismiss()
+    Task { await model.renameBranch(from: branch.name, to: newName) }
+  }
+}
+
+@MainActor
+struct AddWorktreeSheet: View {
+  let model: RepositoryModel
+  let branch: Branch
+  @Environment(\.dismiss) private var dismiss
+  @State private var parentPath: String
+  @State private var folderName: String
+
+  init(model: RepositoryModel, branch: Branch) {
+    self.model = model
+    self.branch = branch
+    let root = model.repository.rootURL
+    self._parentPath = State(initialValue: root.deletingLastPathComponent().path)
+    let safeBranchName = branch.name.replacingOccurrences(of: "/", with: "-")
+    self._folderName = State(initialValue: "\(root.lastPathComponent)-\(safeBranchName)")
+  }
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 12) {
+      Text("Add Worktree for \"\(branch.name)\"")
+        .font(.headline)
+      Form {
+        DestinationFolderFields(
+          parentPath: $parentPath,
+          folderName: $folderName,
+          onSubmitFolderName: create
+        )
+      }
+      .textFieldStyle(.roundedBorder)
+      .frame(width: 420)
+      Text(destination.path)
+        .font(.caption)
+        .foregroundStyle(.secondary)
+        .lineLimit(1)
+        .truncationMode(.middle)
+      HStack {
+        Spacer()
+        Button("Cancel", role: .cancel) {
+          dismiss()
+        }
+        Button("Add Worktree", action: create)
+          .keyboardShortcut(.defaultAction)
+          .disabled(!isValid)
+      }
+    }
+    .padding(20)
+  }
+
+  private var destination: URL {
+    URL(filePath: parentPath, directoryHint: .isDirectory).appending(path: folderName)
+  }
+
+  private var isValid: Bool {
+    !parentPath.trimmingCharacters(in: .whitespaces).isEmpty
+      && !folderName.trimmingCharacters(in: .whitespaces).isEmpty
+      && !FileManager.default.fileExists(atPath: destination.path)
+  }
+
+  private func create() {
+    guard isValid else { return }
+    let destination = destination
+    dismiss()
+    Task { await model.addWorktree(path: destination, branch: branch.name) }
   }
 }
 
@@ -176,6 +403,7 @@ struct AddRemoteSheet: View {
 struct BranchRowView: View {
   let branch: Branch
   var pullRequest: PullRequest?
+  var worktree: Worktree?
 
   var body: some View {
     Label {
@@ -187,6 +415,11 @@ struct BranchRowView: View {
         Spacer(minLength: 4)
         if let pullRequest {
           PRBadgeView(pullRequest: pullRequest)
+        }
+        if let worktree {
+          Image(systemName: "folder")
+            .foregroundStyle(.secondary)
+            .help("Checked out in worktree: \(worktree.path.path)")
         }
         trackingIndicator
       }

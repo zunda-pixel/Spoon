@@ -6,6 +6,7 @@ import UniformTypeIdentifiers
 struct WelcomeView: View {
   @Environment(AppModel.self) private var appModel
   @State private var isChoosingFolder = false
+  @State private var showingCloneSheet = false
   @State private var openErrorMessage: String?
 
   let onOpen: (Repository.ID) -> Void
@@ -33,6 +34,14 @@ struct WelcomeView: View {
         .controlSize(.large)
         .keyboardShortcut("o", modifiers: .command)
         .padding(.top, 16)
+
+        Button {
+          showingCloneSheet = true
+        } label: {
+          Label("Clone Repository…", systemImage: "square.and.arrow.down.on.square")
+        }
+        .controlSize(.large)
+        .keyboardShortcut("o", modifiers: [.command, .shift])
       }
       .frame(maxWidth: .infinity, maxHeight: .infinity)
 
@@ -48,6 +57,9 @@ struct WelcomeView: View {
       if case .success(let url) = result {
         open(url)
       }
+    }
+    .sheet(isPresented: $showingCloneSheet) {
+      CloneRepositorySheet(onOpen: onOpen)
     }
     .alert(
       "Could Not Open Repository",
@@ -106,6 +118,138 @@ struct WelcomeView: View {
         onOpen(repository.id)
       } catch {
         openErrorMessage = error.localizedDescription
+      }
+    }
+  }
+}
+
+@MainActor
+private struct CloneRepositorySheet: View {
+  let onOpen: (Repository.ID) -> Void
+  @Environment(AppModel.self) private var appModel
+  @Environment(\.dismiss) private var dismiss
+  @State private var remoteURL = ""
+  @State private var parentPath: String
+  @State private var folderName = ""
+  @State private var userEditedName = false
+  @State private var progressText = ""
+  @State private var errorMessage: String?
+  @State private var cloneTask: Task<Void, Never>?
+
+  init(onOpen: @escaping (Repository.ID) -> Void) {
+    self.onOpen = onOpen
+    let home = FileManager.default.homeDirectoryForCurrentUser
+    let developer = home.appending(path: "Developer")
+    self._parentPath = State(
+      initialValue: FileManager.default.fileExists(atPath: developer.path)
+        ? developer.path
+        : home.appending(path: "Documents").path
+    )
+  }
+
+  private var isCloning: Bool { cloneTask != nil }
+
+  private var destination: URL {
+    URL(filePath: parentPath, directoryHint: .isDirectory).appending(path: folderName)
+  }
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 12) {
+      Text("Clone Repository")
+        .font(.headline)
+      Form {
+        TextField(
+          "URL", text: $remoteURL,
+          prompt: Text("https://github.com/owner/repo.git")
+        )
+        .onChange(of: remoteURL) {
+          guard !userEditedName else { return }
+          folderName = Self.derivedName(from: remoteURL)
+        }
+        .onSubmit(clone)
+        DestinationFolderFields(
+          parentPath: $parentPath,
+          folderName: Binding(
+            get: { folderName },
+            set: { folderName = $0; userEditedName = true }
+          )
+        )
+      }
+      .textFieldStyle(.roundedBorder)
+      .frame(width: 440)
+      .disabled(isCloning)
+
+      if isCloning {
+        HStack(spacing: 8) {
+          ProgressView()
+            .controlSize(.small)
+          Text(progressText)
+            .font(.caption.monospaced())
+            .foregroundStyle(.secondary)
+            .lineLimit(1)
+        }
+      } else if let errorMessage {
+        Text(errorMessage)
+          .font(.caption)
+          .foregroundStyle(.red)
+          .frame(width: 440, alignment: .leading)
+      }
+
+      HStack {
+        Spacer()
+        Button("Cancel", role: .cancel) {
+          if let cloneTask {
+            cloneTask.cancel()
+          } else {
+            dismiss()
+          }
+        }
+        Button("Clone", action: clone)
+          .keyboardShortcut(.defaultAction)
+          .disabled(!isValid || isCloning)
+      }
+    }
+    .padding(20)
+  }
+
+  /// `https://github.com/owner/repo.git` / `git@github.com:owner/repo.git`
+  /// → `repo`.
+  private static func derivedName(from url: String) -> String {
+    let trimmed = url.trimmingCharacters(in: .whitespacesAndNewlines)
+    let tail = trimmed.split(whereSeparator: { $0 == "/" || $0 == ":" }).last.map(String.init) ?? ""
+    return tail.hasSuffix(".git") ? String(tail.dropLast(4)) : tail
+  }
+
+  private var isValid: Bool {
+    !remoteURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+      && !parentPath.trimmingCharacters(in: .whitespaces).isEmpty
+      && !folderName.trimmingCharacters(in: .whitespaces).isEmpty
+      && !FileManager.default.fileExists(atPath: destination.path)
+  }
+
+  private func clone() {
+    guard isValid, !isCloning else { return }
+    errorMessage = nil
+    progressText = "Starting clone…"
+    let destination = destination
+    let url = remoteURL.trimmingCharacters(in: .whitespacesAndNewlines)
+    cloneTask = Task {
+      do {
+        let repository = try await appModel.cloneRepository(from: url, to: destination) { line in
+          Task { @MainActor in
+            progressText = line
+          }
+        }
+        cloneTask = nil
+        dismiss()
+        onOpen(repository.id)
+      } catch {
+        // Remove git's partial folder so a retry can reuse the name.
+        try? FileManager.default.removeItem(at: destination)
+        if !(error is CancellationError) {
+          errorMessage = error.localizedDescription
+        }
+        cloneTask = nil
       }
     }
   }

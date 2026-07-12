@@ -57,6 +57,19 @@ public final class AppModel {
     }
   }
 
+  /// Clones `remoteURL` into `destination` and records it in recents.
+  /// `progress` receives git's latest `--progress` line off the main actor.
+  public func cloneRepository(
+    from remoteURL: String,
+    to destination: URL,
+    progress: @escaping @Sendable (String) -> Void
+  ) async throws -> Repository {
+    let git = try await resolveGit()
+    try await SystemGitClient.clone(
+      from: remoteURL, to: destination, git: git, runner: runner, progress: progress)
+    return try await openRepository(at: destination)
+  }
+
   /// Resolves `url` to its repository root and records it in recents.
   public func openRepository(at url: URL) async throws -> Repository {
     let git = try await resolveGit()

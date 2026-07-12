@@ -22,13 +22,14 @@ enum GitCommand {
     git: URL,
     repository: URL?,
     arguments: [String],
+    extraEnvironment: [String: String] = [:],
     timeout: Duration? = .seconds(30)
   ) -> Command {
     Command(
       executable: git,
       arguments: baseArguments + arguments,
       workingDirectory: repository,
-      environment: environment,
+      environment: environment.merging(extraEnvironment) { _, override in override },
       timeout: timeout
     )
   }

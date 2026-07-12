@@ -34,6 +34,46 @@ public actor SystemGitClient: GitClient {
     return URL(filePath: path)
   }
 
+  /// Clones `remoteURL` into `destination`, reporting git's `--progress`
+  /// lines (they arrive on stderr, `\r`-separated; the latest line wins).
+  public static func clone(
+    from remoteURL: String,
+    to destination: URL,
+    git: URL,
+    runner: any CommandRunning,
+    progress: @escaping @Sendable (String) -> Void
+  ) async throws {
+    let command = GitCommand.make(
+      git: git,
+      repository: nil,
+      arguments: ["clone", "--progress", remoteURL, destination.path],
+      timeout: .seconds(3600)
+    )
+    var stderr = Data()
+    for try await event in runner.events(command) {
+      switch event {
+      case .standardError(let chunk):
+        stderr.append(chunk)
+        let text = String(decoding: chunk, as: UTF8.self)
+        let lines = text.split(whereSeparator: { $0 == "\r" || $0 == "\n" })
+        if let last = lines.last(where: { !$0.trimmingCharacters(in: .whitespaces).isEmpty }) {
+          progress(String(last))
+        }
+      case .standardOutput:
+        break
+      case .exited(let code):
+        guard code == 0 else {
+          throw CommandError(
+            kind: .nonZeroExit,
+            command: command,
+            exitCode: code,
+            standardErrorExcerpt: CommandError.excerpt(from: stderr)
+          )
+        }
+      }
+    }
+  }
+
   // MARK: - GitClient
 
   public func status() async throws -> WorkingTreeStatus {
@@ -230,12 +270,162 @@ public actor SystemGitClient: GitClient {
     try await runVoid(["switch", branch])
   }
 
-  public func createBranch(name: String, checkout: Bool) async throws {
-    if checkout {
-      try await runVoid(["switch", "-c", name])
-    } else {
-      try await runVoid(["branch", name])
+  public func createBranch(name: String, from startPoint: String?, checkout: Bool) async throws {
+    var arguments = checkout ? ["switch", "-c", name] : ["branch", name]
+    if let startPoint {
+      arguments.append(startPoint)
     }
+    try await runVoid(arguments)
+  }
+
+  public func checkoutRemoteBranch(_ remoteBranch: String) async throws {
+    try await runVoid(["switch", "--track", remoteBranch])
+  }
+
+  public func deleteBranch(name: String, force: Bool) async throws {
+    try await runVoid(["branch", force ? "-D" : "-d", name])
+  }
+
+  public func renameBranch(from oldName: String, to newName: String) async throws {
+    try await runVoid(["branch", "-m", oldName, newName])
+  }
+
+  // MARK: - Worktrees
+
+  public func worktrees() async throws -> [Worktree] {
+    let result = try await run(["worktree", "list", "--porcelain"])
+    return WorktreeParser.parse(result.standardOutput)
+  }
+
+  public func addWorktree(path: URL, branch: String) async throws {
+    try await runVoid(["worktree", "add", path.path, branch], timeout: .seconds(120))
+  }
+
+  public func removeWorktree(path: URL, force: Bool) async throws {
+    var arguments = ["worktree", "remove"]
+    if force {
+      arguments.append("--force")
+    }
+    arguments.append(path.path)
+    try await runVoid(arguments, timeout: .seconds(120))
+  }
+
+  // MARK: - Sequencer (rebase / cherry-pick / revert)
+
+  public func interactiveRebase(_ plan: RebasePlan) async throws {
+    let todoURL = FileManager.default.temporaryDirectory
+      .appending(path: "spoon-rebase-todo-\(UUID().uuidString)")
+    try Data(plan.todoFileContents().utf8).write(to: todoURL)
+    defer { try? FileManager.default.removeItem(at: todoURL) }
+
+    var arguments = ["rebase", "--interactive"]
+    if let base = plan.baseOID {
+      arguments.append(base.rawValue)
+    } else {
+      arguments.append("--root")
+    }
+    // git runs the sequence editor via `sh -c '<editor> "$@"' …`, so both
+    // paths are shell *expansions* — spaces in either path are safe. The
+    // todo path travels in its own variable, never interpolated into code.
+    try await runVoid(
+      arguments,
+      extraEnvironment: [
+        "SPOON_REBASE_TODO": todoURL.path,
+        "GIT_SEQUENCE_EDITOR": #"cp -f "$SPOON_REBASE_TODO""#,
+        "GIT_EDITOR": "true",
+      ],
+      timeout: .seconds(300)
+    )
+  }
+
+  public func cherryPick(_ oid: ObjectID) async throws {
+    try await runVoid(["cherry-pick", oid.rawValue], timeout: .seconds(120))
+  }
+
+  public func revert(_ oid: ObjectID) async throws {
+    try await runVoid(["revert", "--no-edit", oid.rawValue], timeout: .seconds(120))
+  }
+
+  public func sequencerState() async throws -> SequencerState? {
+    let result = try await run(
+      [
+        "rev-parse",
+        "--git-path", "rebase-merge",
+        "--git-path", "rebase-apply",
+        "--git-path", "CHERRY_PICK_HEAD",
+        "--git-path", "REVERT_HEAD",
+      ],
+      timeout: .seconds(10)
+    )
+    let paths = result.standardOutputText
+      .split(separator: "\n")
+      .map { resolveGitPath(String($0)) }
+    guard paths.count == 4 else { return nil }
+    let exists = paths.map { FileManager.default.fileExists(atPath: $0.path) }
+    // A conflicted rebase pick also writes CHERRY_PICK_HEAD, so rebase wins.
+    if exists[0] || exists[1] {
+      return rebaseState(directory: exists[0] ? paths[0] : paths[1])
+    }
+    if exists[2] {
+      return SequencerState(kind: .cherryPick)
+    }
+    if exists[3] {
+      return SequencerState(kind: .revert)
+    }
+    return nil
+  }
+
+  public func continueSequencer(_ kind: SequencerState.Kind) async throws {
+    // A squash's combined-message editor can fire during --continue.
+    try await runVoid(
+      [Self.sequencerSubcommand(kind), "--continue"],
+      extraEnvironment: ["GIT_EDITOR": "true"],
+      timeout: .seconds(300)
+    )
+  }
+
+  public func skipSequencer(_ kind: SequencerState.Kind) async throws {
+    try await runVoid(
+      [Self.sequencerSubcommand(kind), "--skip"],
+      extraEnvironment: ["GIT_EDITOR": "true"],
+      timeout: .seconds(300)
+    )
+  }
+
+  public func abortSequencer(_ kind: SequencerState.Kind) async throws {
+    try await runVoid([Self.sequencerSubcommand(kind), "--abort"], timeout: .seconds(120))
+  }
+
+  private static func sequencerSubcommand(_ kind: SequencerState.Kind) -> String {
+    switch kind {
+    case .rebase: "rebase"
+    case .cherryPick: "cherry-pick"
+    case .revert: "revert"
+    }
+  }
+
+  private nonisolated func resolveGitPath(_ path: String) -> URL {
+    path.hasPrefix("/")
+      ? URL(filePath: path)
+      : repositoryRoot.appending(path: path)
+  }
+
+  private nonisolated func rebaseState(directory: URL) -> SequencerState {
+    func read(_ name: String) -> String? {
+      guard let data = try? Data(contentsOf: directory.appending(path: name)) else { return nil }
+      return String(decoding: data, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+    var branch = read("head-name")
+    if let name = branch, name.hasPrefix("refs/heads/") {
+      branch = String(name.dropFirst("refs/heads/".count))
+    }
+    return SequencerState(
+      kind: .rebase,
+      branchName: branch,
+      stoppedOID: read("stopped-sha").flatMap(ObjectID.init(rawValue:)),
+      stepNumber: read("msgnum").flatMap(Int.init),
+      stepCount: read("end").flatMap(Int.init)
+    )
   }
 
   public func fetch() async throws {
@@ -343,6 +533,15 @@ public actor SystemGitClient: GitClient {
     try await runVoid(["stash", "drop", stash.reference])
   }
 
+  public func stashDiffs(_ stash: Stash) async throws -> [FileDiff] {
+    // `stash show` emits a regular unified diff; --include-untracked also
+    // surfaces the untracked-files commit our saveStash records.
+    let result = try await run([
+      "stash", "show", "--include-untracked", "--patch", "--find-renames", stash.reference,
+    ])
+    return try GitDiffParser.parse(result.standardOutput)
+  }
+
   // MARK: - Helpers
 
   private func run(_ arguments: [String], timeout: Duration? = .seconds(30)) async throws -> CommandResult {
@@ -358,12 +557,14 @@ public actor SystemGitClient: GitClient {
   private func runVoid(
     _ arguments: [String],
     standardInput: Data? = nil,
+    extraEnvironment: [String: String] = [:],
     timeout: Duration? = .seconds(30)
   ) async throws {
     var command = GitCommand.make(
       git: git,
       repository: repositoryRoot,
       arguments: arguments,
+      extraEnvironment: extraEnvironment,
       timeout: timeout
     )
     command.standardInput = standardInput

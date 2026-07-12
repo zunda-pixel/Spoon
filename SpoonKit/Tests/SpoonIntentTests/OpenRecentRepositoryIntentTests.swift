@@ -4,6 +4,9 @@ import SpoonCore
 import SpoonIntent
 import Testing
 
+// Serialized: these tests (including the extension in
+// StashChangesIntentTests.swift) share the process-wide Defaults recents key.
+@Suite(.serialized)
 @MainActor
 struct OpenRecentRepositoryIntentTests {
   @Test func performRoutesThroughAppModelRecents() async throws {

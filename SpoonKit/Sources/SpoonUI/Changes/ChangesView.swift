@@ -32,6 +32,9 @@ struct ChangesView: View {
   @State private var recentMultiSelection: (rows: Set<RepositoryModel.FileSelection>, at: ContinuousClock.Instant)?
   /// Anchor row for shift-click range selection.
   @State private var selectionAnchor: RepositoryModel.FileSelection?
+  /// Collapsed tree directories, keyed `"<area>|<path>"` — storing the
+  /// collapsed side keeps newly appearing directories expanded.
+  @State private var collapsedDirectories: Set<String> = []
 
   var body: some View {
     VStack(spacing: 0) {
@@ -93,32 +96,34 @@ struct ChangesView: View {
   }
 
   private func changeList(_ status: WorkingTreeStatus) -> some View {
-    // The section lists are computed filters over all entries; bind them
-    // once per render instead of re-filtering on every access.
-    let conflicted = status.conflictedEntries
-    let staged = status.stagedEntries
-    let unstaged = status.unstagedEntries
-    let untracked = status.untrackedEntries
+    // The trees are rebuilt by the model alongside `status`; renders only
+    // pay for the cheap leaf walk below.
+    let trees = model.changeTrees
 
-    // Flat display order, for shift-click range selection.
+    // Flat depth-first display order, for shift-click range selection.
+    func selections(
+      _ tree: [FileTreeNode], _ area: RepositoryModel.ChangeArea
+    ) -> [RepositoryModel.FileSelection] {
+      FileTreeBuilder.leafEntries(tree).map {
+        RepositoryModel.FileSelection(path: $0.path, area: area)
+      }
+    }
     let order =
-      conflicted.map { RepositoryModel.FileSelection(path: $0.path, area: .conflicted) }
-      + staged.map { RepositoryModel.FileSelection(path: $0.path, area: .staged) }
-      + unstaged.map { RepositoryModel.FileSelection(path: $0.path, area: .unstaged) }
-      + untracked.map { RepositoryModel.FileSelection(path: $0.path, area: .untracked) }
+      selections(trees.conflicted, .conflicted) + selections(trees.staged, .staged)
+      + selections(trees.unstaged, .unstaged) + selections(trees.untracked, .untracked)
 
     return List(selection: $selection) {
-      section("Conflicts", entries: conflicted, area: .conflicted, order: order)
+      section("Conflicts", tree: trees.conflicted, area: .conflicted, order: order)
       // A visible Changes list always has unstaged content when Staged is
       // empty, so the stage drop target needs no further condition.
       section(
-        "Staged", entries: staged, area: .staged, order: order, showsEmptyDropTarget: true
+        "Staged", tree: trees.staged, area: .staged, order: order, showsEmptyDropTarget: true
       )
       section(
-        "Modified", entries: unstaged, area: .unstaged, order: order,
-        showsEmptyDropTarget: !staged.isEmpty
+        "Modified", tree: trees.unstaged, area: .unstaged, order: order,
+        showsEmptyDropTarget: !trees.staged.isEmpty
       )
-      section("Untracked", entries: untracked, area: .untracked, order: order)
+      section("Untracked", tree: trees.untracked, area: .untracked, order: order)
     }
     // Return mirrors double-click: stage/unstage everything selected.
     .onKeyPress(.return) {
@@ -131,14 +136,14 @@ struct ChangesView: View {
   @ViewBuilder
   private func section(
     _ title: String,
-    entries: [FileStatusEntry],
+    tree: [FileTreeNode],
     area: RepositoryModel.ChangeArea,
     order: [RepositoryModel.FileSelection],
     showsEmptyDropTarget: Bool = false
   ) -> some View {
-    if !entries.isEmpty || showsEmptyDropTarget {
+    if !tree.isEmpty || showsEmptyDropTarget {
       Section(title) {
-        if entries.isEmpty {
+        if tree.isEmpty {
           Label(
             area == .staged ? "Drop files here to stage" : "Drop files here to unstage",
             systemImage: "tray.and.arrow.down"
@@ -148,29 +153,61 @@ struct ChangesView: View {
             handleDrop(items, into: area)
           }
         }
-        ForEach(entries) { entry in
-          FileStatusRow(entry: entry)
-            .tag(RepositoryModel.FileSelection(path: entry.path, area: area))
-            // Any SwiftUI gesture on the row content swallows the click
-            // before the List's AppKit row selection sees it, so this
-            // handler performs selection itself (and the double-click
-            // action via NSEvent.clickCount). Clicks on the row's blank
-            // area still go through the List natively.
-            .simultaneousGesture(
-              TapGesture().onEnded {
-                handleRowClick(for: entry, area: area, order: order)
-              }
-            )
-            .contextMenu {
-              contextMenu(for: entry, area: area)
-            }
-            .draggable(dragPayload(for: entry, area: area))
-            .dropDestination(for: ChangePathsPayload.self) { items, _ in
-              handleDrop(items, into: area)
-            }
+        ForEach(tree) { node in
+          ChangeTreeNodeView(
+            node: node,
+            isExpanded: { expansionBinding(for: $0, area: area) },
+            fileRow: { entry, name in
+              fileRow(entry, displayName: name, area: area, order: order)
+            },
+            onDrop: { items in handleDrop(items, into: area) }
+          )
         }
       }
     }
+  }
+
+  private func fileRow(
+    _ entry: FileStatusEntry,
+    displayName: String,
+    area: RepositoryModel.ChangeArea,
+    order: [RepositoryModel.FileSelection]
+  ) -> some View {
+    FileStatusRow(entry: entry, displayName: displayName)
+      .tag(RepositoryModel.FileSelection(path: entry.path, area: area))
+      // Any SwiftUI gesture on the row content swallows the click
+      // before the List's AppKit row selection sees it, so this
+      // handler performs selection itself (and the double-click
+      // action via NSEvent.clickCount). Clicks on the row's blank
+      // area still go through the List natively.
+      .simultaneousGesture(
+        TapGesture().onEnded {
+          handleRowClick(for: entry, area: area, order: order)
+        }
+      )
+      .contextMenu {
+        contextMenu(for: entry, area: area)
+      }
+      .draggable(dragPayload(for: entry, area: area))
+      .dropDestination(for: ChangePathsPayload.self) { items, _ in
+        handleDrop(items, into: area)
+      }
+  }
+
+  private func expansionBinding(
+    for node: FileTreeNode, area: RepositoryModel.ChangeArea
+  ) -> Binding<Bool> {
+    let key = "\(area)|\(node.path)"
+    return Binding(
+      get: { !collapsedDirectories.contains(key) },
+      set: { expanded in
+        if expanded {
+          collapsedDirectories.remove(key)
+        } else {
+          collapsedDirectories.insert(key)
+        }
+      }
+    )
   }
 
   /// Manual selection for clicks landing on row content: plain click
@@ -340,17 +377,64 @@ struct ChangesView: View {
         moveFiles(stage: [entry.path], unstage: [])
       }
     }
+    // Deleted files have nothing on disk to open or reveal.
+    let url = model.repository.rootURL.appending(path: entry.path)
+    if FileManager.default.fileExists(atPath: url.path) {
+      Divider()
+      Button("Open") {
+        NSWorkspace.shared.open(url)
+      }
+      Button("Reveal in Finder") {
+        NSWorkspace.shared.activateFileViewerSelecting([url])
+      }
+    }
+  }
+}
+
+/// One node of the Changes tree: files render through the fully configured
+/// row closure the owning view supplies; directories are disclosure groups.
+@MainActor
+private struct ChangeTreeNodeView<Row: View>: View {
+  let node: FileTreeNode
+  let isExpanded: (FileTreeNode) -> Binding<Bool>
+  let fileRow: (FileStatusEntry, String) -> Row
+  let onDrop: ([ChangePathsPayload]) -> Void
+
+  var body: some View {
+    if let entry = node.entry {
+      fileRow(entry, node.name)
+    } else if let children = node.children {
+      DisclosureGroup(isExpanded: isExpanded(node)) {
+        ForEach(children) { child in
+          ChangeTreeNodeView(
+            node: child, isExpanded: isExpanded, fileRow: fileRow, onDrop: onDrop
+          )
+        }
+      } label: {
+        Label(node.name, systemImage: "folder")
+          .foregroundStyle(.secondary)
+          .frame(maxWidth: .infinity, alignment: .leading)
+          .contentShape(Rectangle())
+          .onTapGesture {
+            isExpanded(node).wrappedValue.toggle()
+          }
+          .dropDestination(for: ChangePathsPayload.self) { items, _ in
+            onDrop(items)
+          }
+      }
+    }
   }
 }
 
 @MainActor
 struct FileStatusRow: View {
   let entry: FileStatusEntry
+  var displayName: String
 
   var body: some View {
     Label {
       VStack(alignment: .leading, spacing: 1) {
-        Text(entry.path)
+        Text(displayName)
           .lineLimit(1)
           .truncationMode(.middle)
         if let originalPath = entry.originalPath {

@@ -1,6 +1,5 @@
+public import Foundation
 public import Observation
-
-import Foundation
 
 /// Per-window hub tying one repository's git state to the UI.
 /// M2 adds file watching, mutations, GitHub sync, and AI services here.
@@ -10,9 +9,14 @@ public final class RepositoryModel {
   public let repository: Repository
 
   public private(set) var status: WorkingTreeStatus?
+  /// Directory trees for the Changes list, rebuilt alongside `status`.
+  public private(set) var changeTrees = ChangeTrees.empty
   public private(set) var branches: [Branch] = []
   public private(set) var remotes: [Remote] = []
   public private(set) var stashes: [Stash] = []
+  public private(set) var worktrees: [Worktree] = []
+  /// An in-progress rebase / cherry-pick / revert (conflict or edit pause).
+  public private(set) var sequencerState: SequencerState?
   public private(set) var isRefreshing = false
   /// A long-running mutation (fetch/pull/push/commit/…) is in flight.
   public private(set) var isBusy = false
@@ -171,10 +175,21 @@ public final class RepositoryModel {
     isRefreshing = true
     defer { isRefreshing = false }
     do {
-      status = try await gitClient.status()
-      branches = try await gitClient.branches()
-      remotes = try await gitClient.remotes()
-      stashes = try await gitClient.stashes()
+      // Independent reads; the client suspends per subprocess, so these
+      // genuinely run concurrently and refresh takes one round trip.
+      async let status = gitClient.status()
+      async let branches = gitClient.branches()
+      async let remotes = gitClient.remotes()
+      async let stashes = gitClient.stashes()
+      async let worktrees = gitClient.worktrees()
+      async let sequencerState = gitClient.sequencerState()
+      self.status = try await status
+      self.branches = try await branches
+      self.remotes = try await remotes
+      self.stashes = try await stashes
+      self.worktrees = try await worktrees
+      self.sequencerState = try await sequencerState
+      changeTrees = self.status.map(ChangeTrees.init) ?? .empty
       lastErrorMessage = nil
     } catch {
       lastErrorMessage = error.localizedDescription
@@ -346,6 +361,16 @@ public final class RepositoryModel {
     await discardLines(DiffPatchBuilder.changedLineOffsets(of: hunk), of: hunkID, in: diff)
   }
 
+  /// Removes only the selected changed lines of one hunk from the index,
+  /// leaving the working tree untouched. `diff` must be a staged diff.
+  public func unstageLines(_ offsets: Set<Int>, of hunkID: Hunk.ID, in diff: FileDiff) async {
+    guard
+      let patch = DiffPatchBuilder.discardPatch(
+        for: diff, hunkID: hunkID, selectedOffsets: offsets)
+    else { return }
+    await perform { try await $0.applyPatch(patch, reverse: true, toIndex: true) }
+  }
+
   public func commit(message: String, amend: Bool = false) async -> Bool {
     await perform { try await $0.commit(message: message, amend: amend) }
   }
@@ -366,8 +391,94 @@ public final class RepositoryModel {
     await perform { try await $0.checkout(branch: branch) }
   }
 
-  public func createBranch(name: String, checkout: Bool = true) async {
-    await perform { try await $0.createBranch(name: name, checkout: checkout) }
+  public func createBranch(
+    name: String, from startPoint: String? = nil, checkout: Bool = true
+  ) async {
+    await perform { try await $0.createBranch(name: name, from: startPoint, checkout: checkout) }
+  }
+
+  public func checkoutRemoteBranch(_ remoteBranch: String) async {
+    await perform { try await $0.checkoutRemoteBranch(remoteBranch) }
+  }
+
+  /// Destructive: deletes a local branch (`-D` when `force`).
+  public func deleteBranch(name: String, force: Bool = false) async {
+    await perform { try await $0.deleteBranch(name: name, force: force) }
+  }
+
+  public func renameBranch(from oldName: String, to newName: String) async {
+    await perform { try await $0.renameBranch(from: oldName, to: newName) }
+  }
+
+  // MARK: - Worktrees
+
+  /// The linked worktree that has `branch` checked out, if any.
+  public func worktree(for branch: Branch) -> Worktree? {
+    worktrees.first { !$0.isMain && $0.branch == branch.name }
+  }
+
+  public func addWorktree(path: URL, branch: String) async {
+    await perform { try await $0.addWorktree(path: path, branch: branch) }
+  }
+
+  /// Destructive when `force`: discards the worktree's local changes.
+  public func removeWorktree(path: URL, force: Bool = false) async {
+    await perform { try await $0.removeWorktree(path: path, force: force) }
+  }
+
+  // MARK: - Sequencer (rebase / cherry-pick / revert)
+
+  public var isSequencing: Bool { sequencerState != nil }
+
+  /// Builds the editable rebase plan whose oldest step is `commit`.
+  public func rebasePlan(from commit: Commit) async throws -> RebasePlan {
+    guard sequencerState == nil else { throw RebaseSetupError.sequencerActive }
+    guard let status else { throw RebaseSetupError.workingTreeNotClean }
+    guard status.headBranch != nil else { throw RebaseSetupError.detachedHead }
+    guard
+      status.stagedEntries.isEmpty,
+      status.unstagedEntries.isEmpty,
+      status.conflictedEntries.isEmpty
+    else { throw RebaseSetupError.workingTreeNotClean }
+
+    let baseOID = commit.parents.first
+    let reference = baseOID.map { "\($0.rawValue)..HEAD" } ?? "HEAD"
+    let page = try await gitClient.log(LogQuery(reference: reference, maxCount: 1000))
+    guard !page.hasMore else { throw RebaseSetupError.rangeTooLarge }
+    guard !page.commits.contains(where: \.isMerge) else { throw RebaseSetupError.mergeInRange }
+    return RebasePlan(
+      steps: page.commits.reversed().map { RebaseStep(action: .pick, commit: $0) },
+      baseOID: baseOID
+    )
+  }
+
+  @discardableResult
+  public func interactiveRebase(_ plan: RebasePlan) async -> Bool {
+    await perform { try await $0.interactiveRebase(plan) }
+  }
+
+  public func cherryPick(_ oid: ObjectID) async {
+    await perform { try await $0.cherryPick(oid) }
+  }
+
+  public func revert(_ oid: ObjectID) async {
+    await perform { try await $0.revert(oid) }
+  }
+
+  public func continueSequencer() async {
+    guard let kind = sequencerState?.kind else { return }
+    await perform { try await $0.continueSequencer(kind) }
+  }
+
+  public func skipSequencer() async {
+    guard let kind = sequencerState?.kind else { return }
+    await perform { try await $0.skipSequencer(kind) }
+  }
+
+  /// Destructive: throws away the sequencer's applied work so far.
+  public func abortSequencer() async {
+    guard let kind = sequencerState?.kind else { return }
+    await perform { try await $0.abortSequencer(kind) }
   }
 
   public func fetch() async {
@@ -394,6 +505,10 @@ public final class RepositoryModel {
 
   public func dropStash(_ stash: Stash) async {
     await perform { try await $0.dropStash(stash) }
+  }
+
+  public func stashDiffs(_ stash: Stash) async throws -> [FileDiff] {
+    try await gitClient.stashDiffs(stash)
   }
 
   /// Runs one mutation with busy-state, error capture, and a single

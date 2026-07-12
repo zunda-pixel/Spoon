@@ -39,11 +39,40 @@ public protocol GitClient: Sendable {
   func removeRemote(name: String) async throws
 
   func checkout(branch: String) async throws
-  func createBranch(name: String, checkout: Bool) async throws
+  /// Creates a branch at `startPoint` (HEAD when nil), optionally checking
+  /// it out.
+  func createBranch(name: String, from startPoint: String?, checkout: Bool) async throws
+  /// Creates and checks out a local tracking branch for a remote-tracking
+  /// branch like `origin/feature`.
+  func checkoutRemoteBranch(_ remoteBranch: String) async throws
+  /// Deletes a local branch (`-d`, or `-D` when `force`).
+  func deleteBranch(name: String, force: Bool) async throws
+  /// Renames a local branch (`branch -m`); works on the current branch too.
+  func renameBranch(from oldName: String, to newName: String) async throws
   func fetch() async throws
   func pull() async throws
   /// Pushes the current branch; sets upstream on first push.
   func push(force: Bool) async throws
+
+  /// All worktrees of this repository, main worktree first.
+  func worktrees() async throws -> [Worktree]
+  /// Creates a linked worktree at `path` checked out to existing `branch`.
+  func addWorktree(path: URL, branch: String) async throws
+  /// Removes a linked worktree (`--force` discards its local changes).
+  func removeWorktree(path: URL, force: Bool) async throws
+
+  /// Runs a headless `rebase -i` driven by `plan`'s todo list. May return
+  /// with the rebase paused (edit step or conflict) — check `sequencerState()`.
+  func interactiveRebase(_ plan: RebasePlan) async throws
+  /// Applies one commit onto HEAD, keeping its original message.
+  func cherryPick(_ oid: ObjectID) async throws
+  /// Adds one inverse commit with git's default revert message.
+  func revert(_ oid: ObjectID) async throws
+  /// `nil` when no rebase/cherry-pick/revert is in progress.
+  func sequencerState() async throws -> SequencerState?
+  func continueSequencer(_ kind: SequencerState.Kind) async throws
+  func skipSequencer(_ kind: SequencerState.Kind) async throws
+  func abortSequencer(_ kind: SequencerState.Kind) async throws
 
   /// Merge base between two refs.
   func mergeBase(_ a: String, _ b: String) async throws -> ObjectID
@@ -60,4 +89,6 @@ public protocol GitClient: Sendable {
   func saveStash(message: String?, includeUntracked: Bool) async throws
   func applyStash(_ stash: Stash, pop: Bool) async throws
   func dropStash(_ stash: Stash) async throws
+  /// The changes a stash would reapply (its parent vs the stash commit).
+  func stashDiffs(_ stash: Stash) async throws -> [FileDiff]
 }

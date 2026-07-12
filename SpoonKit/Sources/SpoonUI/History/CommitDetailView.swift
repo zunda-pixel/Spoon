@@ -1,3 +1,4 @@
+import AppKit
 import SpoonCore
 import SwiftUI
 
@@ -9,6 +10,7 @@ struct CommitDetailView: View {
 
   @State private var detail: CommitDetail?
   @State private var errorMessage: String?
+  @State private var lineSelection: DiffLineSelection?
 
   init(model: RepositoryModel, oid: ObjectID) {
     self.model = model
@@ -21,7 +23,11 @@ struct CommitDetailView: View {
         VStack(spacing: 0) {
           header(detail)
           Divider()
-          FileDiffListView(diffs: detail.diffs)
+          if let lineSelection {
+            copyBar(lineSelection, diffs: detail.diffs)
+            Divider()
+          }
+          FileDiffListView(diffs: detail.diffs, lineSelection: $lineSelection)
         }
       } else if let errorMessage {
         ContentUnavailableView(
@@ -36,12 +42,36 @@ struct CommitDetailView: View {
     .task(id: oid) {
       do {
         errorMessage = nil
+        lineSelection = nil
         detail = try await model.commitDetail(oid)
       } catch {
         detail = nil
         errorMessage = error.localizedDescription
       }
     }
+  }
+
+  private func copyBar(_ lineSelection: DiffLineSelection, diffs: [FileDiff]) -> some View {
+    LineSelectionBar(selection: lineSelection, onDeselect: { self.lineSelection = nil }) {
+      Button("Copy Selected Lines") {
+        copySelectedLines(lineSelection, diffs: diffs)
+      }
+    }
+  }
+
+  /// Copies the selected lines' text without the +/- diff markers.
+  private func copySelectedLines(_ selection: DiffLineSelection, diffs: [FileDiff]) {
+    guard
+      let diff = diffs.first(where: { $0.id == selection.fileID }),
+      let hunk = diff.hunks.first(where: { $0.id == selection.hunkID })
+    else { return }
+    let text =
+      selection.offsets.sorted()
+      .filter { hunk.lines.indices.contains($0) }
+      .map { hunk.lines[$0].text }
+      .joined(separator: "\n")
+    NSPasteboard.general.clearContents()
+    NSPasteboard.general.setString(text, forType: .string)
   }
 
   private func header(_ detail: CommitDetail) -> some View {
