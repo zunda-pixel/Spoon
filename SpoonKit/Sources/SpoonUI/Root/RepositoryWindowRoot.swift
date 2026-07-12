@@ -6,6 +6,7 @@ enum SidebarItem: Hashable {
   case history
   case branch(String)
   case pullRequests
+  case remote(String)
 }
 
 @MainActor
@@ -226,6 +227,7 @@ struct RepositorySplitView: View {
     case .history: "History"
     case .branch(let name): name
     case .pullRequests: "Pull Requests"
+    case .remote(let name): name
     }
   }
 
@@ -238,6 +240,8 @@ struct RepositorySplitView: View {
       HistoryListView(model: model, selectedCommitID: $selectedCommitID)
     case .pullRequests:
       PRListView(model: model, selectedPRNumber: $selectedPRNumber)
+    case .remote(let name):
+      RemoteDetailView(model: model, remoteName: name)
     }
   }
 
@@ -266,6 +270,8 @@ struct RepositorySplitView: View {
       } else {
         noSelectionPlaceholder
       }
+    case .remote:
+      noSelectionPlaceholder
     }
   }
 

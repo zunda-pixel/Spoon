@@ -207,6 +207,25 @@ public actor SystemGitClient: GitClient {
     try await runVoid(arguments, standardInput: Data(message.utf8), timeout: .seconds(120))
   }
 
+  public func remoteBranches(of remoteName: String) async throws -> [Branch] {
+    let result = try await run([
+      "for-each-ref", "refs/remotes/\(remoteName)",
+      "--sort=-committerdate",
+      "--format=\(GitRefParser.branchFormat)",
+    ])
+    // HEAD/upstream fields are empty for remote refs; the parser maps them
+    // to isCurrent=false / upstream=nil, which is exactly right here.
+    return try GitRefParser.parseBranches(result.standardOutput)
+  }
+
+  public func addRemote(name: String, url: String) async throws {
+    try await runVoid(["remote", "add", name, url])
+  }
+
+  public func removeRemote(name: String) async throws {
+    try await runVoid(["remote", "remove", name])
+  }
+
   public func checkout(branch: String) async throws {
     try await runVoid(["switch", branch])
   }

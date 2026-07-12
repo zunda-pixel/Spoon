@@ -69,6 +69,28 @@ struct SystemGitClientTests {
     }
   }
 
+  @Test func remoteManagementSendsExactArgv() async throws {
+    let runner = FakeCommandRunner()
+    runner.stub(
+      arguments: [
+        "-c", "color.ui=false",
+        "-c", "core.quotePath=false",
+        "remote", "add", "origin", "https://github.com/o/r.git",
+      ]
+    )
+    runner.stub(
+      arguments: [
+        "-c", "color.ui=false",
+        "-c", "core.quotePath=false",
+        "remote", "remove", "origin",
+      ]
+    )
+    let client = makeClient(runner)
+    try await client.addRemote(name: "origin", url: "https://github.com/o/r.git")
+    try await client.removeRemote(name: "origin")
+    #expect(runner.invocations.count == 2)
+  }
+
   @Test func parsesRemoteListing() {
     let remotes = SystemGitClient.parseRemotes(
       """

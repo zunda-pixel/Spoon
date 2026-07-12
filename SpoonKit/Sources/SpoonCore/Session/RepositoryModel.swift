@@ -350,6 +350,18 @@ public final class RepositoryModel {
     await perform { try await $0.commit(message: message, amend: amend) }
   }
 
+  public func remoteBranches(of remoteName: String) async throws -> [Branch] {
+    try await gitClient.remoteBranches(of: remoteName)
+  }
+
+  public func addRemote(name: String, url: String) async {
+    await perform { try await $0.addRemote(name: name, url: url) }
+  }
+
+  public func removeRemote(name: String) async {
+    await perform { try await $0.removeRemote(name: name) }
+  }
+
   public func checkout(branch: String) async {
     await perform { try await $0.checkout(branch: branch) }
   }

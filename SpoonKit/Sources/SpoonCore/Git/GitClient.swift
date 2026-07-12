@@ -33,6 +33,11 @@ public protocol GitClient: Sendable {
   /// Commits staged changes; message may be multi-line.
   func commit(message: String, amend: Bool) async throws
 
+  /// Remote-tracking branches of one remote (`refs/remotes/<name>`).
+  func remoteBranches(of remoteName: String) async throws -> [Branch]
+  func addRemote(name: String, url: String) async throws
+  func removeRemote(name: String) async throws
+
   func checkout(branch: String) async throws
   func createBranch(name: String, checkout: Bool) async throws
   func fetch() async throws

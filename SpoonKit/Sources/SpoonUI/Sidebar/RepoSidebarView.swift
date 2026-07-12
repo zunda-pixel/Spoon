@@ -5,6 +5,13 @@ import SwiftUI
 struct RepoSidebarView: View {
   let model: RepositoryModel
   @Binding var selection: SidebarItem?
+  @State private var showingAddRemoteSheet = false
+  @State private var removingRemote: Remote?
+
+  init(model: RepositoryModel, selection: Binding<SidebarItem?>) {
+    self.model = model
+    self._selection = selection
+  }
 
   var body: some View {
     List(selection: $selection) {
@@ -61,16 +68,107 @@ struct RepoSidebarView: View {
         }
       }
 
-      if !model.remotes.isEmpty {
-        Section("Remotes") {
-          ForEach(model.remotes) { remote in
-            Label(remote.name, systemImage: "network")
-              .foregroundStyle(.secondary)
-          }
+      Section("Remotes") {
+        if model.remotes.isEmpty {
+          Label("No remotes", systemImage: "network.slash")
+            .foregroundStyle(.tertiary)
+            .contextMenu {
+              addRemoteButton
+            }
+        }
+        ForEach(model.remotes) { remote in
+          Label(remote.name, systemImage: "network")
+            .tag(SidebarItem.remote(remote.name))
+            .help(remote.fetchURL)
+            .contextMenu {
+              addRemoteButton
+              Divider()
+              Button("Remove \"\(remote.name)\"…", role: .destructive) {
+                removingRemote = remote
+              }
+            }
         }
       }
     }
     .listStyle(.sidebar)
+    .sheet(isPresented: $showingAddRemoteSheet) {
+      AddRemoteSheet(model: model)
+    }
+    .confirmationDialog(
+      "Remove remote \"\(removingRemote?.name ?? "")\"?",
+      isPresented: .init(
+        get: { removingRemote != nil },
+        set: { if !$0 { removingRemote = nil } }
+      )
+    ) {
+      Button("Remove Remote", role: .destructive) {
+        guard let remote = removingRemote else { return }
+        Task { await model.removeRemote(name: remote.name) }
+      }
+    } message: {
+      Text("Remote-tracking branches and settings for this remote will be deleted.")
+    }
+  }
+
+  private var addRemoteButton: some View {
+    Button("Add Remote…") {
+      showingAddRemoteSheet = true
+    }
+    .disabled(model.isBusy)
+  }
+}
+
+@MainActor
+struct AddRemoteSheet: View {
+  let model: RepositoryModel
+  @Environment(\.dismiss) private var dismiss
+  @State private var name: String
+  @State private var url = ""
+
+  init(model: RepositoryModel) {
+    self.model = model
+    // The conventional first remote name.
+    self._name = State(initialValue: model.remotes.isEmpty ? "origin" : "")
+  }
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 12) {
+      Text("Add Remote")
+        .font(.headline)
+      Form {
+        TextField("Name", text: $name, prompt: Text("origin"))
+        TextField("URL", text: $url, prompt: Text("https://github.com/owner/repo.git"))
+          .onSubmit(add)
+      }
+      .textFieldStyle(.roundedBorder)
+      .frame(width: 360)
+      HStack {
+        Spacer()
+        Button("Cancel", role: .cancel) {
+          dismiss()
+        }
+        Button("Add", action: add)
+          .keyboardShortcut(.defaultAction)
+          .disabled(!isValid)
+      }
+    }
+    .padding(20)
+  }
+
+  private var isValid: Bool {
+    let trimmedName = name.trimmingCharacters(in: .whitespaces)
+    let trimmedURL = url.trimmingCharacters(in: .whitespaces)
+    return !trimmedName.isEmpty && !trimmedName.contains(" ")
+      && !trimmedURL.isEmpty
+      && !model.remotes.contains { $0.name == trimmedName }
+  }
+
+  private func add() {
+    guard isValid else { return }
+    let trimmedName = name.trimmingCharacters(in: .whitespaces)
+    let trimmedURL = url.trimmingCharacters(in: .whitespaces)
+    dismiss()
+    Task { await model.addRemote(name: trimmedName, url: trimmedURL) }
   }
 }
 
