@@ -1,6 +1,12 @@
 {
   "version": 1,
   "skills": {
+    "compose-app-icon": {
+      "source": "giginet/apple-icon-composer-skill",
+      "sourceType": "github",
+      "skillPath": "skills/compose-app-icon/SKILL.md",
+      "computedHash": "d825968f591a32c83f49be0ee986e4335204fa157c46a1a3eb5b6779fe636cb8"
+    },
     "ios-design-guidelines": {
       "source": "ehmo/platform-design-skills",
       "sourceType": "github",
