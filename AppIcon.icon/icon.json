@@ -1,0 +1,66 @@
+{
+  "fill" : {
+    "linear-gradient" : [
+      "display-p3:0.04000,0.78000,0.96000,1.00000",
+      "display-p3:0.00000,0.43000,0.68000,1.00000"
+    ]
+  },
+  "groups" : [
+    {
+      "layers" : [
+        {
+          "glass" : true,
+          "image-name" : "spoon.png",
+          "name" : "Spoon",
+          "position" : {
+            "scale" : 1.05,
+            "translation-in-points" : [
+              -280,
+              35
+            ]
+          }
+        },
+        {
+          "glass" : true,
+          "image-name" : "spoon.png",
+          "name" : "Spoon",
+          "position" : {
+            "scale" : 1.05,
+            "translation-in-points" : [
+              280,
+              35
+            ]
+          }
+        },
+        {
+          "glass" : true,
+          "image-name" : "spoon.png",
+          "name" : "Spoon",
+          "position" : {
+            "scale" : 1.05,
+            "translation-in-points" : [
+              0,
+              35
+            ]
+          }
+        }
+      ],
+      "lighting" : "combined",
+      "shadow" : {
+        "kind" : "neutral",
+        "opacity" : 0.28
+      },
+      "specular" : true,
+      "translucency" : {
+        "enabled" : true,
+        "value" : 0.08
+      }
+    }
+  ],
+  "supported-platforms" : {
+    "circles" : [
+      "watchOS"
+    ],
+    "squares" : "shared"
+  }
+}
