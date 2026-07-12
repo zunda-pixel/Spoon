@@ -1,4 +1,4 @@
-// swift-tools-version: 6.3
+// swift-tools-version: 6.4
 
 import PackageDescription
 
@@ -20,7 +20,7 @@ let package = Package(
   name: "SpoonKit",
   defaultLocalization: "en",
   platforms: [
-    .macOS("27.0"),
+    .macOS(.v27),
   ],
   products: [
     .library(name: "SpoonUI", targets: ["SpoonUI"])
