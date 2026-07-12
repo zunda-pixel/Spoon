@@ -23,6 +23,7 @@ let package = Package(
     .macOS(.v27),
   ],
   products: [
+    .library(name: "SpoonIntent", targets: ["SpoonIntent"]),
     .library(name: "SpoonUI", targets: ["SpoonUI"])
   ],
   dependencies: [
@@ -53,6 +54,21 @@ let package = Package(
     .testTarget(
       name: "SpoonCoreTests",
       dependencies: ["SpoonCore"],
+      swiftSettings: swiftSettings
+    ),
+    .target(
+      name: "SpoonIntent",
+      dependencies: [
+        .target(name: "SpoonCore"),
+      ],
+      swiftSettings: swiftSettings
+    ),
+    .testTarget(
+      name: "SpoonIntentTests",
+      dependencies: [
+        .target(name: "SpoonIntent"),
+        .target(name: "SpoonCore"),
+      ],
       swiftSettings: swiftSettings
     ),
     .target(

@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		2E96D6E430038A7B00AAD68B /* SpoonIntent in Frameworks */ = {isa = PBXBuildFile; productRef = 2E96D6E330038A7B00AAD68B /* SpoonIntent */; };
 		2EBF7F8C300141CD007721E6 /* SpoonUI in Frameworks */ = {isa = PBXBuildFile; productRef = 2EBF7F8B300141CD007721E6 /* SpoonUI */; };
 /* End PBXBuildFile section */
 
@@ -28,6 +29,7 @@
 		000000000000000130000000 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			files = (
+				2E96D6E430038A7B00AAD68B /* SpoonIntent in Frameworks */,
 				2EBF7F8C300141CD007721E6 /* SpoonUI in Frameworks */,
 			);
 		};
@@ -79,6 +81,7 @@
 			name = Spoon;
 			packageProductDependencies = (
 				2EBF7F8B300141CD007721E6 /* SpoonUI */,
+				2E96D6E330038A7B00AAD68B /* SpoonIntent */,
 			);
 			productName = MyApp;
 			productReference = 000000000000000000000120 /* Spoon.app */;
@@ -387,6 +390,10 @@
 /* End XCConfigurationList section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		2E96D6E330038A7B00AAD68B /* SpoonIntent */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = SpoonIntent;
+		};
 		2EBF7F8B300141CD007721E6 /* SpoonUI */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = SpoonUI;

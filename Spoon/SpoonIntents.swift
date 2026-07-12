@@ -1,37 +1,11 @@
 import AppIntents
-import Foundation
-import SpoonCore
+import SpoonIntent
 
-/// Opens a recently used repository by name — Spotlight / Siri surface.
-struct OpenRecentRepositoryIntent: AppIntent {
-  static let title: LocalizedStringResource = "Open Repository"
-  static let description = IntentDescription("Opens a recent git repository in Spoon.")
-  static let openAppWhenRun = true
-
-  @Parameter(title: "Repository Name")
-  var name: String?
-
-  @MainActor
-  func perform() async throws -> some IntentResult & ProvidesDialog {
-    guard let appModel = AppModel.shared else {
-      return .result(dialog: "Spoon is still starting up — try again.")
-    }
-    let recents = appModel.recentRepositories
-    guard !recents.isEmpty else {
-      return .result(dialog: "No recent repositories yet.")
-    }
-    let repository: Repository
-    if let name, !name.isEmpty {
-      guard let match = recents.first(where: { $0.name.localizedCaseInsensitiveContains(name) })
-      else {
-        return .result(dialog: "No recent repository named \(name).")
-      }
-      repository = match
-    } else {
-      repository = recents[0]
-    }
-    appModel.submitExternalOpenRequest(repository.rootURL)
-    return .result(dialog: "Opening \(repository.name).")
+/// Chains the SpoonIntent package into the app's App Intents metadata scan;
+/// without this the intents defined there are invisible to Shortcuts/Siri.
+extension SpoonApp: AppIntentsPackage {
+  nonisolated static var includedPackages: [any AppIntentsPackage.Type] {
+    [SpoonIntentPackage.self]
   }
 }
 
