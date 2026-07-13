@@ -22,7 +22,8 @@ jobs:
 
       - name: Build
         run: |
-          echo "DERIVED_DATA_PATH=$RUNNER_TEMP/DerivedData" >> "$GITHUB_ENV"
+          DERIVED_DATA_PATH="$RUNNER_TEMP/DerivedData"
+          echo "DERIVED_DATA_PATH=$DERIVED_DATA_PATH" >> "$GITHUB_ENV"
 
           xcodebuild \
             -project Spoon.xcodeproj \
