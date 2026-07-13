@@ -156,6 +156,34 @@ struct SystemGitClientTests {
     }
   }
 
+  @Test func cloneWithOptionsSendsExactArgv() async throws {
+    let runner = FakeCommandRunner()
+    runner.stub(
+      arguments: baseFlags + [
+        "clone", "--progress",
+        "--filter=blob:none",
+        "--depth=10",
+        "--single-branch",
+        "--branch", "main",
+        "https://example.com/repo.git", "/tmp/clone-dest",
+      ]
+    )
+    let options = CloneOptions(
+      filterBlobNone: true,
+      depth: 10,
+      singleBranch: true,
+      branch: "main"
+    )
+    try await SystemGitClient.clone(
+      from: "https://example.com/repo.git",
+      to: URL(filePath: "/tmp/clone-dest"),
+      options: options,
+      git: git,
+      runner: runner
+    ) { _ in }
+    #expect(runner.invocations.count == 1)
+  }
+
   @Test func createBranchSendsExactArgv() async throws {
     let runner = FakeCommandRunner()
     runner.stub(arguments: baseFlags + ["switch", "-c", "a"])

@@ -39,6 +39,7 @@ public actor SystemGitClient: GitClient {
   public static func clone(
     from remoteURL: String,
     to destination: URL,
+    options: CloneOptions = .standard,
     git: URL,
     runner: any CommandRunning,
     progress: @escaping @Sendable (String) -> Void
@@ -46,7 +47,7 @@ public actor SystemGitClient: GitClient {
     let command = GitCommand.make(
       git: git,
       repository: nil,
-      arguments: ["clone", "--progress", remoteURL, destination.path],
+      arguments: options.cloneArguments() + [remoteURL, destination.path],
       timeout: .seconds(3600)
     )
     var stderr = Data()

@@ -359,6 +359,32 @@ struct LiveSequencerTests {
     #expect(try await clone.log(LogQuery()).commits.map(\.subject) == ["base"])
   }
 
+  @Test func shallowSingleBranchCloneFetchesOnlyRequestedBranch() async throws {
+    let source = try await LiveRepoFixture.makeTemporaryRepo(runner: runner)
+    let destination = URL.temporaryDirectory.appending(path: "spoon-shallow-clone-\(UUID().uuidString)")
+    defer {
+      try? FileManager.default.removeItem(at: source)
+      try? FileManager.default.removeItem(at: destination)
+    }
+    try await commitFile("base.txt", "base\n", message: "base", in: source)
+    try await arrange(["switch", "-c", "side"], in: source)
+    try await commitFile("side.txt", "side\n", message: "side", in: source)
+    try await arrange(["switch", "main"], in: source)
+
+    let options = CloneOptions(depth: 1, singleBranch: true, branch: "main")
+    try await SystemGitClient.clone(
+      from: source.path,
+      to: destination,
+      options: options,
+      git: LiveRepoFixture.git,
+      runner: runner
+    ) { _ in }
+
+    let clone = makeClient(destination)
+    #expect(try await clone.branches().map(\.name) == ["main"])
+    #expect(try await clone.log(LogQuery()).commits.map(\.subject) == ["base"])
+  }
+
   @Test func createBranchFromAnotherBranchStartsAtItsTip() async throws {
     let root = try await LiveRepoFixture.makeTemporaryRepo(runner: runner)
     defer { try? FileManager.default.removeItem(at: root) }

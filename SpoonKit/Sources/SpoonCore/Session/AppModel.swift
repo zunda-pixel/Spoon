@@ -62,11 +62,18 @@ public final class AppModel {
   public func cloneRepository(
     from remoteURL: String,
     to destination: URL,
+    options: CloneOptions = .standard,
     progress: @escaping @Sendable (String) -> Void
   ) async throws -> Repository {
     let git = try await resolveGit()
     try await SystemGitClient.clone(
-      from: remoteURL, to: destination, git: git, runner: runner, progress: progress)
+      from: remoteURL,
+      to: destination,
+      options: options,
+      git: git,
+      runner: runner,
+      progress: progress
+    )
     return try await openRepository(at: destination)
   }
 

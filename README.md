@@ -79,7 +79,6 @@ are **not exposed** in Spoon’s UI or `GitClient` API today.
 ### Repository & remotes
 
 - **`git init`** — create a new repository from Spoon
-- **Partial / filter clones** — e.g. `--filter=blob:none`, `--depth`, `--single-branch`
 - **Sparse checkout** — `sparse-checkout` / cone mode
 - **Submodule clone** — `--recurse-submodules` at clone time
 - **Edit remote URL** — `git remote set-url` (add/remove only today)

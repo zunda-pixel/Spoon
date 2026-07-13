@@ -132,6 +132,11 @@ private struct CloneRepositorySheet: View {
   @State private var parentPath: String
   @State private var folderName = ""
   @State private var userEditedName = false
+  @State private var filterBlobNone = false
+  @State private var shallowClone = false
+  @State private var depth = 1
+  @State private var singleBranch = false
+  @State private var branchName = ""
   @State private var progressText = ""
   @State private var errorMessage: String?
   @State private var cloneTask: Task<Void, Never>?
@@ -173,6 +178,13 @@ private struct CloneRepositorySheet: View {
             get: { folderName },
             set: { folderName = $0; userEditedName = true }
           )
+        )
+        CloneOptionsFields(
+          filterBlobNone: $filterBlobNone,
+          shallowClone: $shallowClone,
+          depth: $depth,
+          singleBranch: $singleBranch,
+          branchName: $branchName
         )
       }
       .textFieldStyle(.roundedBorder)
@@ -225,6 +237,7 @@ private struct CloneRepositorySheet: View {
       && !parentPath.trimmingCharacters(in: .whitespaces).isEmpty
       && !folderName.trimmingCharacters(in: .whitespaces).isEmpty
       && !FileManager.default.fileExists(atPath: destination.path)
+      && (!shallowClone || depth >= 1)
   }
 
   private func clone() {
@@ -233,9 +246,17 @@ private struct CloneRepositorySheet: View {
     progressText = "Starting clone…"
     let destination = destination
     let url = remoteURL.trimmingCharacters(in: .whitespacesAndNewlines)
+    let options = CloneOptions(
+      filterBlobNone: filterBlobNone,
+      depth: shallowClone ? depth : nil,
+      singleBranch: singleBranch,
+      branch: branchName.isEmpty ? nil : branchName
+    )
     cloneTask = Task {
       do {
-        let repository = try await appModel.cloneRepository(from: url, to: destination) { line in
+        let repository = try await appModel.cloneRepository(
+          from: url, to: destination, options: options
+        ) { line in
           Task { @MainActor in
             progressText = line
           }
