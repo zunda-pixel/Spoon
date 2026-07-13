@@ -73,10 +73,12 @@ struct MergeSheet: View {
       return "The merge fails without changing the repository if a fast-forward is not possible."
     }
     if options.strategy == .ours {
-      return "The “ours” strategy keeps the current tree and ignores all changes from the merged branch."
+      return
+        "The “ours” strategy keeps the current tree and ignores all changes from the merged branch."
     }
     if options.conflictPreference != .automatic {
-      return "The preference applies only to conflicting hunks; non-conflicting changes from both branches remain."
+      return
+        "The preference applies only to conflicting hunks; non-conflicting changes from both branches remain."
     }
     if options.commitMode == .squash {
       return "Changes are staged together without creating a commit."

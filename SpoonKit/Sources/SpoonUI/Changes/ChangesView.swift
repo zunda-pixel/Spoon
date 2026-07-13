@@ -5,7 +5,7 @@ import UniformTypeIdentifiers
 
 /// App-private drag payload for moving files between index areas.
 /// A dedicated UTType keeps foreign text drags from matching the targets.
-private struct ChangePathsPayload: Codable, Transferable {
+struct ChangePathsPayload: Codable, Transferable {
   var paths: [String]
 
   static let contentType = UTType(exportedAs: "com.spoon.app.change-paths")
@@ -19,18 +19,24 @@ private struct ChangePathsPayload: Codable, Transferable {
 struct ChangesView: View {
   let model: RepositoryModel
   @Binding var selection: Set<RepositoryModel.FileSelection>
+  let navigation: RepositoryNavigationState
 
-  init(model: RepositoryModel, selection: Binding<Set<RepositoryModel.FileSelection>>) {
+  init(
+    model: RepositoryModel,
+    selection: Binding<Set<RepositoryModel.FileSelection>>,
+    navigation: RepositoryNavigationState
+  ) {
     self.model = model
     self._selection = selection
+    self.navigation = navigation
   }
 
   @State private var confirmingDiscard: RepositoryModel.FileSelection?
-  @State private var historyPath: String?
   /// The first click of a double-click collapses a multi-selection to the
   /// clicked row (List behavior), so remember the just-collapsed selection
   /// long enough for the double-click handler to act on all of it.
-  @State private var recentMultiSelection: (rows: Set<RepositoryModel.FileSelection>, at: ContinuousClock.Instant)?
+  @State private var recentMultiSelection:
+    (rows: Set<RepositoryModel.FileSelection>, at: ContinuousClock.Instant)?
   /// Anchor row for shift-click range selection.
   @State private var selectionAnchor: RepositoryModel.FileSelection?
   /// Collapsed tree directories, keyed `"<area>|<path>"` — storing the
@@ -94,16 +100,6 @@ struct ChangesView: View {
     } message: {
       Text("This cannot be undone.")
     }
-    .sheet(
-      isPresented: .init(
-        get: { historyPath != nil },
-        set: { if !$0 { historyPath = nil } }
-      )
-    ) {
-      if let historyPath {
-        FileHistorySheet(model: model, path: historyPath)
-      }
-    }
   }
 
   private func changeList(_ status: WorkingTreeStatus) -> some View {
@@ -160,6 +156,11 @@ struct ChangesView: View {
             systemImage: "tray.and.arrow.down"
           )
           .foregroundStyle(.tertiary)
+          .accessibilityHint(
+            area == .staged
+              ? "Drop modified or untracked files to stage them"
+              : "Drop staged files to unstage them"
+          )
           .dropDestination(for: ChangePathsPayload.self) { items, _ in
             handleDrop(items, into: area)
           }
@@ -186,6 +187,11 @@ struct ChangesView: View {
   ) -> some View {
     FileStatusRow(entry: entry, displayName: displayName)
       .tag(RepositoryModel.FileSelection(path: entry.path, area: area))
+      .accessibilityHint(
+        area == .staged
+          ? "Press Return to unstage; use the context menu for more actions"
+          : "Press Return to stage; use the context menu for more actions"
+      )
       // Any SwiftUI gesture on the row content swallows the click
       // before the List's AppKit row selection sees it, so this
       // handler performs selection itself (and the double-click
@@ -197,7 +203,15 @@ struct ChangesView: View {
         }
       )
       .contextMenu {
-        contextMenu(for: entry, area: area)
+        ChangeFileContextMenu(
+          model: model,
+          navigation: navigation,
+          entry: entry,
+          area: area,
+          targets: actionTargets(for: entry, area: area),
+          confirmingDiscard: $confirmingDiscard,
+          moveFiles: moveFiles
+        )
       }
       .draggable(dragPayload(for: entry, area: area))
       .dropDestination(for: ChangePathsPayload.self) { items, _ in
@@ -257,7 +271,9 @@ struct ChangesView: View {
   // MARK: - Drag & drop between areas
 
   /// Dragging a selected row carries the whole selection.
-  private func dragPayload(for entry: FileStatusEntry, area: RepositoryModel.ChangeArea) -> ChangePathsPayload {
+  private func dragPayload(for entry: FileStatusEntry, area: RepositoryModel.ChangeArea)
+    -> ChangePathsPayload
+  {
     ChangePathsPayload(paths: actionTargets(for: entry, area: area).map(\.path).sorted())
   }
 
@@ -332,159 +348,6 @@ struct ChangesView: View {
       }
       if !unstagePaths.isEmpty {
         await model.unstage(paths: unstagePaths)
-      }
-    }
-  }
-
-  @ViewBuilder
-  private func contextMenu(for entry: FileStatusEntry, area: RepositoryModel.ChangeArea) -> some View {
-    let targets = actionTargets(for: entry, area: area)
-    if targets.count > 1 {
-      multiTargetMenu(targets)
-    } else {
-      singleTargetMenu(for: entry, area: area)
-    }
-  }
-
-  @ViewBuilder
-  private func multiTargetMenu(_ targets: Set<RepositoryModel.FileSelection>) -> some View {
-    let stageable = targets.filter { $0.area != .staged }
-    let staged = targets.filter { $0.area == .staged }
-    if !stageable.isEmpty {
-      Button("Stage (\(stageable.count))") {
-        moveFiles(stage: stageable.map(\.path), unstage: [])
-      }
-    }
-    if !staged.isEmpty {
-      Button("Unstage (\(staged.count))") {
-        moveFiles(stage: [], unstage: staged.map(\.path))
-      }
-    }
-  }
-
-  @ViewBuilder
-  private func singleTargetMenu(for entry: FileStatusEntry, area: RepositoryModel.ChangeArea) -> some View {
-    switch area {
-    case .staged:
-      Button("Unstage") {
-        moveFiles(stage: [], unstage: [entry.path])
-      }
-    case .unstaged:
-      Button("Stage") {
-        moveFiles(stage: [entry.path], unstage: [])
-      }
-      Button("Discard Changes…", role: .destructive) {
-        confirmingDiscard = RepositoryModel.FileSelection(path: entry.path, area: area)
-      }
-    case .untracked:
-      Button("Stage") {
-        moveFiles(stage: [entry.path], unstage: [])
-      }
-      Button("Delete File…", role: .destructive) {
-        confirmingDiscard = RepositoryModel.FileSelection(path: entry.path, area: area)
-      }
-    case .conflicted:
-      Button("Mark Resolved (Stage)") {
-        moveFiles(stage: [entry.path], unstage: [])
-      }
-    }
-    if area != .untracked {
-      Divider()
-      Button("Show File History…") {
-        historyPath = entry.path
-      }
-    }
-    // Deleted files have nothing on disk to open or reveal.
-    let url = model.repository.rootURL.appending(path: entry.path)
-    if FileManager.default.fileExists(atPath: url.path) {
-      Divider()
-      Button("Open") {
-        NSWorkspace.shared.open(url)
-      }
-      Button("Reveal in Finder") {
-        NSWorkspace.shared.activateFileViewerSelecting([url])
-      }
-    }
-  }
-}
-
-/// One node of the Changes tree: files render through the fully configured
-/// row closure the owning view supplies; directories are disclosure groups.
-@MainActor
-private struct ChangeTreeNodeView<Row: View>: View {
-  let node: FileTreeNode
-  let isExpanded: (FileTreeNode) -> Binding<Bool>
-  let fileRow: (FileStatusEntry, String) -> Row
-  let onDrop: ([ChangePathsPayload]) -> Void
-
-  var body: some View {
-    if let entry = node.entry {
-      fileRow(entry, node.name)
-    } else if let children = node.children {
-      DisclosureGroup(isExpanded: isExpanded(node)) {
-        ForEach(children) { child in
-          ChangeTreeNodeView(
-            node: child, isExpanded: isExpanded, fileRow: fileRow, onDrop: onDrop
-          )
-        }
-      } label: {
-        Label(node.name, systemImage: "folder")
-          .foregroundStyle(.secondary)
-          .frame(maxWidth: .infinity, alignment: .leading)
-          .contentShape(Rectangle())
-          .onTapGesture {
-            isExpanded(node).wrappedValue.toggle()
-          }
-          .dropDestination(for: ChangePathsPayload.self) { items, _ in
-            onDrop(items)
-          }
-      }
-    }
-  }
-}
-
-@MainActor
-struct FileStatusRow: View {
-  let entry: FileStatusEntry
-  var displayName: String
-
-  var body: some View {
-    Label {
-      VStack(alignment: .leading, spacing: 1) {
-        Text(displayName)
-          .lineLimit(1)
-          .truncationMode(.middle)
-        if let originalPath = entry.originalPath {
-          Text("from \(originalPath)")
-            .font(.caption)
-            .foregroundStyle(.secondary)
-            .lineLimit(1)
-            .truncationMode(.middle)
-        }
-      }
-    } icon: {
-      statusIcon
-    }
-  }
-
-  @ViewBuilder
-  private var statusIcon: some View {
-    if entry.conflict != nil {
-      Image(systemName: "exclamationmark.triangle.fill")
-        .foregroundStyle(.orange)
-    } else if entry.isUntracked {
-      Image(systemName: "questionmark.circle")
-        .foregroundStyle(.secondary)
-    } else {
-      switch entry.staged ?? entry.unstaged {
-      case .added:
-        Image(systemName: "plus.circle.fill").foregroundStyle(.green)
-      case .deleted:
-        Image(systemName: "minus.circle.fill").foregroundStyle(.red)
-      case .renamed, .copied:
-        Image(systemName: "arrow.right.circle.fill").foregroundStyle(.blue)
-      case .modified, .typeChanged, nil:
-        Image(systemName: "pencil.circle.fill").foregroundStyle(.yellow)
       }
     }
   }

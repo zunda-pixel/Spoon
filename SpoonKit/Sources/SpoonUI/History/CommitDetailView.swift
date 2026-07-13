@@ -52,11 +52,15 @@ struct CommitDetailView: View {
   }
 
   private func copyBar(_ lineSelection: DiffLineSelection, diffs: [FileDiff]) -> some View {
-    LineSelectionBar(selection: lineSelection, onDeselect: { self.lineSelection = nil }) {
-      Button("Copy Selected Lines") {
-        copySelectedLines(lineSelection, diffs: diffs)
+    LineSelectionBar(
+      selection: lineSelection,
+      onDeselect: { self.lineSelection = nil },
+      actions: {
+        Button("Copy Selected Lines") {
+          copySelectedLines(lineSelection, diffs: diffs)
+        }
       }
-    }
+    )
   }
 
   /// Copies the selected lines' text without the +/- diff markers.

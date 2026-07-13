@@ -1,7 +1,6 @@
+import Defaults
 public import Foundation
 public import Observation
-
-import Defaults
 
 /// App-wide state: recent repositories, shared process infrastructure, and
 /// the factory for per-window `RepositoryModel`s.

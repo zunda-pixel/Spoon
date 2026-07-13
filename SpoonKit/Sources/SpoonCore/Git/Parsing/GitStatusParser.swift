@@ -84,7 +84,9 @@ public enum GitStatusParser {
 
   /// `2 XY sub mH mI mW hH hI X<score> <path>` — 9 fixed fields, then the path;
   /// the original path arrives as the following NUL token.
-  private static func parseRename(_ record: Substring, originalPath: String) throws -> FileStatusEntry {
+  private static func parseRename(_ record: Substring, originalPath: String) throws
+    -> FileStatusEntry
+  {
     let fields = record.split(separator: " ", maxSplits: 9, omittingEmptySubsequences: false)
     guard fields.count == 10, let xy = xy(fields[1]) else {
       throw ParseError(record: String(record))
@@ -106,7 +108,9 @@ public enum GitStatusParser {
     return FileStatusEntry(path: String(fields[10]), conflict: conflict)
   }
 
-  private static func xy(_ field: Substring) -> (staged: FileStatusEntry.Change?, unstaged: FileStatusEntry.Change?)? {
+  private static func xy(_ field: Substring) -> (
+    staged: FileStatusEntry.Change?, unstaged: FileStatusEntry.Change?
+  )? {
     guard field.count == 2, let x = field.first, let y = field.last else { return nil }
     return (
       staged: x == "." ? nil : FileStatusEntry.Change(rawValue: x),

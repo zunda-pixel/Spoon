@@ -96,20 +96,26 @@ struct DiffDetailView: View {
   }
 
   private func selectionBar(_ lineSelection: DiffLineSelection, diffs: [FileDiff]) -> some View {
-    LineSelectionBar(selection: lineSelection, onDeselect: { self.lineSelection = nil }) {
-      if selection.area == .unstaged {
-        Button("Discard Selected Lines…", role: .destructive) {
-          guard let diff = diffs.first(where: { $0.id == lineSelection.fileID }) else { return }
-          pendingDiscard = .lines(diff, lineSelection.hunkID, lineSelection.offsets)
-        }
-      } else {
-        Button("Unstage Selected Lines") {
-          guard let diff = diffs.first(where: { $0.id == lineSelection.fileID }) else { return }
-          self.lineSelection = nil
-          Task { await model.unstageLines(lineSelection.offsets, of: lineSelection.hunkID, in: diff) }
+    LineSelectionBar(
+      selection: lineSelection,
+      onDeselect: { self.lineSelection = nil },
+      actions: {
+        if selection.area == .unstaged {
+          Button("Discard Selected Lines…", role: .destructive) {
+            guard let diff = diffs.first(where: { $0.id == lineSelection.fileID }) else { return }
+            pendingDiscard = .lines(diff, lineSelection.hunkID, lineSelection.offsets)
+          }
+        } else {
+          Button("Unstage Selected Lines") {
+            guard let diff = diffs.first(where: { $0.id == lineSelection.fileID }) else { return }
+            self.lineSelection = nil
+            Task {
+              await model.unstageLines(lineSelection.offsets, of: lineSelection.hunkID, in: diff)
+            }
+          }
         }
       }
-    }
+    )
   }
 
   private func confirmPendingDiscard() {
@@ -140,18 +146,20 @@ struct DiffDetailView: View {
       HunkAction(
         title: "Stage Hunk",
         systemImage: "plus.circle",
-        isEnabled: { $0.kind == .modified && !$0.isBinary }
-      ) { diff, hunk in
-        Task { await model.stageHunk(hunk.id, of: diff) }
-      }
+        isEnabled: { $0.kind == .modified && !$0.isBinary },
+        handler: { diff, hunk in
+          Task { await model.stageHunk(hunk.id, of: diff) }
+        }
+      )
     case .staged:
       HunkAction(
         title: "Unstage Hunk",
         systemImage: "minus.circle",
-        isEnabled: { $0.kind == .modified && !$0.isBinary }
-      ) { diff, hunk in
-        Task { await model.unstageHunk(hunk.id, of: diff) }
-      }
+        isEnabled: { $0.kind == .modified && !$0.isBinary },
+        handler: { diff, hunk in
+          Task { await model.unstageHunk(hunk.id, of: diff) }
+        }
+      )
     case .untracked, .conflicted:
       nil
     }

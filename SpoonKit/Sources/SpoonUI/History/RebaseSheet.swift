@@ -79,10 +79,13 @@ struct RebaseSheet: View {
                 .truncationMode(.tail)
             }
             if step.action == .reword {
-              TextField("New commit message", text: Binding(
-                get: { step.newMessage ?? "" },
-                set: { step.newMessage = $0 }
-              ))
+              TextField(
+                "New commit message",
+                text: Binding(
+                  get: { step.newMessage ?? "" },
+                  set: { step.newMessage = $0 }
+                )
+              )
               .textFieldStyle(.roundedBorder)
             }
           }

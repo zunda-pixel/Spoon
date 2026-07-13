@@ -17,19 +17,26 @@ struct SequencerBannerView: View {
     HStack(spacing: 12) {
       Image(systemName: "exclamationmark.triangle.fill")
         .foregroundStyle(.orange)
+        .accessibilityHidden(true)
       VStack(alignment: .leading, spacing: 2) {
         Text(title)
           .font(.headline)
+          .accessibilitySortPriority(2)
         Text(subtitle)
           .font(.caption)
           .foregroundStyle(.secondary)
+          .accessibilitySortPriority(1)
       }
+      .accessibilityElement(children: .combine)
       Spacer()
       Button("Continue") {
         Task { await model.continueSequencer() }
       }
       .disabled(hasConflicts || model.isBusy)
       .help(hasConflicts ? "Resolve and stage all conflicts first" : "Resume the operation")
+      .accessibilityHint(
+        hasConflicts ? "Resolve and stage all conflicts first" : "Resumes the paused operation"
+      )
       if state.kind != .merge {
         // `git merge` has no --skip.
         Button("Skip") {
@@ -49,6 +56,9 @@ struct SequencerBannerView: View {
     .overlay(alignment: .bottom) {
       Divider()
     }
+    .accessibilityElement(children: .contain)
+    .accessibilityLabel("\(kindName) status")
+    .accessibilityValue(hasConflicts ? "Paused with conflicts" : "Paused")
     .confirmationDialog("Abort \(kindName)?", isPresented: $confirmingAbort) {
       Button("Abort \(kindName)", role: .destructive) {
         Task { await model.abortSequencer() }

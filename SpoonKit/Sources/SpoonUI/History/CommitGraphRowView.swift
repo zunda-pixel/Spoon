@@ -16,6 +16,7 @@ struct CommitGraphRowView: View {
     HStack(spacing: 10) {
       graphCanvas
         .frame(width: Self.laneWidth * CGFloat(max(row.laneCount, 1)))
+        .accessibilityHidden(true)
 
       VStack(alignment: .leading, spacing: 2) {
         HStack(spacing: 6) {
@@ -42,6 +43,22 @@ struct CommitGraphRowView: View {
       Spacer(minLength: 0)
     }
     .frame(height: Self.rowHeight)
+    .accessibilityElement(children: .ignore)
+    .accessibilityLabel(row.commit.subject)
+    .accessibilityValue(accessibilityValue)
+    .accessibilityHint("Select to show commit details; open the context menu for revision actions")
+  }
+
+  private var accessibilityValue: String {
+    var components = [
+      "Commit \(row.commit.oid.shortened)",
+      "by \(row.commit.authorName)",
+      row.commit.committedAt.formatted(.relative(presentation: .named)),
+    ]
+    if row.commit.isMerge {
+      components.insert("Merge commit", at: 0)
+    }
+    return components.joined(separator: ", ")
   }
 
   private var graphCanvas: some View {

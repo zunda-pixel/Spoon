@@ -1,5 +1,4 @@
 import Foundation
-import Synchronization
 import Testing
 
 @testable import SpoonCore
@@ -45,7 +44,8 @@ struct SystemGitClientTests {
         "--sort=-committerdate",
         "--format=\(GitRefParser.branchFormat)",
       ],
-      stdout: "*\u{0}main\u{0}4ae2b1babc8e42f9dc9e34b7de1836a10ed4c331\u{0}subject\u{0}\u{0}\u{0}1720000000\n"
+      stdout:
+        "*\u{0}main\u{0}4ae2b1babc8e42f9dc9e34b7de1836a10ed4c331\u{0}subject\u{0}\u{0}\u{0}1720000000\n"
     )
 
     let branches = try await makeClient(runner).branches()
@@ -109,6 +109,25 @@ struct SystemGitClientTests {
     )
     try await client.removeRemote(name: "origin")
     #expect(runner.invocations.count == 4)
+  }
+
+  @Test func remotesSendsExactArgvAndPreservesDistinctURLs() async throws {
+    let runner = FakeCommandRunner()
+    runner.stub(
+      arguments: baseFlags + ["remote", "-v"],
+      stdout: """
+        origin\thttps://example.com/fetch.git (fetch)
+        origin\tssh://git@example.com/push.git (push)
+
+        """
+    )
+
+    let remotes = try await makeClient(runner).remotes()
+
+    #expect(remotes.count == 1)
+    #expect(remotes[0].fetchURL == "https://example.com/fetch.git")
+    #expect(remotes[0].pushURL == "ssh://git@example.com/push.git")
+    #expect(runner.invocations.count == 1)
   }
 
   @Test func backfillCapabilityAndCommandSendExactArgv() async throws {
@@ -193,76 +212,6 @@ struct SystemGitClientTests {
     #expect(runner.invocations.count == 2)
   }
 
-  @Test func cloneSendsExactArgvAndStreamsProgress() async throws {
-    let runner = FakeCommandRunner()
-    runner.stub(
-      arguments: baseFlags + [
-        "clone", "--progress", "https://example.com/repo.git", "/tmp/clone-dest",
-      ],
-      stderr: "Cloning into 'clone-dest'...\nReceiving objects:  50%\rReceiving objects: 100%, done.\n"
-    )
-    let lines = Mutex<[String]>([])
-    try await SystemGitClient.clone(
-      from: "https://example.com/repo.git",
-      to: URL(filePath: "/tmp/clone-dest"),
-      git: git,
-      runner: runner
-    ) { line in
-      lines.withLock { $0.append(line) }
-    }
-    #expect(runner.invocations.count == 1)
-    #expect(lines.withLock { $0.last } == "Receiving objects: 100%, done.")
-  }
-
-  @Test func cloneFailureBecomesCommandError() async {
-    let runner = FakeCommandRunner()
-    runner.stub(
-      arguments: baseFlags + [
-        "clone", "--progress", "https://example.com/missing.git", "/tmp/clone-missing",
-      ],
-      stderr: "fatal: repository not found\n",
-      exitCode: 128
-    )
-    await #expect(throws: CommandError.self) {
-      try await SystemGitClient.clone(
-        from: "https://example.com/missing.git",
-        to: URL(filePath: "/tmp/clone-missing"),
-        git: git,
-        runner: runner
-      ) { _ in }
-    }
-  }
-
-  @Test func cloneWithOptionsSendsExactArgv() async throws {
-    let runner = FakeCommandRunner()
-    runner.stub(
-      arguments: baseFlags + [
-        "clone", "--progress",
-        "--filter=blob:none",
-        "--depth=10",
-        "--single-branch",
-        "--branch", "main",
-        "--recurse-submodules",
-        "https://example.com/repo.git", "/tmp/clone-dest",
-      ]
-    )
-    let options = CloneOptions(
-      filterBlobNone: true,
-      depth: 10,
-      singleBranch: true,
-      branch: "main",
-      recurseSubmodules: true
-    )
-    try await SystemGitClient.clone(
-      from: "https://example.com/repo.git",
-      to: URL(filePath: "/tmp/clone-dest"),
-      options: options,
-      git: git,
-      runner: runner
-    ) { _ in }
-    #expect(runner.invocations.count == 1)
-  }
-
   @Test func createBranchSendsExactArgv() async throws {
     let runner = FakeCommandRunner()
     runner.stub(arguments: baseFlags + ["switch", "-c", "a"])
@@ -291,7 +240,7 @@ struct SystemGitClientTests {
     #expect(runner.invocations.count == 1)
   }
 
-  @Test func fileHistoryReflogAndResetSendExactArgv() async throws {
+  @Test func fileHistoryReflogAndResetModesSendExactArgv() async throws {
     let runner = FakeCommandRunner()
     runner.stub(
       arguments: baseFlags + [
@@ -307,16 +256,21 @@ struct SystemGitClientTests {
         "--max-count=25", "--skip=5",
       ]
     )
-    runner.stub(arguments: baseFlags + ["reset", "--hard", "aaaa1111"])
+    for mode in ["soft", "mixed", "hard"] {
+      runner.stub(arguments: baseFlags + ["reset", "--\(mode)", "aaaa1111"])
+    }
     let client = makeClient(runner)
 
     _ = try await client.log(
       LogQuery(path: "Sources/App.swift", maxCount: 10)
     )
     _ = try await client.reflog(maxCount: 25, skip: 5)
-    try await client.reset(to: ObjectID(rawValue: "aaaa1111")!, mode: .hard)
+    let target = ObjectID(rawValue: "aaaa1111")!
+    try await client.reset(to: target, mode: .soft)
+    try await client.reset(to: target, mode: .mixed)
+    try await client.reset(to: target, mode: .hard)
 
-    #expect(runner.invocations.count == 3)
+    #expect(runner.invocations.count == 5)
   }
 
   @Test func mergeSendsExactArgv() async throws {
@@ -452,6 +406,16 @@ struct SystemGitClientTests {
     try await client.disableSparseCheckout()
 
     #expect(runner.invocations.count == 4)
+  }
+
+  @Test func sparseCheckoutRejectsEmptyPathsWithoutRunningGit() async {
+    let runner = FakeCommandRunner()
+    let client = makeClient(runner)
+
+    await #expect(throws: SparseCheckoutError.emptyPaths) {
+      try await client.setSparseCheckout(paths: ["", "  "])
+    }
+    #expect(runner.invocations.isEmpty)
   }
 
   @Test func cherryPickAndRevertSendExactArgv() async throws {

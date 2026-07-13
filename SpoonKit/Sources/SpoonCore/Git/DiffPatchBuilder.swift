@@ -22,7 +22,8 @@ public enum DiffPatchBuilder {
     var delta = 0
     for hunk in diff.hunks {
       guard hunkIDs.contains(hunk.id) else { continue }
-      let newStart = hunk.oldCount == 0
+      let newStart =
+        hunk.oldCount == 0
         ? hunk.oldStart + delta + 1  // pure insertion anchors after oldStart
         : hunk.oldStart + delta
       text += "@@ -\(hunk.oldStart),\(hunk.oldCount) +\(newStart),\(hunk.newCount) @@\n"
@@ -72,7 +73,7 @@ public enum DiffPatchBuilder {
     guard !selection.isEmpty else { return nil }
 
     var body = ""
-    var resultCount = 0    // a side: worktree after the discard
+    var resultCount = 0  // a side: worktree after the discard
     var worktreeCount = 0  // b side: worktree as it is now (matched by -R)
     for (offset, line) in hunk.lines.enumerated() {
       switch line.kind {

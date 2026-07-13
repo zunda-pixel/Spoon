@@ -23,6 +23,27 @@ struct PRBadgeView: View {
     .padding(.vertical, 1)
     .background(.quaternary, in: Capsule())
     .help(pullRequest.title)
+    .accessibilityElement(children: .ignore)
+    .accessibilityLabel("Pull request \(pullRequest.number)")
+    .accessibilityValue(accessibilityValue)
+  }
+
+  private var accessibilityValue: String {
+    var values = [pullRequest.isDraft ? "Draft" : "Open", pullRequest.title]
+    if let checksState = pullRequest.checksState {
+      values.append(checksHelp(checksState))
+    }
+    switch pullRequest.reviewDecision {
+    case .approved:
+      values.append("Approved")
+    case .changesRequested:
+      values.append("Changes requested")
+    case .reviewRequired:
+      values.append("Review required")
+    case nil:
+      break
+    }
+    return values.joined(separator: ", ")
   }
 
   @ViewBuilder

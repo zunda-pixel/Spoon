@@ -21,18 +21,21 @@ struct AIJSONExtractionTests {
   }
 
   @Test func decodesFencedJSON() throws {
-    let report = try AgentCLI.decodeReport(from: "Here you go:\n```json\n\(validReport)\n```\nDone.")
+    let report = try AgentCLI.decodeReport(
+      from: "Here you go:\n```json\n\(validReport)\n```\nDone.")
     #expect(report.findings.count == 1)
   }
 
   @Test func decodesProseWrappedJSON() throws {
-    let report = try AgentCLI.decodeReport(from: "The review result is \(validReport) — hope that helps!")
+    let report = try AgentCLI.decodeReport(
+      from: "The review result is \(validReport) — hope that helps!")
     #expect(report.summary == "Looks good")
   }
 
   @Test func unknownSeverityBecomesMedium() throws {
     let report = try AgentCLI.decodeReport(
-      from: #"{"summary": "s", "findings": [{"file": "a", "severity": "CATASTROPHIC", "title": "t", "body": "b"}]}"#
+      from:
+        #"{"summary": "s", "findings": [{"file": "a", "severity": "CATASTROPHIC", "title": "t", "body": "b"}]}"#
     )
     #expect(report.findings[0].severity == .medium)
   }

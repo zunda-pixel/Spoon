@@ -104,7 +104,9 @@ public struct CommandError: Error, Sendable {
   public var exitCode: Int32?
   public var standardErrorExcerpt: String
 
-  public init(kind: Kind, command: Command, exitCode: Int32? = nil, standardErrorExcerpt: String = "") {
+  public init(
+    kind: Kind, command: Command, exitCode: Int32? = nil, standardErrorExcerpt: String = ""
+  ) {
     self.kind = kind
     self.command = command
     self.exitCode = exitCode

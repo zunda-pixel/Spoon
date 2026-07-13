@@ -1,17 +1,20 @@
 public import Foundation
-
 import HTTPTypes
 import HTTPTypesFoundation
 
 /// Transport seam so tests can replay recorded GraphQL responses.
 public protocol GitHubTransport: Sendable {
-  func post(_ url: URL, headers: [String: String], body: Data) async throws -> (status: Int, body: Data)
+  func post(_ url: URL, headers: [String: String], body: Data) async throws -> (
+    status: Int, body: Data
+  )
 }
 
 public struct URLSessionGitHubTransport: GitHubTransport {
   public init() {}
 
-  public func post(_ url: URL, headers: [String: String], body: Data) async throws -> (status: Int, body: Data) {
+  public func post(_ url: URL, headers: [String: String], body: Data) async throws -> (
+    status: Int, body: Data
+  ) {
     var request = HTTPRequest(method: .post, url: url)
     for (name, value) in headers {
       if let field = HTTPField.Name(name) {

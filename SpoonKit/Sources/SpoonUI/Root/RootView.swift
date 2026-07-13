@@ -1,6 +1,5 @@
 public import SpoonCore
 public import SwiftUI
-
 import os
 
 let uiLogger = Logger(subsystem: "com.spoon.app", category: "ui")

@@ -2,7 +2,6 @@ import SpoonCore
 import SwiftUI
 
 /// Message editor + commit button pinned under the Changes list.
-/// The sparkle menu is a placeholder until the AI milestone.
 @MainActor
 struct CommitComposerView: View {
   let model: RepositoryModel
@@ -21,6 +20,8 @@ struct CommitComposerView: View {
         .scrollContentBackground(.hidden)
         .padding(6)
         .background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 6))
+        .accessibilityLabel("Commit message")
+        .accessibilityHint("Enter the message for the staged changes")
         .overlay(alignment: .topLeading) {
           if message.isEmpty {
             Text("Commit message")
@@ -60,6 +61,7 @@ struct CommitComposerView: View {
         {
           ProgressView()
             .controlSize(.small)
+            .accessibilityLabel("Commit operation in progress")
         }
 
         Button("Commit") {
@@ -80,7 +82,8 @@ struct CommitComposerView: View {
   private var canCommit: Bool {
     guard !model.isBusy else { return false }
     let hasMessage = !message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-    let hasStaged = !(model.status?.stagedEntries.isEmpty ?? true)
+    let hasStaged =
+      !(model.status?.stagedEntries.isEmpty ?? true)
       || !(model.status?.conflictedEntries.isEmpty ?? true)
     return hasMessage && (hasStaged || amend)
   }

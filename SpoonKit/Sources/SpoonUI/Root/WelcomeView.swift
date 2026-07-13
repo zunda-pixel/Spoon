@@ -189,7 +189,10 @@ private struct CloneRepositorySheet: View {
           parentPath: $parentPath,
           folderName: Binding(
             get: { folderName },
-            set: { folderName = $0; userEditedName = true }
+            set: {
+              folderName = $0
+              userEditedName = true
+            }
           )
         )
         CloneOptionsFields(

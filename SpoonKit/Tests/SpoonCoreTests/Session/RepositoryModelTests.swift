@@ -1,0 +1,283 @@
+import Foundation
+import Testing
+
+@testable import SpoonCore
+
+@MainActor
+@Suite("RepositoryModel")
+struct RepositoryModelTests {
+  @Test func refreshAppliesACompleteSnapshot() async {
+    let client = FakeRepositoryGitClient()
+    let oid = makeOID("11111111")
+    await client.configure(
+      status: makeStatus(oid: oid, branch: "main"),
+      branches: [makeBranch("main", oid: oid, isCurrent: true)]
+    )
+    let model = makeModel(client)
+
+    await model.refresh()
+
+    #expect(model.status?.headOID == oid)
+    #expect(model.currentBranch?.name == "main")
+    #expect(model.lastErrorMessage == nil)
+  }
+
+  @Test func mutationRefreshesTheWorkingTree() async {
+    let client = FakeRepositoryGitClient()
+    let oid = makeOID("22222222")
+    await client.configure(
+      status: WorkingTreeStatus(
+        headOID: oid,
+        headBranch: "main",
+        entries: [FileStatusEntry(path: "note.txt", isUntracked: true)]
+      ),
+      branches: [makeBranch("main", oid: oid, isCurrent: true)]
+    )
+    let model = makeModel(client)
+    await model.refresh()
+
+    await model.stage(paths: ["note.txt"])
+
+    #expect(await client.stageCallCount == 1)
+    #expect(model.status?.stagedEntries.map(\.path) == ["note.txt"])
+    #expect(model.status?.untrackedEntries.isEmpty == true)
+  }
+
+  @Test func historyLoadsSubsequentPages() async {
+    let client = FakeRepositoryGitClient()
+    let head = makeOID("33333333")
+    let first = makeCommit("33333333", subject: "first")
+    let second = makeCommit("44444444", subject: "second")
+    await client.configure(
+      status: makeStatus(oid: head, branch: "main"),
+      branches: [makeBranch("main", oid: head, isCurrent: true)],
+      logPages: [
+        0: LogPage(commits: [first], hasMore: true),
+        500: LogPage(commits: [second], hasMore: false),
+      ]
+    )
+    let model = makeModel(client)
+    await model.refresh()
+
+    await model.loadHistoryIfNeeded()
+    #expect(model.historyRows.map(\.commit.subject) == ["first"])
+    #expect(model.hasMoreHistory)
+
+    await model.loadMoreHistory()
+    #expect(model.historyRows.map(\.commit.subject) == ["first", "second"])
+    #expect(!model.hasMoreHistory)
+  }
+
+  @Test func historyLoadsTheSelectedReferenceAndPreservesItAcrossPages() async {
+    let client = FakeRepositoryGitClient()
+    let head = makeOID("77777777")
+    await client.configure(
+      status: makeStatus(oid: head, branch: "main"),
+      branches: [makeBranch("main", oid: head, isCurrent: true)],
+      logPages: [
+        0: LogPage(commits: [makeCommit("77777777", subject: "feature")], hasMore: true),
+        500: LogPage(commits: [], hasMore: false),
+      ]
+    )
+    let model = makeModel(client)
+    await model.refresh()
+
+    await model.loadHistoryIfNeeded(reference: "feature/topic")
+    await model.loadMoreHistory()
+
+    #expect(await client.logQueries.map(\.reference) == ["feature/topic", "feature/topic"])
+  }
+
+  @Test func failedRefreshPreservesThePreviousSnapshot() async {
+    let client = FakeRepositoryGitClient()
+    let originalOID = makeOID("55555555")
+    await client.configure(
+      status: makeStatus(oid: originalOID, branch: "main"),
+      branches: [makeBranch("main", oid: originalOID, isCurrent: true)]
+    )
+    let model = makeModel(client)
+    await model.refresh()
+
+    let replacementOID = makeOID("66666666")
+    await client.configure(
+      status: makeStatus(oid: replacementOID, branch: "replacement"),
+      branches: [makeBranch("replacement", oid: replacementOID, isCurrent: true)],
+      failBranches: true
+    )
+    await model.refresh()
+
+    #expect(model.status?.headOID == originalOID)
+    #expect(model.currentBranch?.name == "main")
+    #expect(model.lastErrorMessage == FakeRepositoryGitClient.Failure.refresh.localizedDescription)
+  }
+
+  private func makeModel(_ client: FakeRepositoryGitClient) -> RepositoryModel {
+    RepositoryModel(
+      repository: Repository(rootURL: URL(filePath: "/tmp/repository-model-tests")),
+      gitClient: client
+    )
+  }
+
+  private func makeStatus(oid: ObjectID, branch: String) -> WorkingTreeStatus {
+    WorkingTreeStatus(headOID: oid, headBranch: branch)
+  }
+
+  private func makeBranch(_ name: String, oid: ObjectID, isCurrent: Bool) -> Branch {
+    Branch(
+      name: name,
+      isCurrent: isCurrent,
+      tip: oid,
+      subject: name,
+      upstream: nil,
+      ahead: nil,
+      behind: nil,
+      committedAt: nil
+    )
+  }
+
+  private func makeCommit(_ oid: String, subject: String) -> Commit {
+    Commit(
+      oid: makeOID(oid),
+      parents: [],
+      subject: subject,
+      authorName: "Tester",
+      authorEmail: "tester@example.com",
+      authoredAt: .distantPast,
+      committedAt: .distantPast
+    )
+  }
+
+  private func makeOID(_ value: String) -> ObjectID {
+    ObjectID(rawValue: value)!
+  }
+}
+
+private actor FakeRepositoryGitClient: GitClient {
+  enum Failure: LocalizedError {
+    case refresh
+    case unimplemented
+
+    var errorDescription: String? {
+      switch self {
+      case .refresh: "Refresh failed"
+      case .unimplemented: "Not implemented by RepositoryModelTests fake"
+      }
+    }
+  }
+
+  nonisolated let repositoryRoot = URL(filePath: "/tmp/repository-model-tests")
+
+  private var currentStatus = WorkingTreeStatus()
+  private var currentBranches: [Branch] = []
+  private var pages: [Int: LogPage] = [:]
+  private var shouldFailBranches = false
+  private(set) var stageCallCount = 0
+  private(set) var logQueries: [LogQuery] = []
+
+  func configure(
+    status: WorkingTreeStatus,
+    branches: [Branch],
+    logPages: [Int: LogPage] = [:],
+    failBranches: Bool = false
+  ) {
+    currentStatus = status
+    currentBranches = branches
+    pages = logPages
+    shouldFailBranches = failBranches
+  }
+
+  func status() async throws -> WorkingTreeStatus { currentStatus }
+
+  func branches() async throws -> [Branch] {
+    if shouldFailBranches { throw Failure.refresh }
+    return currentBranches
+  }
+
+  func remotes() async throws -> [Remote] { [] }
+  func stashes() async throws -> [Stash] { [] }
+  func tags() async throws -> [SpoonCore.Tag] { [] }
+  func worktrees() async throws -> [Worktree] { [] }
+  func sequencerState() async throws -> SequencerState? { nil }
+  func supportsBackfill() async -> Bool { false }
+
+  func stage(paths: [String]) async throws {
+    stageCallCount += 1
+    currentStatus.entries = currentStatus.entries.map { entry in
+      guard paths.contains(entry.path) else { return entry }
+      var updated = entry
+      updated.staged = .added
+      updated.isUntracked = false
+      return updated
+    }
+  }
+
+  func log(_ query: LogQuery) async throws -> LogPage {
+    logQueries.append(query)
+    return pages[query.skip] ?? LogPage(commits: [], hasMore: false)
+  }
+
+  func diffWorkingTree(path: String?, staged: Bool) async throws -> [FileDiff] { [] }
+  func untrackedFileDiff(path: String) async throws -> FileDiff { throw Failure.unimplemented }
+  func unstage(paths: [String]) async throws { throw Failure.unimplemented }
+  func applyPatch(_ patch: String, reverse: Bool, toIndex: Bool) async throws {
+    throw Failure.unimplemented
+  }
+  func discardWorkingTree(paths: [String]) async throws { throw Failure.unimplemented }
+  func deleteUntracked(paths: [String]) async throws { throw Failure.unimplemented }
+  func commit(message: String, amend: Bool) async throws { throw Failure.unimplemented }
+  func reset(to target: ObjectID, mode: ResetMode) async throws { throw Failure.unimplemented }
+  func commitDetail(_ oid: ObjectID) async throws -> CommitDetail { throw Failure.unimplemented }
+  func reflog(maxCount: Int, skip: Int) async throws -> [ReflogEntry] { [] }
+  func checkout(branch: String) async throws { throw Failure.unimplemented }
+  func checkoutRevision(_ oid: ObjectID) async throws { throw Failure.unimplemented }
+  func createBranch(name: String, from startPoint: String?, checkout: Bool) async throws {
+    throw Failure.unimplemented
+  }
+  func checkoutRemoteBranch(_ remoteBranch: String) async throws { throw Failure.unimplemented }
+  func merge(branch: String, options: MergeOptions) async throws { throw Failure.unimplemented }
+  func deleteBranch(name: String, force: Bool) async throws { throw Failure.unimplemented }
+  func renameBranch(from oldName: String, to newName: String) async throws {
+    throw Failure.unimplemented
+  }
+  func defaultBranch() async throws -> String { "main" }
+  func remoteBranches(of remoteName: String) async throws -> [Branch] { [] }
+  func addRemote(name: String, url: String) async throws { throw Failure.unimplemented }
+  func setRemoteURL(name: String, fetchURL: String, pushURL: String?) async throws {
+    throw Failure.unimplemented
+  }
+  func removeRemote(name: String) async throws { throw Failure.unimplemented }
+  func fetch() async throws { throw Failure.unimplemented }
+  func backfill() async throws { throw Failure.unimplemented }
+  func pull() async throws { throw Failure.unimplemented }
+  func push(force: Bool) async throws { throw Failure.unimplemented }
+  func createTag(name: String, at target: ObjectID?, message: String?) async throws {
+    throw Failure.unimplemented
+  }
+  func deleteTag(name: String) async throws { throw Failure.unimplemented }
+  func pushTag(name: String, to remoteName: String) async throws { throw Failure.unimplemented }
+  func pushAllTags(to remoteName: String) async throws { throw Failure.unimplemented }
+  func deleteRemoteTag(name: String, from remoteName: String) async throws {
+    throw Failure.unimplemented
+  }
+  func addWorktree(path: URL, branch: String) async throws { throw Failure.unimplemented }
+  func removeWorktree(path: URL, force: Bool) async throws { throw Failure.unimplemented }
+  func sparseCheckoutPaths() async throws -> [String]? { nil }
+  func setSparseCheckout(paths: [String]) async throws { throw Failure.unimplemented }
+  func disableSparseCheckout() async throws { throw Failure.unimplemented }
+  func interactiveRebase(_ plan: RebasePlan) async throws { throw Failure.unimplemented }
+  func cherryPick(_ oid: ObjectID) async throws { throw Failure.unimplemented }
+  func revert(_ oid: ObjectID) async throws { throw Failure.unimplemented }
+  func continueSequencer(_ kind: SequencerState.Kind) async throws { throw Failure.unimplemented }
+  func skipSequencer(_ kind: SequencerState.Kind) async throws { throw Failure.unimplemented }
+  func abortSequencer(_ kind: SequencerState.Kind) async throws { throw Failure.unimplemented }
+  func mergeBase(_ a: String, _ b: String) async throws -> ObjectID { throw Failure.unimplemented }
+  func diff(from: String, to: String) async throws -> [FileDiff] { [] }
+  func diffText(from: String, to: String) async throws -> String { "" }
+  func stagedDiffText() async throws -> String { "" }
+  func saveStash(message: String?, includeUntracked: Bool) async throws {
+    throw Failure.unimplemented
+  }
+  func applyStash(_ stash: Stash, pop: Bool) async throws { throw Failure.unimplemented }
+  func dropStash(_ stash: Stash) async throws { throw Failure.unimplemented }
+  func stashDiffs(_ stash: Stash) async throws -> [FileDiff] { [] }
+}

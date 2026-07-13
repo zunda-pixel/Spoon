@@ -1,15 +1,23 @@
-public import SwiftUI
-
 import SpoonCore
+public import SwiftUI
 
 struct RepositoryModelFocusedKey: FocusedValueKey {
   typealias Value = RepositoryModel
+}
+
+struct RepositoryNavigationStateFocusedKey: FocusedValueKey {
+  typealias Value = RepositoryNavigationState
 }
 
 extension FocusedValues {
   var repositoryModel: RepositoryModel? {
     get { self[RepositoryModelFocusedKey.self] }
     set { self[RepositoryModelFocusedKey.self] = newValue }
+  }
+
+  var repositoryNavigationState: RepositoryNavigationState? {
+    get { self[RepositoryNavigationStateFocusedKey.self] }
+    set { self[RepositoryNavigationStateFocusedKey.self] = newValue }
   }
 }
 
@@ -18,6 +26,7 @@ extension FocusedValues {
 @MainActor
 public struct SpoonCommands: Commands {
   @FocusedValue(\.repositoryModel) private var model
+  @FocusedValue(\.repositoryNavigationState) private var navigation
 
   public init() {}
 
@@ -33,13 +42,13 @@ public struct SpoonCommands: Commands {
         run { await $0.pull() }
       }
       .keyboardShortcut("l", modifiers: [.shift, .command])
-      .disabled(unavailable)
+      .disabled(repositoryMutationUnavailable)
 
       if model?.supportsBackfill == true {
         Button("Backfill Missing Objects") {
           run { await $0.backfill() }
         }
-        .disabled(unavailable)
+        .disabled(repositoryMutationUnavailable)
       }
 
       Button("Push") {
@@ -49,7 +58,7 @@ public struct SpoonCommands: Commands {
       .disabled(pushUnavailable)
 
       Button("Force Push with Lease…") {
-        model?.requestForcePushConfirmation()
+        navigation?.confirm(.forcePush)
       }
       .keyboardShortcut("u", modifiers: [.option, .shift, .command])
       .disabled(pushUnavailable)
@@ -57,20 +66,45 @@ public struct SpoonCommands: Commands {
       Divider()
 
       Button("New Branch…") {
-        model?.requestNewBranchSheet()
+        navigation?.present(.newBranch(startPoint: nil))
       }
       .keyboardShortcut("n", modifiers: [.shift, .command])
-      .disabled(unavailable)
+      .disabled(repositoryMutationUnavailable)
 
       Button("Sparse Checkout…") {
-        model?.requestSparseCheckoutSheet()
+        navigation?.present(.sparseCheckout)
       }
-      .disabled(unavailable)
+      .keyboardShortcut("k", modifiers: [.option, .command])
+      .disabled(repositoryMutationUnavailable)
 
       Button("Stash Changes") {
         run { await $0.saveStash(message: nil, includeUntracked: true) }
       }
-      .disabled(unavailable)
+      .keyboardShortcut("s", modifiers: [.option, .command])
+      .disabled(repositoryMutationUnavailable || model?.status?.isClean != false)
+
+      if let state = model?.sequencerState {
+        Divider()
+
+        Button("Continue \(sequencerName(state.kind))") {
+          run { await $0.continueSequencer() }
+        }
+        .keyboardShortcut(.return, modifiers: [.shift, .command])
+        .disabled(unavailable || model?.status?.conflictedEntries.isEmpty == false)
+
+        if state.kind != .merge {
+          Button("Skip Current Commit") {
+            run { await $0.skipSequencer() }
+          }
+          .keyboardShortcut(.return, modifiers: [.option, .command])
+          .disabled(unavailable)
+        }
+
+        Button("Abort \(sequencerName(state.kind))…", role: .destructive) {
+          navigation?.confirm(.abortSequencer)
+        }
+        .disabled(unavailable)
+      }
 
       Divider()
 
@@ -80,6 +114,34 @@ public struct SpoonCommands: Commands {
       .keyboardShortcut("r", modifiers: .command)
       .disabled(model == nil)
     }
+
+    CommandGroup(after: .sidebar) {
+      Button("Show Changes") {
+        navigation?.select(.changes)
+      }
+      .keyboardShortcut("1", modifiers: .command)
+      .disabled(navigation == nil)
+
+      Button("Show History") {
+        navigation?.select(.history)
+      }
+      .keyboardShortcut("2", modifiers: .command)
+      .disabled(navigation == nil)
+
+      Button("Show Reflog") {
+        navigation?.select(.reflog)
+      }
+      .keyboardShortcut("3", modifiers: .command)
+      .disabled(navigation == nil)
+
+      if model?.gitHubRepoRef != nil {
+        Button("Show Pull Requests") {
+          navigation?.select(.pullRequests)
+        }
+        .keyboardShortcut("4", modifiers: .command)
+        .disabled(navigation == nil)
+      }
+    }
   }
 
   private var unavailable: Bool {
@@ -88,6 +150,19 @@ public struct SpoonCommands: Commands {
 
   private var pushUnavailable: Bool {
     unavailable || model?.isSequencing == true
+  }
+
+  private var repositoryMutationUnavailable: Bool {
+    unavailable || model?.isSequencing == true
+  }
+
+  private func sequencerName(_ kind: SequencerState.Kind) -> String {
+    switch kind {
+    case .rebase: "Rebase"
+    case .cherryPick: "Cherry-Pick"
+    case .revert: "Revert"
+    case .merge: "Merge"
+    }
   }
 
   private func run(_ operation: @escaping @MainActor (RepositoryModel) async -> Void) {

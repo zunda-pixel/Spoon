@@ -47,7 +47,9 @@ public struct SubprocessCommandRunner: CommandRunning {
           .path(FilePath(command.executable.path(percentEncoded: false))),
           arguments: Arguments(command.arguments),
           environment: subprocessEnvironment(for: command),
-          workingDirectory: command.workingDirectory.map { FilePath($0.path(percentEncoded: false)) },
+          workingDirectory: command.workingDirectory.map {
+            FilePath($0.path(percentEncoded: false))
+          },
           platformOptions: platformOptions(),
           input: .data(stdin),
           output: .data(limit: Self.outputLimit),
@@ -58,7 +60,9 @@ public struct SubprocessCommandRunner: CommandRunning {
           .path(FilePath(command.executable.path(percentEncoded: false))),
           arguments: Arguments(command.arguments),
           environment: subprocessEnvironment(for: command),
-          workingDirectory: command.workingDirectory.map { FilePath($0.path(percentEncoded: false)) },
+          workingDirectory: command.workingDirectory.map {
+            FilePath($0.path(percentEncoded: false))
+          },
           platformOptions: platformOptions(),
           input: .none,
           output: .data(limit: Self.outputLimit),
@@ -103,7 +107,9 @@ public struct SubprocessCommandRunner: CommandRunning {
           .path(FilePath(command.executable.path(percentEncoded: false))),
           arguments: Arguments(command.arguments),
           environment: subprocessEnvironment(for: command),
-          workingDirectory: command.workingDirectory.map { FilePath($0.path(percentEncoded: false)) },
+          workingDirectory: command.workingDirectory.map {
+            FilePath($0.path(percentEncoded: false))
+          },
           platformOptions: platformOptions(),
           input: .data(stdin),
           output: .sequence,
@@ -116,7 +122,9 @@ public struct SubprocessCommandRunner: CommandRunning {
           .path(FilePath(command.executable.path(percentEncoded: false))),
           arguments: Arguments(command.arguments),
           environment: subprocessEnvironment(for: command),
-          workingDirectory: command.workingDirectory.map { FilePath($0.path(percentEncoded: false)) },
+          workingDirectory: command.workingDirectory.map {
+            FilePath($0.path(percentEncoded: false))
+          },
           platformOptions: platformOptions(),
           input: .none,
           output: .sequence,

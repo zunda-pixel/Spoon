@@ -76,7 +76,9 @@ struct PullRequestSyncTests {
 
   struct StubTransport: GitHubTransport {
     var body: String
-    func post(_ url: URL, headers: [String: String], body: Data) async throws -> (status: Int, body: Data) {
+    func post(_ url: URL, headers: [String: String], body: Data) async throws -> (
+      status: Int, body: Data
+    ) {
       (200, Data(self.body.utf8))
     }
   }
@@ -86,7 +88,9 @@ struct PullRequestSyncTests {
     func token() async -> String? { value }
   }
 
-  private func makeService(transport: StubTransport, token: String? = "tok") -> PullRequestSyncService {
+  private func makeService(transport: StubTransport, token: String? = "tok")
+    -> PullRequestSyncService
+  {
     PullRequestSyncService(
       client: GitHubAPIClient(tokenProvider: StubToken(value: token), transport: transport),
       repoRef: RepoRef(owner: "o", name: "r")

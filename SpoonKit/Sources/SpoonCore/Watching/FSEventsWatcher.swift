@@ -1,6 +1,5 @@
-public import Foundation
-
 import CoreServices
+public import Foundation
 
 /// Streams batches of changed directory paths under a root via FSEvents.
 ///

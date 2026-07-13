@@ -1,6 +1,5 @@
-public import SwiftUI
-
 import SpoonCore
+public import SwiftUI
 
 @MainActor
 public struct SettingsView: View {

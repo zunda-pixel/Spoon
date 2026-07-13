@@ -1,6 +1,5 @@
-public import Foundation
-
 import CryptoKit
+public import Foundation
 
 /// Persists the last PR sync per repository so cold starts show
 /// stale-but-instant badges while the first network sync runs.

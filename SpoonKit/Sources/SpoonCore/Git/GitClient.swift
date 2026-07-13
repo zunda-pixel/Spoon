@@ -1,14 +1,10 @@
 public import Foundation
 
-/// The seam UI and services depend on for repository state.
-/// M1 surface: read-only queries. Mutations (stage/commit/checkout/…) land in M2.
-public protocol GitClient: Sendable {
+/// Repository working-tree queries and mutations.
+public protocol GitWorkingTreeClient: Sendable {
   var repositoryRoot: URL { get }
 
   func status() async throws -> WorkingTreeStatus
-  func branches() async throws -> [Branch]
-  func remotes() async throws -> [Remote]
-  func log(_ query: LogQuery) async throws -> LogPage
 
   /// Working-tree patch: index vs HEAD when `staged`, else worktree vs index.
   /// `path` narrows to one file; `nil` diffs everything.
@@ -16,9 +12,6 @@ public protocol GitClient: Sendable {
   /// Synthesized all-added diff for an untracked file.
   func untrackedFileDiff(path: String) async throws -> FileDiff
   /// Metadata, full message, and first-parent patch for one commit.
-  func commitDetail(_ oid: ObjectID) async throws -> CommitDetail
-  func reflog(maxCount: Int, skip: Int) async throws -> [ReflogEntry]
-
   /// Stages whole paths (also marks conflicted paths resolved).
   func stage(paths: [String]) async throws
   /// Removes paths from the index, keeping working-tree contents.
@@ -34,42 +27,36 @@ public protocol GitClient: Sendable {
   /// Commits staged changes; message may be multi-line.
   func commit(message: String, amend: Bool) async throws
   func reset(to target: ObjectID, mode: ResetMode) async throws
+}
 
+/// Commit history and reflog queries.
+public protocol GitHistoryClient: Sendable {
+  func log(_ query: LogQuery) async throws -> LogPage
+  func commitDetail(_ oid: ObjectID) async throws -> CommitDetail
+  func reflog(maxCount: Int, skip: Int) async throws -> [ReflogEntry]
+}
+
+/// Local branch operations.
+public protocol GitBranchClient: Sendable {
+  func branches() async throws -> [Branch]
+  func checkout(branch: String) async throws
+  func checkoutRevision(_ oid: ObjectID) async throws
+  func createBranch(name: String, from startPoint: String?, checkout: Bool) async throws
+  func checkoutRemoteBranch(_ remoteBranch: String) async throws
+  func merge(branch: String, options: MergeOptions) async throws
+  func deleteBranch(name: String, force: Bool) async throws
+  func renameBranch(from oldName: String, to newName: String) async throws
+  func defaultBranch() async throws -> String
+}
+
+/// Remote configuration and synchronization.
+public protocol GitRemoteClient: Sendable {
+  func remotes() async throws -> [Remote]
   /// Remote-tracking branches of one remote (`refs/remotes/<name>`).
   func remoteBranches(of remoteName: String) async throws -> [Branch]
   func addRemote(name: String, url: String) async throws
   func setRemoteURL(name: String, fetchURL: String, pushURL: String?) async throws
   func removeRemote(name: String) async throws
-
-  func checkout(branch: String) async throws
-  /// Checks out a commit directly (detached HEAD).
-  func checkoutRevision(_ oid: ObjectID) async throws
-  /// Creates a branch at `startPoint` (HEAD when nil), optionally checking
-  /// it out.
-  func createBranch(name: String, from startPoint: String?, checkout: Bool) async throws
-  /// Creates and checks out a local tracking branch for a remote-tracking
-  /// branch like `origin/feature`.
-  func checkoutRemoteBranch(_ remoteBranch: String) async throws
-
-  /// Merges `branch` into the current branch using the selected fast-forward,
-  /// commit, strategy, and conflict-preference behavior.
-  func merge(branch: String, options: MergeOptions) async throws
-
-  func tags() async throws -> [Tag]
-  /// Creates a tag at `target` (HEAD when nil); a non-empty `message` makes
-  /// it an annotated tag.
-  func createTag(name: String, at target: ObjectID?, message: String?) async throws
-  func deleteTag(name: String) async throws
-  /// Pushes one local tag to a remote.
-  func pushTag(name: String, to remoteName: String) async throws
-  /// Pushes every local tag to a remote.
-  func pushAllTags(to remoteName: String) async throws
-  /// Deletes a tag from a remote without changing the local tag.
-  func deleteRemoteTag(name: String, from remoteName: String) async throws
-  /// Deletes a local branch (`-d`, or `-D` when `force`).
-  func deleteBranch(name: String, force: Bool) async throws
-  /// Renames a local branch (`branch -m`); works on the current branch too.
-  func renameBranch(from oldName: String, to newName: String) async throws
   func fetch() async throws
   /// Whether the installed git provides `git backfill` (2.49+).
   func supportsBackfill() async -> Bool
@@ -78,19 +65,38 @@ public protocol GitClient: Sendable {
   func pull() async throws
   /// Pushes the current branch; sets upstream on first push.
   func push(force: Bool) async throws
+}
 
+/// Tag queries and mutations.
+public protocol GitTagClient: Sendable {
+  func tags() async throws -> [Tag]
+  func createTag(name: String, at target: ObjectID?, message: String?) async throws
+  func deleteTag(name: String) async throws
+  func pushTag(name: String, to remoteName: String) async throws
+  func pushAllTags(to remoteName: String) async throws
+  func deleteRemoteTag(name: String, from remoteName: String) async throws
+}
+
+/// Linked-worktree operations.
+public protocol GitWorktreeClient: Sendable {
   /// All worktrees of this repository, main worktree first.
   func worktrees() async throws -> [Worktree]
   /// Creates a linked worktree at `path` checked out to existing `branch`.
   func addWorktree(path: URL, branch: String) async throws
   /// Removes a linked worktree (`--force` discards its local changes).
   func removeWorktree(path: URL, force: Bool) async throws
+}
 
+/// Sparse-checkout configuration.
+public protocol GitSparseCheckoutClient: Sendable {
   /// Current cone-mode sparse paths; `nil` when sparse checkout is disabled.
   func sparseCheckoutPaths() async throws -> [String]?
   func setSparseCheckout(paths: [String]) async throws
   func disableSparseCheckout() async throws
+}
 
+/// Rebase, cherry-pick, revert, and merge sequencer operations.
+public protocol GitSequencerClient: Sendable {
   /// Runs a headless `rebase -i` driven by `plan`'s todo list. May return
   /// with the rebase paused (edit step or conflict) — check `sequencerState()`.
   func interactiveRebase(_ plan: RebasePlan) async throws
@@ -103,18 +109,22 @@ public protocol GitClient: Sendable {
   func continueSequencer(_ kind: SequencerState.Kind) async throws
   func skipSequencer(_ kind: SequencerState.Kind) async throws
   func abortSequencer(_ kind: SequencerState.Kind) async throws
+}
 
+/// Cross-reference diff operations used by review features.
+public protocol GitReviewClient: Sendable {
   /// Merge base between two refs.
   func mergeBase(_ a: String, _ b: String) async throws -> ObjectID
-  /// Default branch short name (from origin/HEAD, falling back to main/master).
-  func defaultBranch() async throws -> String
   /// Unified diff between two refs (e.g. merge-base..HEAD for reviews).
   func diff(from: String, to: String) async throws -> [FileDiff]
   /// Raw unified diff text between two refs, for AI prompts.
   func diffText(from: String, to: String) async throws -> String
   /// Raw staged diff text, for AI prompts.
   func stagedDiffText() async throws -> String
+}
 
+/// Stash queries and mutations.
+public protocol GitStashClient: Sendable {
   func stashes() async throws -> [Stash]
   func saveStash(message: String?, includeUntracked: Bool) async throws
   func applyStash(_ stash: Stash, pop: Bool) async throws
@@ -122,3 +132,17 @@ public protocol GitClient: Sendable {
   /// The changes a stash would reapply (its parent vs the stash commit).
   func stashDiffs(_ stash: Stash) async throws -> [FileDiff]
 }
+
+/// Backward-compatible aggregate used by existing UI, services, and fakes.
+public protocol GitClient:
+  GitWorkingTreeClient,
+  GitHistoryClient,
+  GitBranchClient,
+  GitRemoteClient,
+  GitTagClient,
+  GitWorktreeClient,
+  GitSparseCheckoutClient,
+  GitSequencerClient,
+  GitReviewClient,
+  GitStashClient
+{}

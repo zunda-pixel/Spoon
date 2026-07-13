@@ -10,7 +10,7 @@ struct LiveSequencerTests {
   private let runner = SubprocessCommandRunner()
 
   private func makeClient(_ root: URL) -> SystemGitClient {
-    SystemGitClient(repositoryRoot: root, git: LiveRepoFixture.git, runner: runner)
+    LiveRepoFixture.makeClient(for: root, runner: runner)
   }
 
   private func arrange(_ arguments: [String], in root: URL) async throws {
@@ -20,18 +20,18 @@ struct LiveSequencerTests {
   private func commitFile(
     _ file: String, _ content: String, message: String, in root: URL
   ) async throws {
-    try Data(content.utf8).write(to: root.appending(path: file))
-    try await arrange(["add", "."], in: root)
-    try await arrange(["commit", "-m", message], in: root)
+    try await LiveRepoFixture.commitFile(
+      file, content: content, message: message, in: root, runner: runner)
   }
 
   /// History: base (base.txt) → second (second.txt) → third (third.txt).
   private func makeThreeCommitRepo() async throws -> URL {
-    let root = try await LiveRepoFixture.makeTemporaryRepo(runner: runner)
-    for subject in ["base", "second", "third"] {
-      try await commitFile("\(subject).txt", "\(subject)\n", message: subject, in: root)
-    }
-    return root
+    try await LiveRepoFixture.makeTemporaryRepo(
+      commits: ["base", "second", "third"].map {
+        LiveRepoFixture.CommitSpec(file: "\($0).txt", content: "\($0)\n", message: $0)
+      },
+      runner: runner
+    )
   }
 
   /// Oldest-first plan covering `commits.prefix(upToOldest)` … HEAD.
@@ -430,54 +430,6 @@ struct LiveSequencerTests {
     #expect(try await client.branches().map(\.name) == ["main"])
   }
 
-  @Test func cloneCreatesAWorkingLocalCopy() async throws {
-    let source = try await LiveRepoFixture.makeTemporaryRepo(runner: runner)
-    let destination = URL.temporaryDirectory.appending(path: "spoon-clone-\(UUID().uuidString)")
-    defer {
-      try? FileManager.default.removeItem(at: source)
-      try? FileManager.default.removeItem(at: destination)
-    }
-    try await commitFile("base.txt", "base\n", message: "base", in: source)
-
-    try await SystemGitClient.clone(
-      from: source.path, to: destination, git: LiveRepoFixture.git, runner: runner
-    ) { _ in }
-
-    #expect(FileManager.default.fileExists(atPath: destination.appending(path: "base.txt").path))
-    let root = await SystemGitClient.repositoryRoot(
-      containing: destination, git: LiveRepoFixture.git, runner: runner)
-    #expect(root != nil)
-    let clone = makeClient(destination)
-    #expect(try await clone.remotes().map(\.name) == ["origin"])
-    #expect(try await clone.log(LogQuery()).commits.map(\.subject) == ["base"])
-  }
-
-  @Test func shallowSingleBranchCloneFetchesOnlyRequestedBranch() async throws {
-    let source = try await LiveRepoFixture.makeTemporaryRepo(runner: runner)
-    let destination = URL.temporaryDirectory.appending(path: "spoon-shallow-clone-\(UUID().uuidString)")
-    defer {
-      try? FileManager.default.removeItem(at: source)
-      try? FileManager.default.removeItem(at: destination)
-    }
-    try await commitFile("base.txt", "base\n", message: "base", in: source)
-    try await arrange(["switch", "-c", "side"], in: source)
-    try await commitFile("side.txt", "side\n", message: "side", in: source)
-    try await arrange(["switch", "main"], in: source)
-
-    let options = CloneOptions(depth: 1, singleBranch: true, branch: "main")
-    try await SystemGitClient.clone(
-      from: source.path,
-      to: destination,
-      options: options,
-      git: LiveRepoFixture.git,
-      runner: runner
-    ) { _ in }
-
-    let clone = makeClient(destination)
-    #expect(try await clone.branches().map(\.name) == ["main"])
-    #expect(try await clone.log(LogQuery()).commits.map(\.subject) == ["base"])
-  }
-
   @Test func createBranchFromAnotherBranchStartsAtItsTip() async throws {
     let root = try await LiveRepoFixture.makeTemporaryRepo(runner: runner)
     defer { try? FileManager.default.removeItem(at: root) }
@@ -588,11 +540,13 @@ struct LiveSequencerTests {
     try await client.setSparseCheckout(paths: ["Sources"])
     #expect(try await client.sparseCheckoutPaths() == ["Sources"])
     #expect(FileManager.default.fileExists(atPath: root.appending(path: "Sources/App.swift").path))
-    #expect(!FileManager.default.fileExists(atPath: root.appending(path: "Tests/AppTests.swift").path))
+    #expect(
+      !FileManager.default.fileExists(atPath: root.appending(path: "Tests/AppTests.swift").path))
 
     try await client.disableSparseCheckout()
     #expect(try await client.sparseCheckoutPaths() == nil)
-    #expect(FileManager.default.fileExists(atPath: root.appending(path: "Tests/AppTests.swift").path))
+    #expect(
+      FileManager.default.fileExists(atPath: root.appending(path: "Tests/AppTests.swift").path))
   }
 
   // MARK: - Stash detail / staged line unstage
@@ -628,7 +582,8 @@ struct LiveSequencerTests {
     try await arrange(["add", "file.txt"], in: root)
     let client = makeClient(root)
 
-    let staged = try #require(try await client.diffWorkingTree(path: "file.txt", staged: true).first)
+    let staged = try #require(
+      try await client.diffWorkingTree(path: "file.txt", staged: true).first)
     let hunk = try #require(staged.hunks.first)
     let fourOffsets = Set(
       hunk.lines.indices.filter { hunk.lines[$0].text == "4" || hunk.lines[$0].text == "FOUR" }

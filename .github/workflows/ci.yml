@@ -1,0 +1,26 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+
+permissions:
+  contents: read
+
+jobs:
+  spoon-kit:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v7.0.0
+
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: "26.3"
+
+      - name: Build SpoonUI
+        working-directory: SpoonKit
+        run: swift build --target SpoonUI
+
+      - name: Test SpoonCore
+        working-directory: SpoonKit
+        run: swift test --test-product SpoonCoreTests

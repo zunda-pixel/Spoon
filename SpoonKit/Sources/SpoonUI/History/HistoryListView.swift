@@ -4,15 +4,8 @@ import SwiftUI
 @MainActor
 struct HistoryListView: View {
   let model: RepositoryModel
-  @Binding var selectedCommitID: String?
-  @State private var rebaseSheetCommit: Commit?
-  @State private var taggingCommit: Commit?
-  @State private var resettingCommit: Commit?
-
-  init(model: RepositoryModel, selectedCommitID: Binding<String?>) {
-    self.model = model
-    self._selectedCommitID = selectedCommitID
-  }
+  let reference: String?
+  @Bindable var navigation: RepositoryNavigationState
 
   var body: some View {
     Group {
@@ -27,7 +20,7 @@ struct HistoryListView: View {
           )
         }
       } else {
-        List(selection: $selectedCommitID) {
+        List(selection: $navigation.selectedCommitID) {
           ForEach(model.historyRows) { row in
             CommitGraphRowView(row: row)
               .tag(row.id)
@@ -54,41 +47,29 @@ struct HistoryListView: View {
         .listStyle(.plain)
       }
     }
-    .task(id: model.repository.id) {
-      await model.loadHistoryIfNeeded()
-    }
-    .sheet(item: $rebaseSheetCommit) { commit in
-      RebaseSheet(model: model, fromCommit: commit)
-    }
-    .sheet(item: $taggingCommit) { commit in
-      TagCommitSheet(model: model, commit: commit)
-    }
-    .sheet(item: $resettingCommit) { commit in
-      ResetSheet(
-        model: model,
-        target: commit.oid,
-        targetDescription: "\(commit.oid.shortened) — \(commit.subject)"
-      )
+    .task(id: reference) {
+      navigation.selectedCommitID = nil
+      await model.loadHistoryIfNeeded(reference: reference)
     }
   }
 
   @ViewBuilder
   private func commitMenu(_ commit: Commit) -> some View {
-    Button("Checkout Commit (Detached)") {
-      Task { await model.checkoutRevision(commit.oid) }
-    }
-    .disabled(model.isBusy || model.isSequencing)
+    RevisionContextMenu(
+      model: model,
+      navigation: navigation,
+      oid: commit.oid,
+      startPoint: commit.oid.rawValue,
+      targetDescription: "\(commit.oid.shortened) — \(commit.subject)"
+    )
+    Divider()
     Button("Tag Commit…") {
-      taggingCommit = commit
+      navigation.present(.tag(commit))
     }
     .disabled(model.isBusy)
-    Button("Reset Current Branch to Here…") {
-      resettingCommit = commit
-    }
-    .disabled(model.isBusy || model.isSequencing)
     Divider()
     Button("Interactive Rebase from Here…") {
-      rebaseSheetCommit = commit
+      navigation.present(.rebase(commit))
     }
     .disabled(commit.isMerge || model.isBusy || model.isSequencing)
     Divider()

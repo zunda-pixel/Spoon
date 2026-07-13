@@ -5,66 +5,71 @@ import SwiftUI
 struct SparseCheckoutSheet: View {
   let model: RepositoryModel
   @Environment(\.dismiss) private var dismiss
-  @State private var isEnabled = false
+  @State private var isCurrentlyEnabled = false
   @State private var pathsText = ""
   @State private var isLoading = true
   @State private var errorMessage: String?
 
   private var paths: [String] {
-    pathsText.split(separator: "\n")
+    pathsText.split(separator: "\n", omittingEmptySubsequences: false)
       .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
       .filter { !$0.isEmpty }
   }
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 12) {
-      Text("Sparse Checkout")
-        .font(.headline)
+    SheetFormLayout(
+      title: "Sparse Checkout",
+      subtitle: "One repository-relative folder per line (cone mode)."
+    ) {
       if isLoading {
         ProgressView()
           .frame(width: 440, height: 180)
       } else {
-        Toggle("Limit the working tree to selected folders", isOn: $isEnabled)
-        Text("One repository-relative folder per line (cone mode).")
-          .font(.caption)
-          .foregroundStyle(.secondary)
         TextEditor(text: $pathsText)
           .font(.body.monospaced())
           .frame(width: 440, height: 180)
           .border(.separator)
-          .disabled(!isEnabled)
-        if let errorMessage {
+        if paths.isEmpty {
+          Label(
+            "Enter at least one path. Restoring the full working tree uses Disable Sparse Checkout.",
+            systemImage: "exclamationmark.triangle"
+          )
+          .font(.caption)
+          .foregroundStyle(.red)
+          .frame(width: 440, alignment: .leading)
+        } else if let errorMessage {
           Text(errorMessage)
             .font(.caption)
             .foregroundStyle(.red)
         }
-        HStack {
-          Spacer()
-          Button("Cancel", role: .cancel) {
-            dismiss()
-          }
-          Button("Apply") {
-            let enabled = isEnabled
-            let paths = paths
-            dismiss()
-            Task {
-              if enabled {
-                await model.setSparseCheckout(paths: paths)
-              } else {
-                await model.disableSparseCheckout()
-              }
-            }
-          }
-          .keyboardShortcut(.defaultAction)
-          .disabled(isEnabled && paths.isEmpty)
-        }
       }
+    } actions: {
+      if isCurrentlyEnabled {
+        Button("Disable Sparse Checkout", role: .destructive) {
+          dismiss()
+          Task { await model.disableSparseCheckout() }
+        }
+        .disabled(isLoading)
+      }
+      Button("Cancel", role: .cancel) {
+        dismiss()
+      }
+      Button(isCurrentlyEnabled ? "Update Paths" : "Enable Sparse Checkout") {
+        let paths = paths
+        guard !paths.isEmpty else {
+          errorMessage = SparseCheckoutError.emptyPaths.localizedDescription
+          return
+        }
+        dismiss()
+        Task { await model.setSparseCheckout(paths: paths) }
+      }
+      .keyboardShortcut(.defaultAction)
+      .disabled(isLoading || paths.isEmpty)
     }
-    .padding(20)
     .task {
       do {
         let current = try await model.sparseCheckoutPaths()
-        isEnabled = current != nil
+        isCurrentlyEnabled = current != nil
         pathsText = current?.joined(separator: "\n") ?? ""
       } catch {
         errorMessage = error.localizedDescription

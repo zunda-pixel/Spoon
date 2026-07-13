@@ -46,7 +46,8 @@ public enum GitDiffParser {
         switch line.first {
         case " ":
           currentHunk?.lines.append(
-            DiffLine(kind: .context, text: String(line.dropFirst()), oldLine: oldLine, newLine: newLine)
+            DiffLine(
+              kind: .context, text: String(line.dropFirst()), oldLine: oldLine, newLine: newLine)
           )
           oldLine += 1
           newLine += 1
@@ -164,7 +165,9 @@ public enum GitDiffParser {
     )
   }
 
-  private static func parseRange(_ field: Substring, expecting sign: Character) -> (start: Int, count: Int)? {
+  private static func parseRange(_ field: Substring, expecting sign: Character) -> (
+    start: Int, count: Int
+  )? {
     guard field.first == sign else { return nil }
     let numbers = field.dropFirst().split(separator: ",")
     guard let start = numbers.first.flatMap({ Int($0) }) else { return nil }

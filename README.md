@@ -1,6 +1,6 @@
 # Spoon
 
-An AI-first git client for macOS, built with SwiftUI for macOS 27 (Golden Gate).
+An AI-first git client for macOS, built with SwiftUI for macOS 26 or later.
 
 ![Spoon](docs/screenshot.png)
 
@@ -13,7 +13,8 @@ An AI-first git client for macOS, built with SwiftUI for macOS 27 (Golden Gate).
   drop between areas, discard selected lines, right-click to open a file or
   reveal it in Finder.
 - **History** — commit graph with infinite scroll; commit details show the
-  full patch with selectable, copyable lines.
+  full patch. File history and reflog inspection are available from contextual
+  menus and the sidebar.
 - **Interactive rebase** — pick / squash / drop / edit with drag-to-reorder,
   from a commit's context menu; plus cherry-pick and revert. Conflicts and
   edit stops show a banner with Continue / Skip / Abort.
@@ -23,11 +24,13 @@ An AI-first git client for macOS, built with SwiftUI for macOS 27 (Golden Gate).
   branch; link a branch to its own worktree (add / open in a new window /
   remove).
 - **Tags** — list in the sidebar, tag any commit (lightweight or annotated),
-  delete.
+  push to remotes, and delete locally or remotely.
 - **Stashes** — save (including untracked files), browse a stash's diff,
   apply, pop, or drop it.
 - **Clone** — clone over https / ssh from the Welcome screen with live
-  progress.
+  progress. Existing folders can also be initialized as repositories.
+- **Remotes and storage** — add, edit, and remove remotes; fetch partial-clone
+  objects when supported; configure cone-mode sparse checkout.
 - **Pull requests** — branches display their open GitHub PR with review and
   CI status; a PR list and detail view come from the GitHub GraphQL API.
 - **AI** — generate commit messages and review branches with Claude Code or
@@ -62,8 +65,8 @@ available, to our knowledge).
 | Git-flow | ✅ | — |
 | Git LFS | ✅ | — |
 | GPG signing | ✅ | — |
-| Blame / file history | ✅ | — |
-| Reflog | ✅ | — |
+| Blame / file history | ✅ | partial (file history, no blame) |
+| Reflog | ✅ | ✅ |
 | Image diffs / side-by-side diff | ✅ | — |
 | GitHub integration | Notifications | PR badges on branches, PR list & details (CI + reviews) |
 | AI commit messages (Claude Code / Codex) | ✅ | ✅ |
@@ -119,8 +122,9 @@ are **not exposed** in Spoon’s UI or `GitClient` API today.
 
 ## Requirements
 
-- macOS 27 (Golden Gate) or later
+- macOS 26 or later
 - `git` (Xcode Command Line Tools are enough)
+- To build from source: Xcode 26.3 or later with Swift 6.3
 - Optional, for the matching features:
   - [`gh`](https://cli.github.com) — GitHub authentication for PR sync
   - [`claude`](https://claude.com/claude-code) and/or `codex` — AI commit
@@ -128,7 +132,19 @@ are **not exposed** in Spoon’s UI or `GitClient` API today.
 
 ## Building
 
-Open `Spoon.xcodeproj` with Xcode 27 and run the **Spoon** scheme.
+Open `Spoon.xcodeproj` with Xcode 26.3 or later and run the **Spoon** scheme.
+
+The package checks used by CI can also be run directly:
+
+```sh
+cd SpoonKit
+swift build --target SpoonUI
+swift test --test-product SpoonCoreTests
+```
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the contribution workflow,
+[docs/architecture.md](docs/architecture.md) for the code structure, and
+[docs/testing.md](docs/testing.md) for test categories and manual smoke checks.
 
 ## License
 

@@ -147,6 +147,29 @@ struct FileDiffHeaderView: View {
     .padding(.horizontal, 12)
     .padding(.vertical, 6)
     .background(.bar)
+    .accessibilityElement(children: .ignore)
+    .accessibilityLabel(diff.path)
+    .accessibilityValue(accessibilityValue)
+  }
+
+  private var accessibilityValue: String {
+    var components = [kindDescription]
+    if let oldPath = diff.oldPath {
+      components.append("from \(oldPath)")
+    }
+    components.append("\(diff.additionCount) additions")
+    components.append("\(diff.deletionCount) deletions")
+    return components.joined(separator: ", ")
+  }
+
+  private var kindDescription: String {
+    switch diff.kind {
+    case .added: "Added file"
+    case .deleted: "Deleted file"
+    case .renamed: "Renamed file"
+    case .copied: "Copied file"
+    case .modified: "Modified file"
+    }
   }
 
   private var icon: String {
@@ -211,6 +234,9 @@ struct HunkView: View {
           .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(hunk.header)
+        .accessibilityValue(isExpanded ? "Expanded" : "Collapsed")
+        .accessibilityHint("Shows or hides the lines in this hunk")
 
         if let action {
           Button(action.title, systemImage: action.systemImage) {
@@ -248,6 +274,8 @@ struct HunkView: View {
         }
       }
     }
+    .accessibilityElement(children: .contain)
+    .accessibilityLabel("Diff hunk")
   }
 
   private var selectionKey: (String, Hunk.ID) { (diff.id, hunk.id) }
@@ -296,7 +324,22 @@ struct DiffLineRow: View {
 
   private nonisolated static let numberWidth: CGFloat = 40
 
+  @ViewBuilder
   var body: some View {
+    if isSelectable, let onSelect {
+      Button(action: onSelect) {
+        content
+      }
+      .buttonStyle(.plain)
+      .accessibilityAddTraits(isSelected ? .isSelected : [])
+      .accessibilityHint(
+        "Select this changed line; Shift extends and Command toggles the selection")
+    } else {
+      content
+    }
+  }
+
+  private var content: some View {
     HStack(alignment: .top, spacing: 0) {
       lineNumber(line.oldLine)
       lineNumber(line.newLine)
@@ -304,17 +347,18 @@ struct DiffLineRow: View {
         .frame(width: 16)
       Text(line.text.isEmpty ? " " : line.text)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .foregroundStyle(line.kind == .noNewlineMarker ? AnyShapeStyle(.secondary) : AnyShapeStyle(.primary))
+        .foregroundStyle(
+          line.kind == .noNewlineMarker ? AnyShapeStyle(.secondary) : AnyShapeStyle(.primary))
     }
     .font(.callout.monospaced())
     .lineLimit(1)
     .padding(.horizontal, 12)
     .background(isSelected ? Color.accentColor.opacity(0.28) : background)
     .contentShape(Rectangle())
-    .onTapGesture {
-      onSelect?()
-    }
     .help(isSelectable ? "Click to select; ⇧click extends, ⌘click toggles" : "")
+    .accessibilityElement(children: .ignore)
+    .accessibilityLabel(accessibilityLabel)
+    .accessibilityValue(isSelected ? "Selected" : "")
   }
 
   private func lineNumber(_ number: Int?) -> some View {
@@ -330,6 +374,26 @@ struct DiffLineRow: View {
     case .deletion: "−"
     case .context: ""
     case .noNewlineMarker: ""
+    }
+  }
+
+  private var accessibilityLabel: String {
+    let location: String
+    switch (line.oldLine, line.newLine) {
+    case (let old?, let new?): location = "Old line \(old), new line \(new)"
+    case (let old?, nil): location = "Old line \(old)"
+    case (nil, let new?): location = "New line \(new)"
+    case (nil, nil): location = "Diff marker"
+    }
+    return "\(kindDescription), \(location), \(line.text)"
+  }
+
+  private var kindDescription: String {
+    switch line.kind {
+    case .addition: "Addition"
+    case .deletion: "Deletion"
+    case .context: "Context"
+    case .noNewlineMarker: "No newline at end of file"
     }
   }
 

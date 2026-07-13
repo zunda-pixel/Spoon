@@ -1,16 +1,6 @@
 import SpoonCore
 import SwiftUI
 
-enum SidebarItem: Hashable {
-  case changes
-  case history
-  case reflog
-  case branch(String)
-  case pullRequests
-  case remote(String)
-  case stash(Int)
-}
-
 @MainActor
 struct RepositoryWindowRoot: View {
   let repositoryID: Repository.ID
@@ -18,10 +8,6 @@ struct RepositoryWindowRoot: View {
   @Environment(AppModel.self) private var appModel
   @State private var model: RepositoryModel?
   @State private var loadErrorMessage: String?
-
-  init(repositoryID: Repository.ID) {
-    self.repositoryID = repositoryID
-  }
 
   var body: some View {
     Group {
@@ -38,13 +24,16 @@ struct RepositoryWindowRoot: View {
           .task { await load() }
       }
     }
-    .navigationTitle(Repository(rootURL: URL(filePath: repositoryID, directoryHint: .isDirectory)).name)
+    .navigationTitle(Repository(rootURL: repositoryURL).name)
+  }
+
+  private var repositoryURL: URL {
+    URL(filePath: repositoryID, directoryHint: .isDirectory)
   }
 
   private func load() async {
     do {
-      let repository = Repository(rootURL: URL(filePath: repositoryID, directoryHint: .isDirectory))
-      let model = try await appModel.makeRepositoryModel(for: repository)
+      let model = try await appModel.makeRepositoryModel(for: Repository(rootURL: repositoryURL))
       await model.refresh()
       model.startWatching()
       self.model = model
@@ -57,117 +46,57 @@ struct RepositoryWindowRoot: View {
 @MainActor
 struct RepositorySplitView: View {
   let model: RepositoryModel
-  @State private var selection: SidebarItem? = .changes
-  @State private var selectedCommitID: String?
-  @State private var selectedReflogOID: String?
-  @State private var fileSelections: Set<RepositoryModel.FileSelection> = []
-  @State private var selectedPRNumber: Int?
-  @State private var showingNewBranchSheet = false
-  @State private var showingSparseCheckoutSheet = false
-
-  init(model: RepositoryModel) {
-    self.model = model
-  }
+  @State private var navigation = RepositoryNavigationState()
 
   var body: some View {
     NavigationSplitView {
-      RepoSidebarView(model: model, selection: $selection)
+      RepoSidebarView(model: model, navigation: navigation)
         .navigationSplitViewColumnWidth(min: 220, ideal: 260)
     } content: {
-      contentColumn
+      RepositoryContentColumn(model: model, navigation: navigation)
         .navigationSplitViewColumnWidth(min: 300, ideal: 380)
     } detail: {
-      detailColumn
+      RepositoryDetailColumn(model: model, navigation: navigation)
     }
     .safeAreaInset(edge: .top, spacing: 0) {
       if let state = model.sequencerState {
         SequencerBannerView(model: model, state: state)
       }
     }
-    // The window (and tab) title must identify the repository; the
-    // section lives in the subtitle. Column-level navigationTitles would
-    // otherwise take over the titlebar.
     .navigationTitle(model.repository.name)
     .navigationSubtitle(sectionTitle)
     .navigationDocument(model.repository.rootURL)
     .toolbar {
-      ToolbarItem(placement: .navigation) {
-        branchMenu
-      }
-      ToolbarItemGroup {
-        Button {
-          Task { await model.fetch() }
-        } label: {
-          Label("Fetch", systemImage: "arrow.down.circle")
-        }
-        .help("Fetch all remotes (⇧⌘F)")
-        .disabled(model.isBusy)
-
-        Button {
-          Task { await model.pull() }
-        } label: {
-          remoteCountLabel("Pull", systemImage: "arrow.down.to.line", count: model.currentBranch?.behind)
-        }
-        .help("Pull (⇧⌘L)")
-        .disabled(model.isBusy || model.isSequencing)
-
-        Menu {
-          Button("Push") {
-            Task { await model.push() }
-          }
-          Divider()
-          Button("Force Push with Lease…", role: .destructive) {
-            model.requestForcePushConfirmation()
-          }
-        } label: {
-          remoteCountLabel("Push", systemImage: "arrow.up.to.line", count: model.currentBranch?.ahead)
-        } primaryAction: {
-          Task { await model.push() }
-        }
-        .help("Push (⇧⌘U); open the menu for force push")
-        .disabled(model.isBusy || model.isSequencing)
-      }
-      ToolbarItemGroup {
-        Menu {
-          ForEach(AIProviderID.allCases) { provider in
-            Button("Review with \(provider.displayName)") {
-              Task { await model.runReview(with: provider) }
-            }
-          }
-        } label: {
-          if case .reviewing = model.aiActivity {
-            Label("Reviewing…", systemImage: "sparkles")
-          } else {
-            Label("AI Review", systemImage: "sparkles")
-          }
-        }
-        .disabled(model.aiActivity != nil)
-        .help("Review this branch with Claude Code or Codex")
-
-        if model.isBusy || model.isRefreshing || model.aiActivity != nil {
-          ProgressView()
-            .controlSize(.small)
-        }
-        Button {
-          Task { await model.refresh() }
-        } label: {
-          Label("Refresh", systemImage: "arrow.clockwise")
-        }
-        .keyboardShortcut("r", modifiers: .command)
-        .disabled(model.isRefreshing)
-      }
+      RepositoryToolbar(model: model, navigation: navigation)
     }
-    .sheet(
+    .repositorySheets(model: model, navigation: navigation)
+    .confirmationDialog(
+      "Force push \(model.currentBranch?.name ?? "the current branch")?",
       isPresented: .init(
-        get: { model.reviewReport != nil },
-        set: { if !$0 { model.dismissReview() } }
+        get: { navigation.confirmation == .forcePush },
+        set: { if !$0 { navigation.confirmation = nil } }
       )
     ) {
-      if let report = model.reviewReport {
-        ReviewFindingsView(report: report) {
-          model.dismissReview()
-        }
+      Button("Force Push with Lease", role: .destructive) {
+        Task { await model.push(force: true) }
       }
+    } message: {
+      Text(
+        "This rewrites the remote branch history. The push will be refused if the remote changed since your last fetch."
+      )
+    }
+    .confirmationDialog(
+      "Abort \(sequencerName)?",
+      isPresented: .init(
+        get: { navigation.confirmation == .abortSequencer },
+        set: { if !$0 { navigation.confirmation = nil } }
+      )
+    ) {
+      Button("Abort \(sequencerName)", role: .destructive) {
+        Task { await model.abortSequencer() }
+      }
+    } message: {
+      Text("All progress from this operation will be discarded and the branch restored.")
     }
     .alert(
       "AI Task Failed",
@@ -180,40 +109,6 @@ struct RepositorySplitView: View {
     } message: {
       Text(model.aiErrorMessage ?? "")
     }
-    .sheet(isPresented: $showingNewBranchSheet) {
-      NewBranchSheet(model: model)
-    }
-    .sheet(isPresented: $showingSparseCheckoutSheet) {
-      SparseCheckoutSheet(model: model)
-    }
-    .confirmationDialog(
-      "Force push \(model.currentBranch?.name ?? "the current branch")?",
-      isPresented: .init(
-        get: { model.isForcePushConfirmationRequested },
-        set: { model.isForcePushConfirmationRequested = $0 }
-      )
-    ) {
-      Button("Force Push with Lease", role: .destructive) {
-        Task { await model.push(force: true) }
-      }
-    } message: {
-      Text(
-        "This rewrites the remote branch history. The push will be refused if the remote changed since your last fetch."
-      )
-    }
-    .focusedSceneValue(\.repositoryModel, model)
-    .onChange(of: model.isNewBranchSheetRequested) {
-      if model.isNewBranchSheetRequested {
-        model.isNewBranchSheetRequested = false
-        showingNewBranchSheet = true
-      }
-    }
-    .onChange(of: model.isSparseCheckoutSheetRequested) {
-      if model.isSparseCheckoutSheetRequested {
-        model.isSparseCheckoutSheetRequested = false
-        showingSparseCheckoutSheet = true
-      }
-    }
     .alert(
       "Operation Failed",
       isPresented: .init(
@@ -225,45 +120,12 @@ struct RepositorySplitView: View {
     } message: {
       Text(model.lastErrorMessage ?? "")
     }
-  }
-
-  private var branchMenu: some View {
-    Menu {
-      ForEach(model.branches) { branch in
-        Button {
-          Task { await model.checkout(branch: branch.name) }
-        } label: {
-          if branch.isCurrent {
-            Label(branch.name, systemImage: "checkmark")
-          } else {
-            Text(branch.name)
-          }
-        }
-        .disabled(branch.isCurrent)
-      }
-      Divider()
-      Button("New Branch…") {
-        showingNewBranchSheet = true
-      }
-    } label: {
-      currentBranchLabel
-    }
-    .disabled(model.isBusy || model.isSequencing)
-  }
-
-  private func remoteCountLabel(_ title: String, systemImage: String, count: Int?) -> some View {
-    HStack(spacing: 3) {
-      Image(systemName: systemImage)
-      if let count, count > 0 {
-        Text("\(count)")
-          .font(.caption.monospacedDigit())
-      }
-    }
-    .accessibilityLabel(title)
+    .focusedSceneValue(\.repositoryModel, model)
+    .focusedSceneValue(\.repositoryNavigationState, navigation)
   }
 
   private var sectionTitle: String {
-    switch selection {
+    switch navigation.sidebarSelection {
     case .changes, nil: "Changes"
     case .history: "History"
     case .reflog: "Reflog"
@@ -274,154 +136,13 @@ struct RepositorySplitView: View {
     }
   }
 
-  @ViewBuilder
-  private var contentColumn: some View {
-    switch selection {
-    case .changes, nil:
-      ChangesView(model: model, selection: $fileSelections)
-    case .history, .branch:
-      HistoryListView(model: model, selectedCommitID: $selectedCommitID)
-    case .reflog:
-      ReflogView(model: model, selectedOID: $selectedReflogOID)
-    case .pullRequests:
-      PRListView(model: model, selectedPRNumber: $selectedPRNumber)
-    case .remote(let name):
-      RemoteDetailView(model: model, remoteName: name)
-    case .stash(let index):
-      StashDetailView(model: model, stashIndex: index)
+  private var sequencerName: String {
+    switch model.sequencerState?.kind {
+    case .rebase: "Rebase"
+    case .cherryPick: "Cherry-Pick"
+    case .revert: "Revert"
+    case .merge: "Merge"
+    case nil: "Operation"
     }
-  }
-
-  @ViewBuilder
-  private var detailColumn: some View {
-    switch selection {
-    case .changes, nil:
-      if fileSelections.count == 1, let single = fileSelections.first {
-        DiffDetailView(model: model, selection: single)
-      } else if fileSelections.count > 1 {
-        MultiSelectionActionsView(model: model, selections: fileSelections)
-      } else {
-        noSelectionPlaceholder
-      }
-    case .history, .branch:
-      if let selectedCommitID, let oid = ObjectID(rawValue: selectedCommitID) {
-        CommitDetailView(model: model, oid: oid)
-      } else {
-        noSelectionPlaceholder
-      }
-    case .reflog:
-      if let selectedReflogOID, let oid = ObjectID(rawValue: selectedReflogOID) {
-        CommitDetailView(model: model, oid: oid)
-      } else {
-        noSelectionPlaceholder
-      }
-    case .pullRequests:
-      if let selectedPRNumber,
-        let pullRequest = model.openPullRequests.first(where: { $0.number == selectedPRNumber })
-      {
-        PRDetailView(pullRequest: pullRequest)
-      } else {
-        noSelectionPlaceholder
-      }
-    case .remote, .stash:
-      noSelectionPlaceholder
-    }
-  }
-
-  private var noSelectionPlaceholder: some View {
-    ContentUnavailableView(
-      "No Selection",
-      systemImage: "doc.text.magnifyingglass",
-      description: Text("Select a file or commit to see its changes.")
-    )
-  }
-
-  private var currentBranchLabel: some View {
-    Label(
-      model.currentBranch?.name ?? model.status?.headBranch ?? "detached HEAD",
-      systemImage: "arrow.trianglehead.branch"
-    )
-    .labelStyle(.titleAndIcon)
-  }
-}
-
-/// Detail column for a multi-file selection: bulk stage/unstage actions.
-@MainActor
-private struct MultiSelectionActionsView: View {
-  let model: RepositoryModel
-  let selections: Set<RepositoryModel.FileSelection>
-
-  var body: some View {
-    let stageable = selections.filter { $0.area != .staged }
-    let staged = selections.filter { $0.area == .staged }
-
-    VStack(spacing: 14) {
-      Image(systemName: "doc.on.doc")
-        .font(.system(size: 40))
-        .foregroundStyle(.secondary)
-      Text("\(selections.count) files selected")
-        .font(.title3)
-      HStack {
-        if !stageable.isEmpty {
-          Button("Stage \(stageable.count) File(s)") {
-            Task { await model.stage(paths: stageable.map(\.path)) }
-          }
-        }
-        if !staged.isEmpty {
-          Button("Unstage \(staged.count) File(s)") {
-            Task { await model.unstage(paths: staged.map(\.path)) }
-          }
-        }
-      }
-      .disabled(model.isBusy)
-    }
-    .frame(maxWidth: .infinity, maxHeight: .infinity)
-  }
-}
-
-@MainActor
-struct NewBranchSheet: View {
-  let model: RepositoryModel
-  /// Branch (or any ref) the new branch starts at; nil means HEAD.
-  let startPoint: String?
-  @Environment(\.dismiss) private var dismiss
-  @State private var name = ""
-
-  init(model: RepositoryModel, startPoint: String? = nil) {
-    self.model = model
-    self.startPoint = startPoint
-  }
-
-  var body: some View {
-    VStack(alignment: .leading, spacing: 12) {
-      Text(startPoint.map { "New Branch from \"\($0)\"" } ?? "New Branch")
-        .font(.headline)
-      TextField("Branch name", text: $name)
-        .textFieldStyle(.roundedBorder)
-        .frame(width: 280)
-        .onSubmit(create)
-      HStack {
-        Spacer()
-        Button("Cancel", role: .cancel) {
-          dismiss()
-        }
-        Button("Create and Checkout", action: create)
-          .keyboardShortcut(.defaultAction)
-          .disabled(!isValidName)
-      }
-    }
-    .padding(20)
-  }
-
-  private var isValidName: Bool {
-    let trimmed = name.trimmingCharacters(in: .whitespaces)
-    return !trimmed.isEmpty && !trimmed.contains(" ") && !trimmed.hasPrefix("-")
-  }
-
-  private func create() {
-    guard isValidName else { return }
-    let branchName = name.trimmingCharacters(in: .whitespaces)
-    dismiss()
-    Task { await model.createBranch(name: branchName, from: startPoint, checkout: true) }
   }
 }

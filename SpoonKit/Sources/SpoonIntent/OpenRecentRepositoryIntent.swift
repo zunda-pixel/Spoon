@@ -10,7 +10,7 @@ public struct OpenRecentRepositoryIntent: AppIntent {
 
   @Parameter(title: "Repository Name")
   public var name: String?
-  
+
   public init() {}
 
   @MainActor

@@ -23,9 +23,13 @@ struct LiveGitTests {
     let root = try await makeTemporaryRepo()
     defer { try? FileManager.default.removeItem(at: root) }
 
-    try Data("hello\n".utf8).write(to: root.appending(path: "committed.txt"))
-    try await runGit(["add", "."], in: root)
-    try await runGit(["commit", "-m", "initial commit"], in: root)
+    try await LiveRepoFixture.commitFile(
+      "committed.txt",
+      content: "hello\n",
+      message: "initial commit",
+      in: root,
+      runner: runner
+    )
 
     try Data("dirty\n".utf8).write(to: root.appending(path: "committed.txt"))
     try Data("new\n".utf8).write(to: root.appending(path: "untracked file.txt"))
@@ -105,10 +109,13 @@ struct LiveGitTests {
 
     // Commit a file long enough to yield two separate hunks.
     let numbers = (1...40).map(String.init)
-    try Data((numbers.joined(separator: "\n") + "\n").utf8)
-      .write(to: root.appending(path: "file.txt"))
-    try await runGit(["add", "."], in: root)
-    try await runGit(["commit", "-m", "base"], in: root)
+    try await LiveRepoFixture.commitFile(
+      "file.txt",
+      content: numbers.joined(separator: "\n") + "\n",
+      message: "base",
+      in: root,
+      runner: runner
+    )
 
     // Edit near the top and near the bottom.
     var edited = numbers
@@ -125,12 +132,14 @@ struct LiveGitTests {
     let patch = try #require(DiffPatchBuilder.patch(for: diff, including: [diff.hunks[1].id]))
     try await client.applyPatch(patch, reverse: false, toIndex: true)
 
-    let staged = try #require(try await client.diffWorkingTree(path: "file.txt", staged: true).first)
+    let staged = try #require(
+      try await client.diffWorkingTree(path: "file.txt", staged: true).first)
     #expect(staged.hunks.count == 1)
     #expect(staged.hunks[0].lines.contains { $0.text == "THIRTY-SIX" })
     #expect(!staged.hunks[0].lines.contains { $0.text == "THREE" })
 
-    let unstaged = try #require(try await client.diffWorkingTree(path: "file.txt", staged: false).first)
+    let unstaged = try #require(
+      try await client.diffWorkingTree(path: "file.txt", staged: false).first)
     #expect(unstaged.hunks.count == 1)
     #expect(unstaged.hunks[0].lines.contains { $0.text == "THREE" })
 
@@ -173,14 +182,12 @@ struct LiveGitTests {
     defer { try? FileManager.default.removeItem(at: root) }
     let client = SystemGitClient(repositoryRoot: root, git: git, runner: runner)
 
-    try Data("base\n".utf8).write(to: root.appending(path: "tracked.txt"))
-    try await runGit(["add", "."], in: root)
-    try await runGit(["commit", "-m", "base"], in: root)
+    try await LiveRepoFixture.commitFile(
+      "tracked.txt", content: "base\n", message: "base", in: root, runner: runner)
     let base = try #require(try await client.log(LogQuery()).commits.first)
 
-    try Data("other\n".utf8).write(to: root.appending(path: "other.txt"))
-    try await runGit(["add", "."], in: root)
-    try await runGit(["commit", "-m", "other"], in: root)
+    try await LiveRepoFixture.commitFile(
+      "other.txt", content: "other\n", message: "other", in: root, runner: runner)
 
     let filePage = try await client.log(LogQuery(path: "tracked.txt"))
     #expect(filePage.commits.map(\.subject) == ["base"])
@@ -199,9 +206,13 @@ struct LiveGitTests {
 
     let file = root.appending(path: "file.txt")
     let numbers = (1...9).map(String.init)
-    try Data((numbers.joined(separator: "\n") + "\n").utf8).write(to: file)
-    try await runGit(["add", "."], in: root)
-    try await runGit(["commit", "-m", "base"], in: root)
+    try await LiveRepoFixture.commitFile(
+      "file.txt",
+      content: numbers.joined(separator: "\n") + "\n",
+      message: "base",
+      in: root,
+      runner: runner
+    )
 
     // Two edits inside one hunk: line 4 and line 6.
     var edited = numbers
@@ -231,7 +242,8 @@ struct LiveGitTests {
     #expect(contents == expected.joined(separator: "\n") + "\n")
 
     // Remaining diff shows only the SIX edit.
-    let after = try #require(try await client.diffWorkingTree(path: "file.txt", staged: false).first)
+    let after = try #require(
+      try await client.diffWorkingTree(path: "file.txt", staged: false).first)
     let changed = after.hunks.flatMap(\.lines).filter { $0.kind != .context }.map(\.text)
     #expect(changed.sorted() == ["6", "SIX"])
   }
@@ -240,10 +252,13 @@ struct LiveGitTests {
     let root = try await makeTemporaryRepo()
     defer { try? FileManager.default.removeItem(at: root) }
 
-    try Data(String(repeating: "line\n", count: 50).utf8)
-      .write(to: root.appending(path: "original.txt"))
-    try await runGit(["add", "."], in: root)
-    try await runGit(["commit", "-m", "add original"], in: root)
+    try await LiveRepoFixture.commitFile(
+      "original.txt",
+      content: String(repeating: "line\n", count: 50),
+      message: "add original",
+      in: root,
+      runner: runner
+    )
     try await runGit(["mv", "original.txt", "renamed with space.txt"], in: root)
 
     let client = SystemGitClient(repositoryRoot: root, git: git, runner: runner)

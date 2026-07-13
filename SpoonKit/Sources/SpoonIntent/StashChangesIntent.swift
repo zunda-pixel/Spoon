@@ -1,5 +1,4 @@
 public import AppIntents
-
 import Defaults
 import Foundation
 import SpoonCore

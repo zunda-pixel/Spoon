@@ -5,7 +5,8 @@ public import Foundation
 public enum GitTagParser {
   /// NUL-separated fields, newline-separated records. `%(*objectname)` is
   /// the peeled commit for annotated tags and empty for lightweight ones.
-  public static let tagFormat = "%(refname:short)%00%(objectname)%00%(*objectname)%00%(creatordate:unix)"
+  public static let tagFormat =
+    "%(refname:short)%00%(objectname)%00%(*objectname)%00%(creatordate:unix)"
 
   public struct ParseError: Error, Sendable {
     public var line: String
