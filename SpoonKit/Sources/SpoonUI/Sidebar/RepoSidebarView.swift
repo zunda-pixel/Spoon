@@ -40,6 +40,8 @@ struct RepoSidebarView: View {
           .tag(SidebarItem.changes)
         Label("History", systemImage: "clock")
           .tag(SidebarItem.history)
+        Label("Reflog", systemImage: "clock.arrow.trianglehead.counterclockwise.rotate.90")
+          .tag(SidebarItem.reflog)
         if model.gitHubRepoRef != nil {
           Label("Pull Requests", systemImage: "arrow.triangle.pull")
             .badge(model.openPullRequests.count)

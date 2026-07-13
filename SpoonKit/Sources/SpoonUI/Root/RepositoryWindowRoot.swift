@@ -4,6 +4,7 @@ import SwiftUI
 enum SidebarItem: Hashable {
   case changes
   case history
+  case reflog
   case branch(String)
   case pullRequests
   case remote(String)
@@ -58,9 +59,11 @@ struct RepositorySplitView: View {
   let model: RepositoryModel
   @State private var selection: SidebarItem? = .changes
   @State private var selectedCommitID: String?
+  @State private var selectedReflogOID: String?
   @State private var fileSelections: Set<RepositoryModel.FileSelection> = []
   @State private var selectedPRNumber: Int?
   @State private var showingNewBranchSheet = false
+  @State private var showingSparseCheckoutSheet = false
 
   init(model: RepositoryModel) {
     self.model = model
@@ -180,6 +183,9 @@ struct RepositorySplitView: View {
     .sheet(isPresented: $showingNewBranchSheet) {
       NewBranchSheet(model: model)
     }
+    .sheet(isPresented: $showingSparseCheckoutSheet) {
+      SparseCheckoutSheet(model: model)
+    }
     .confirmationDialog(
       "Force push \(model.currentBranch?.name ?? "the current branch")?",
       isPresented: .init(
@@ -200,6 +206,12 @@ struct RepositorySplitView: View {
       if model.isNewBranchSheetRequested {
         model.isNewBranchSheetRequested = false
         showingNewBranchSheet = true
+      }
+    }
+    .onChange(of: model.isSparseCheckoutSheetRequested) {
+      if model.isSparseCheckoutSheetRequested {
+        model.isSparseCheckoutSheetRequested = false
+        showingSparseCheckoutSheet = true
       }
     }
     .alert(
@@ -254,6 +266,7 @@ struct RepositorySplitView: View {
     switch selection {
     case .changes, nil: "Changes"
     case .history: "History"
+    case .reflog: "Reflog"
     case .branch(let name): name
     case .pullRequests: "Pull Requests"
     case .remote(let name): name
@@ -268,6 +281,8 @@ struct RepositorySplitView: View {
       ChangesView(model: model, selection: $fileSelections)
     case .history, .branch:
       HistoryListView(model: model, selectedCommitID: $selectedCommitID)
+    case .reflog:
+      ReflogView(model: model, selectedOID: $selectedReflogOID)
     case .pullRequests:
       PRListView(model: model, selectedPRNumber: $selectedPRNumber)
     case .remote(let name):
@@ -290,6 +305,12 @@ struct RepositorySplitView: View {
       }
     case .history, .branch:
       if let selectedCommitID, let oid = ObjectID(rawValue: selectedCommitID) {
+        CommitDetailView(model: model, oid: oid)
+      } else {
+        noSelectionPlaceholder
+      }
+    case .reflog:
+      if let selectedReflogOID, let oid = ObjectID(rawValue: selectedReflogOID) {
         CommitDetailView(model: model, oid: oid)
       } else {
         noSelectionPlaceholder

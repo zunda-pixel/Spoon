@@ -124,6 +124,9 @@ public actor SystemGitClient: GitClient {
     }
     arguments.append(query.reference ?? "HEAD")
     arguments.append("--")
+    if let path = query.path {
+      arguments.append(path)
+    }
     let result = try await run(arguments)
     var commits = try GitLogParser.parse(result.standardOutput)
     let hasMore = commits.count > query.maxCount
@@ -131,6 +134,19 @@ public actor SystemGitClient: GitClient {
       commits.removeLast()
     }
     return LogPage(commits: commits, hasMore: hasMore)
+  }
+
+  public func reflog(maxCount: Int, skip: Int) async throws -> [ReflogEntry] {
+    var arguments = [
+      "reflog", "show", "-z",
+      "--format=\(GitReflogParser.format)",
+      "--max-count=\(maxCount)",
+    ]
+    if skip > 0 {
+      arguments.append("--skip=\(skip)")
+    }
+    let result = try await run(arguments)
+    return try GitReflogParser.parse(result.standardOutput)
   }
 
   public func diffWorkingTree(path: String?, staged: Bool) async throws -> [FileDiff] {
@@ -264,6 +280,10 @@ public actor SystemGitClient: GitClient {
     try await runVoid(arguments, standardInput: Data(message.utf8), timeout: .seconds(120))
   }
 
+  public func reset(to target: ObjectID, mode: ResetMode) async throws {
+    try await runVoid(["reset", "--\(mode.rawValue)", target.rawValue])
+  }
+
   public func remoteBranches(of remoteName: String) async throws -> [Branch] {
     let result = try await run([
       "for-each-ref", "refs/remotes/\(remoteName)",
@@ -277,6 +297,11 @@ public actor SystemGitClient: GitClient {
 
   public func addRemote(name: String, url: String) async throws {
     try await runVoid(["remote", "add", name, url])
+  }
+
+  public func setRemoteURL(name: String, fetchURL: String, pushURL: String?) async throws {
+    try await runVoid(["remote", "set-url", name, fetchURL])
+    try await runVoid(["remote", "set-url", "--push", name, pushURL ?? fetchURL])
   }
 
   public func removeRemote(name: String) async throws {
@@ -380,13 +405,43 @@ public actor SystemGitClient: GitClient {
     try await runVoid(arguments, timeout: .seconds(120))
   }
 
+  public func sparseCheckoutPaths() async throws -> [String]? {
+    guard
+      let enabled = try? await run(["config", "--bool", "core.sparseCheckout"]),
+      enabled.standardOutputText.trimmingCharacters(in: .whitespacesAndNewlines) == "true"
+    else { return nil }
+    let result = try await run(["sparse-checkout", "list"])
+    return result.standardOutputText
+      .split(separator: "\n")
+      .map(String.init)
+  }
+
+  public func setSparseCheckout(paths: [String]) async throws {
+    guard !paths.isEmpty else { return }
+    try await runVoid(["sparse-checkout", "set", "--cone", "--"] + paths)
+  }
+
+  public func disableSparseCheckout() async throws {
+    try await runVoid(["sparse-checkout", "disable"])
+  }
+
   // MARK: - Sequencer (rebase / cherry-pick / revert)
 
   public func interactiveRebase(_ plan: RebasePlan) async throws {
     let todoURL = FileManager.default.temporaryDirectory
       .appending(path: "spoon-rebase-todo-\(UUID().uuidString)")
+    let rewordDirectory = FileManager.default.temporaryDirectory
+      .appending(path: "spoon-rebase-messages-\(UUID().uuidString)")
     try Data(plan.todoFileContents().utf8).write(to: todoURL)
-    defer { try? FileManager.default.removeItem(at: todoURL) }
+    try FileManager.default.createDirectory(at: rewordDirectory, withIntermediateDirectories: true)
+    for (index, step) in plan.steps.enumerated() where step.action == .reword {
+      guard let message = step.newMessage else { continue }
+      try Data(message.utf8).write(to: rewordDirectory.appending(path: "\(index)"))
+    }
+    defer {
+      try? FileManager.default.removeItem(at: todoURL)
+      try? FileManager.default.removeItem(at: rewordDirectory)
+    }
 
     var arguments = ["rebase", "--interactive"]
     if let base = plan.baseOID {
@@ -401,6 +456,7 @@ public actor SystemGitClient: GitClient {
       arguments,
       extraEnvironment: [
         "SPOON_REBASE_TODO": todoURL.path,
+        "SPOON_REWORD_DIR": rewordDirectory.path,
         "GIT_SEQUENCE_EDITOR": #"cp -f "$SPOON_REBASE_TODO""#,
         "GIT_EDITOR": "true",
       ],
@@ -505,6 +561,19 @@ public actor SystemGitClient: GitClient {
 
   public func fetch() async throws {
     try await runVoid(["fetch", "--all", "--prune"], timeout: .seconds(300))
+  }
+
+  public func supportsBackfill() async -> Bool {
+    guard let result = try? await run(["version"], timeout: .seconds(10)) else { return false }
+    let fields = result.standardOutputText.split(whereSeparator: { !$0.isNumber && $0 != "." })
+    guard let version = fields.first(where: { $0.contains(".") }) else { return false }
+    let components = version.split(separator: ".").compactMap { Int($0) }
+    guard components.count >= 2 else { return false }
+    return components[0] > 2 || (components[0] == 2 && components[1] >= 49)
+  }
+
+  public func backfill() async throws {
+    try await runVoid(["backfill"], timeout: .seconds(3600))
   }
 
   public func pull() async throws {

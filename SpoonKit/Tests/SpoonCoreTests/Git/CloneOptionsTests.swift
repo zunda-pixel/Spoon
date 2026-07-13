@@ -13,7 +13,8 @@ struct CloneOptionsTests {
       filterBlobNone: true,
       depth: 1,
       singleBranch: true,
-      branch: "main"
+      branch: "main",
+      recurseSubmodules: true
     )
     #expect(
       options.cloneArguments() == [
@@ -24,6 +25,7 @@ struct CloneOptionsTests {
         "--single-branch",
         "--branch",
         "main",
+        "--recurse-submodules",
       ]
     )
   }

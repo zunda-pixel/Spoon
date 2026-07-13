@@ -50,24 +50,41 @@ struct RebaseSheet: View {
 
   private func planEditor(_ plan: Binding<RebasePlan>) -> some View {
     let value = plan.wrappedValue
+    let rewordCount = value.steps.count { $0.action == .reword }
     return VStack(alignment: .leading, spacing: 10) {
       List {
         ForEach(plan.steps) { $step in
-          HStack(spacing: 8) {
-            Picker("Action", selection: $step.action) {
-              ForEach(RebaseAction.allCases, id: \.self) { action in
-                Text(action.rawValue.capitalized)
-                  .tag(action)
+          VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 8) {
+              Picker("Action", selection: $step.action) {
+                ForEach(RebaseAction.allCases, id: \.self) { action in
+                  Text(action.rawValue.capitalized)
+                    .tag(action)
+                }
               }
+              .labelsHidden()
+              .frame(width: 96)
+              .onChange(of: step.action) {
+                if step.action == .reword,
+                  step.newMessage?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty != false
+                {
+                  step.newMessage = step.commit.subject
+                }
+              }
+              Text(step.commit.oid.shortened)
+                .font(.caption.monospaced())
+                .foregroundStyle(.secondary)
+              Text(step.commit.subject)
+                .lineLimit(1)
+                .truncationMode(.tail)
             }
-            .labelsHidden()
-            .frame(width: 96)
-            Text(step.commit.oid.shortened)
-              .font(.caption.monospaced())
-              .foregroundStyle(.secondary)
-            Text(step.commit.subject)
-              .lineLimit(1)
-              .truncationMode(.tail)
+            if step.action == .reword {
+              TextField("New commit message", text: Binding(
+                get: { step.newMessage ?? "" },
+                set: { step.newMessage = $0 }
+              ))
+              .textFieldStyle(.roundedBorder)
+            }
           }
           .listRowSeparator(.hidden)
         }
@@ -76,7 +93,10 @@ struct RebaseSheet: View {
         }
       }
       .listStyle(.bordered)
-      .frame(width: 480, height: min(320, CGFloat(value.steps.count) * 34 + 16))
+      .frame(
+        width: 480,
+        height: min(420, CGFloat(value.steps.count * 34 + rewordCount * 30 + 16))
+      )
 
       Text("Drag rows to reorder commits.")
         .font(.caption)
@@ -109,7 +129,9 @@ struct RebaseSheet: View {
     case .empty:
       "Keep at least one commit (not everything can be dropped)."
     case .squashWithoutTarget:
-      "Squash needs an earlier kept commit to fold into."
+      "Squash and fixup need an earlier kept commit to fold into."
+    case .rewordMessageEmpty:
+      "Enter a replacement message for every reword step."
     case nil:
       nil
     }

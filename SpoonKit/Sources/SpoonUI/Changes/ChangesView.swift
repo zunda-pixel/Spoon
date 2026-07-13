@@ -26,6 +26,7 @@ struct ChangesView: View {
   }
 
   @State private var confirmingDiscard: RepositoryModel.FileSelection?
+  @State private var historyPath: String?
   /// The first click of a double-click collapses a multi-selection to the
   /// clicked row (List behavior), so remember the just-collapsed selection
   /// long enough for the double-click handler to act on all of it.
@@ -92,6 +93,16 @@ struct ChangesView: View {
       }
     } message: {
       Text("This cannot be undone.")
+    }
+    .sheet(
+      isPresented: .init(
+        get: { historyPath != nil },
+        set: { if !$0 { historyPath = nil } }
+      )
+    ) {
+      if let historyPath {
+        FileHistorySheet(model: model, path: historyPath)
+      }
     }
   }
 
@@ -375,6 +386,12 @@ struct ChangesView: View {
     case .conflicted:
       Button("Mark Resolved (Stage)") {
         moveFiles(stage: [entry.path], unstage: [])
+      }
+    }
+    if area != .untracked {
+      Divider()
+      Button("Show File History…") {
+        historyPath = entry.path
       }
     }
     // Deleted files have nothing on disk to open or reveal.

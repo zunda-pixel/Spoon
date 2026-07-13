@@ -21,17 +21,25 @@ public struct Commit: Sendable, Hashable, Identifiable {
 public struct LogQuery: Sendable, Hashable {
   /// Ref to walk from; `nil` means HEAD.
   public var reference: String?
+  /// Repository-relative path to follow; `nil` means all paths.
+  public var path: String?
   public var maxCount: Int
   public var skip: Int
 
-  public init(reference: String? = nil, maxCount: Int = 500, skip: Int = 0) {
+  public init(
+    reference: String? = nil,
+    path: String? = nil,
+    maxCount: Int = 500,
+    skip: Int = 0
+  ) {
     self.reference = reference
+    self.path = path
     self.maxCount = maxCount
     self.skip = skip
   }
 
   public func next() -> LogQuery {
-    LogQuery(reference: reference, maxCount: maxCount, skip: skip + maxCount)
+    LogQuery(reference: reference, path: path, maxCount: maxCount, skip: skip + maxCount)
   }
 }
 

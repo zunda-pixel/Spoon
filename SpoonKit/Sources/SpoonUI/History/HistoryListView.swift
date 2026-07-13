@@ -7,6 +7,7 @@ struct HistoryListView: View {
   @Binding var selectedCommitID: String?
   @State private var rebaseSheetCommit: Commit?
   @State private var taggingCommit: Commit?
+  @State private var resettingCommit: Commit?
 
   init(model: RepositoryModel, selectedCommitID: Binding<String?>) {
     self.model = model
@@ -62,6 +63,13 @@ struct HistoryListView: View {
     .sheet(item: $taggingCommit) { commit in
       TagCommitSheet(model: model, commit: commit)
     }
+    .sheet(item: $resettingCommit) { commit in
+      ResetSheet(
+        model: model,
+        target: commit.oid,
+        targetDescription: "\(commit.oid.shortened) — \(commit.subject)"
+      )
+    }
   }
 
   @ViewBuilder
@@ -74,6 +82,10 @@ struct HistoryListView: View {
       taggingCommit = commit
     }
     .disabled(model.isBusy)
+    Button("Reset Current Branch to Here…") {
+      resettingCommit = commit
+    }
+    .disabled(model.isBusy || model.isSequencing)
     Divider()
     Button("Interactive Rebase from Here…") {
       rebaseSheetCommit = commit

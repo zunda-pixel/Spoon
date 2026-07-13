@@ -65,6 +65,34 @@ struct LiveSequencerTests {
     #expect(try await client.sequencerState() == nil)
   }
 
+  @Test func rewordAndFixupRewriteHistory() async throws {
+    let root = try await makeThreeCommitRepo()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let client = makeClient(root)
+    let commits = try await client.log(LogQuery()).commits
+    let second = try #require(commits.first { $0.subject == "second" })
+    let third = try #require(commits.first { $0.subject == "third" })
+    let plan = RebasePlan(
+      steps: [
+        RebaseStep(
+          action: .reword,
+          commit: second,
+          newMessage: "renamed second\n\nreplacement body"
+        ),
+        RebaseStep(action: .fixup, commit: third),
+      ],
+      baseOID: second.parents.first
+    )
+
+    try await client.interactiveRebase(plan)
+
+    let after = try await client.log(LogQuery())
+    #expect(after.commits.map(\.subject) == ["renamed second", "base"])
+    let detail = try await client.commitDetail(after.commits[0].oid)
+    #expect(detail.fullMessage.contains("replacement body"))
+    #expect(FileManager.default.fileExists(atPath: root.appending(path: "third.txt").path))
+  }
+
   @Test func dropRemovesCommitAndItsFile() async throws {
     let root = try await makeThreeCommitRepo()
     defer { try? FileManager.default.removeItem(at: root) }
@@ -538,6 +566,33 @@ struct LiveSequencerTests {
 
     try await client.removeWorktree(path: worktreePath, force: false)
     #expect(try await client.worktrees().count == 1)
+  }
+
+  @Test func sparseCheckoutSetListAndDisableRoundTrip() async throws {
+    let root = try await LiveRepoFixture.makeTemporaryRepo(runner: runner)
+    defer { try? FileManager.default.removeItem(at: root) }
+    try FileManager.default.createDirectory(
+      at: root.appending(path: "Sources"),
+      withIntermediateDirectories: true
+    )
+    try FileManager.default.createDirectory(
+      at: root.appending(path: "Tests"),
+      withIntermediateDirectories: true
+    )
+    try Data("source\n".utf8).write(to: root.appending(path: "Sources/App.swift"))
+    try Data("test\n".utf8).write(to: root.appending(path: "Tests/AppTests.swift"))
+    try await arrange(["add", "."], in: root)
+    try await arrange(["commit", "-m", "add tree"], in: root)
+    let client = makeClient(root)
+
+    try await client.setSparseCheckout(paths: ["Sources"])
+    #expect(try await client.sparseCheckoutPaths() == ["Sources"])
+    #expect(FileManager.default.fileExists(atPath: root.appending(path: "Sources/App.swift").path))
+    #expect(!FileManager.default.fileExists(atPath: root.appending(path: "Tests/AppTests.swift").path))
+
+    try await client.disableSparseCheckout()
+    #expect(try await client.sparseCheckoutPaths() == nil)
+    #expect(FileManager.default.fileExists(atPath: root.appending(path: "Tests/AppTests.swift").path))
   }
 
   // MARK: - Stash detail / staged line unstage

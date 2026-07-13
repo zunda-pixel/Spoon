@@ -46,6 +46,36 @@ struct RebasePlanTests {
     #expect(plan([(.pick, "aaaa1111", "a"), (.pick, "bbbb2222", "b")]).validationError == nil)
   }
 
+  @Test func rewordRendersPickAndAmendExec() {
+    let step = RebaseStep(
+      action: .reword,
+      commit: commit("aaaa1111", "old subject"),
+      newMessage: "new subject\n\nnew body"
+    )
+    let plan = RebasePlan(steps: [step], baseOID: ObjectID(rawValue: "beef0000"))
+
+    #expect(
+      plan.todoFileContents() == """
+        pick aaaa1111 old subject
+        exec git commit --amend -F "$SPOON_REWORD_DIR/0"
+
+        """
+    )
+    #expect(plan.validationError == nil)
+  }
+
+  @Test func rewordNeedsMessageAndFixupNeedsTarget() {
+    let reword = RebaseStep(action: .reword, commit: commit("aaaa1111", "a"))
+    #expect(
+      RebasePlan(steps: [reword], baseOID: nil).validationError
+        == .rewordMessageEmpty
+    )
+    #expect(
+      plan([(.fixup, "aaaa1111", "a")]).validationError
+        == .squashWithoutTarget
+    )
+  }
+
   @Test func squashAfterKeptCommitIsValid() {
     #expect(plan([(.edit, "aaaa1111", "a"), (.squash, "bbbb2222", "b")]).validationError == nil)
   }

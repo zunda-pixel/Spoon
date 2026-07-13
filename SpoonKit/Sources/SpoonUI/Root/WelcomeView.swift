@@ -149,6 +149,7 @@ private struct CloneRepositorySheet: View {
   @State private var depth = 1
   @State private var singleBranch = false
   @State private var branchName = ""
+  @State private var recurseSubmodules = false
   @State private var progressText = ""
   @State private var errorMessage: String?
   @State private var cloneTask: Task<Void, Never>?
@@ -196,7 +197,8 @@ private struct CloneRepositorySheet: View {
           shallowClone: $shallowClone,
           depth: $depth,
           singleBranch: $singleBranch,
-          branchName: $branchName
+          branchName: $branchName,
+          recurseSubmodules: $recurseSubmodules
         )
       }
       .textFieldStyle(.roundedBorder)
@@ -262,7 +264,8 @@ private struct CloneRepositorySheet: View {
       filterBlobNone: filterBlobNone,
       depth: shallowClone ? depth : nil,
       singleBranch: singleBranch,
-      branch: branchName.isEmpty ? nil : branchName
+      branch: branchName.isEmpty ? nil : branchName,
+      recurseSubmodules: recurseSubmodules
     )
     cloneTask = Task {
       do {

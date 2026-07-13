@@ -10,6 +10,8 @@ public struct CloneOptions: Sendable, Equatable {
   public var singleBranch: Bool
   /// Branch to check out (`--branch`); the remote's default when `nil`.
   public var branch: String?
+  /// Initializes and updates all submodules after cloning.
+  public var recurseSubmodules: Bool
 
   public static let standard = CloneOptions()
 
@@ -17,13 +19,15 @@ public struct CloneOptions: Sendable, Equatable {
     filterBlobNone: Bool = false,
     depth: Int? = nil,
     singleBranch: Bool = false,
-    branch: String? = nil
+    branch: String? = nil,
+    recurseSubmodules: Bool = false
   ) {
     self.filterBlobNone = filterBlobNone
     self.depth = depth
     self.singleBranch = singleBranch
     let trimmed = branch?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
     self.branch = trimmed.isEmpty ? nil : trimmed
+    self.recurseSubmodules = recurseSubmodules
   }
 
   /// `git clone` arguments before the remote URL and destination path.
@@ -41,6 +45,9 @@ public struct CloneOptions: Sendable, Equatable {
     if let branch {
       arguments.append("--branch")
       arguments.append(branch)
+    }
+    if recurseSubmodules {
+      arguments.append("--recurse-submodules")
     }
     return arguments
   }

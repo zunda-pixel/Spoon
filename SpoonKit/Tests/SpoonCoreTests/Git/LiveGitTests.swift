@@ -168,6 +168,31 @@ struct LiveGitTests {
     #expect(first.diffs[0].kind == .added)
   }
 
+  @Test func fileHistoryResetAndReflogRoundTrip() async throws {
+    let root = try await makeTemporaryRepo()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let client = SystemGitClient(repositoryRoot: root, git: git, runner: runner)
+
+    try Data("base\n".utf8).write(to: root.appending(path: "tracked.txt"))
+    try await runGit(["add", "."], in: root)
+    try await runGit(["commit", "-m", "base"], in: root)
+    let base = try #require(try await client.log(LogQuery()).commits.first)
+
+    try Data("other\n".utf8).write(to: root.appending(path: "other.txt"))
+    try await runGit(["add", "."], in: root)
+    try await runGit(["commit", "-m", "other"], in: root)
+
+    let filePage = try await client.log(LogQuery(path: "tracked.txt"))
+    #expect(filePage.commits.map(\.subject) == ["base"])
+
+    try await client.reset(to: base.oid, mode: .hard)
+    #expect(try await client.log(LogQuery()).commits.map(\.subject) == ["base"])
+    #expect(!FileManager.default.fileExists(atPath: root.appending(path: "other.txt").path))
+
+    let reflog = try await client.reflog(maxCount: 20, skip: 0)
+    #expect(reflog.contains { $0.subject.contains("reset: moving to") })
+  }
+
   @Test func lineDiscardRevertsOnlySelectedLines() async throws {
     let root = try await makeTemporaryRepo()
     defer { try? FileManager.default.removeItem(at: root) }

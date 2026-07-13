@@ -10,6 +10,7 @@ struct RemoteDetailView: View {
 
   @State private var branches: [Branch]?
   @State private var errorMessage: String?
+  @State private var showingEditSheet = false
   @Environment(\.openURL) private var openURL
 
   init(model: RepositoryModel, remoteName: String) {
@@ -43,6 +44,11 @@ struct RemoteDetailView: View {
         errorMessage = error.localizedDescription
       }
     }
+    .sheet(isPresented: $showingEditSheet) {
+      if let remote {
+        EditRemoteSheet(model: model, remote: remote)
+      }
+    }
   }
 
   private var header: some View {
@@ -73,6 +79,11 @@ struct RemoteDetailView: View {
           }
           .controlSize(.small)
         }
+        Button("Edit URLs…", systemImage: "pencil") {
+          showingEditSheet = true
+        }
+        .controlSize(.small)
+        .disabled(model.isBusy)
       }
     }
     .frame(maxWidth: .infinity, alignment: .leading)

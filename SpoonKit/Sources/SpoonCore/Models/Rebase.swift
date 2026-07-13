@@ -25,11 +25,12 @@ public enum RebaseSetupError: LocalizedError, Sendable, Hashable {
   }
 }
 
-/// A todo action for headless interactive rebase (v1 subset — reword and
-/// fixup are deliberately left out until there is message-editing UI).
+/// A todo action for headless interactive rebase.
 public enum RebaseAction: String, Sendable, Hashable, CaseIterable {
   case pick
+  case reword
   case squash
+  case fixup
   case drop
   case edit
 }
@@ -39,6 +40,8 @@ public enum RebaseAction: String, Sendable, Hashable, CaseIterable {
 public struct RebaseStep: Sendable, Hashable, Identifiable {
   public var action: RebaseAction
   public var commit: Commit
+  /// Replacement full message for `.reword`; ignored by other actions.
+  public var newMessage: String? = nil
 
   public var id: String { commit.id }
 }
@@ -56,6 +59,8 @@ public struct RebasePlan: Sendable, Hashable {
     case empty
     /// A squash has no earlier kept commit to fold into.
     case squashWithoutTarget
+    /// A reword step has no replacement message.
+    case rewordMessageEmpty
   }
 
   public var validationError: ValidationError? {
@@ -63,8 +68,13 @@ public struct RebasePlan: Sendable, Hashable {
     var hasTarget = false
     for step in steps {
       switch step.action {
-      case .squash:
+      case .squash, .fixup:
         if !hasTarget { return .squashWithoutTarget }
+      case .reword:
+        guard let message = step.newMessage?.trimmingCharacters(in: .whitespacesAndNewlines),
+          !message.isEmpty
+        else { return .rewordMessageEmpty }
+        hasTarget = true
       case .pick, .edit:
         hasTarget = true
       case .drop:
@@ -77,8 +87,15 @@ public struct RebasePlan: Sendable, Hashable {
   /// `<action> <full-oid> <subject>` per step. Drops are explicit lines, not
   /// omissions, so `rebase.missingCommitsCheck = error` setups keep working.
   public func todoFileContents() -> String {
-    steps
-      .map { "\($0.action.rawValue) \($0.commit.oid.rawValue) \($0.commit.subject)\n" }
-      .joined()
+    steps.enumerated().map { index, step in
+      if step.action == .reword {
+        return """
+          pick \(step.commit.oid.rawValue) \(step.commit.subject)
+          exec git commit --amend -F "$SPOON_REWORD_DIR/\(index)"
+
+          """
+      }
+      return "\(step.action.rawValue) \(step.commit.oid.rawValue) \(step.commit.subject)\n"
+    }.joined()
   }
 }

@@ -76,26 +76,14 @@ Spoon shells out to your system `git` and covers everyday client workflows. The
 items below exist in **modern Git** (including recent 2.4x–2.55 releases) but
 are **not exposed** in Spoon’s UI or `GitClient` API today.
 
-### Repository & remotes
-
-- **Sparse checkout** — `sparse-checkout` / cone mode
-- **Submodule clone** — `--recurse-submodules` at clone time
-- **Edit remote URL** — `git remote set-url` (add/remove only today)
-- **`git backfill`** (2.49+) — fetch missing blobs in partial clones
-
 ### History & inspection
 
-- **Reflog** — recover “lost” commits and branch tips
 - **Blame** — `git blame` / annotate lines in a file
-- **File history** — `git log -- <path>` as a dedicated view
 - **Bisect** — binary search for the commit that introduced a bug
 - **Range diff** — `git range-diff`, including `--remerge-diff` (2.48+)
 
 ### Commits & history editing
 
-- **Reset** — `git reset` (soft / mixed / hard)
-- **Interactive rebase: reword & fixup** — Spoon supports pick, squash, drop, and
-  edit only; reword/fixup are omitted until message-editing UI exists
 - **`git history reword` / `git history split`** (2.54+, experimental) — simpler
   history edits without a full interactive rebase
 - **`git replay`** (experimental) — replay commits onto a new base without

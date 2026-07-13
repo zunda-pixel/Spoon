@@ -35,6 +35,13 @@ public struct SpoonCommands: Commands {
       .keyboardShortcut("l", modifiers: [.shift, .command])
       .disabled(unavailable)
 
+      if model?.supportsBackfill == true {
+        Button("Backfill Missing Objects") {
+          run { await $0.backfill() }
+        }
+        .disabled(unavailable)
+      }
+
       Button("Push") {
         run { await $0.push(force: false) }
       }
@@ -53,6 +60,11 @@ public struct SpoonCommands: Commands {
         model?.requestNewBranchSheet()
       }
       .keyboardShortcut("n", modifiers: [.shift, .command])
+      .disabled(unavailable)
+
+      Button("Sparse Checkout…") {
+        model?.requestSparseCheckoutSheet()
+      }
       .disabled(unavailable)
 
       Button("Stash Changes") {

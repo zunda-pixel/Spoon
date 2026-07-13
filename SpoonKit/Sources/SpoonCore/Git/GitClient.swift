@@ -17,6 +17,7 @@ public protocol GitClient: Sendable {
   func untrackedFileDiff(path: String) async throws -> FileDiff
   /// Metadata, full message, and first-parent patch for one commit.
   func commitDetail(_ oid: ObjectID) async throws -> CommitDetail
+  func reflog(maxCount: Int, skip: Int) async throws -> [ReflogEntry]
 
   /// Stages whole paths (also marks conflicted paths resolved).
   func stage(paths: [String]) async throws
@@ -32,10 +33,12 @@ public protocol GitClient: Sendable {
   func deleteUntracked(paths: [String]) async throws
   /// Commits staged changes; message may be multi-line.
   func commit(message: String, amend: Bool) async throws
+  func reset(to target: ObjectID, mode: ResetMode) async throws
 
   /// Remote-tracking branches of one remote (`refs/remotes/<name>`).
   func remoteBranches(of remoteName: String) async throws -> [Branch]
   func addRemote(name: String, url: String) async throws
+  func setRemoteURL(name: String, fetchURL: String, pushURL: String?) async throws
   func removeRemote(name: String) async throws
 
   func checkout(branch: String) async throws
@@ -68,6 +71,10 @@ public protocol GitClient: Sendable {
   /// Renames a local branch (`branch -m`); works on the current branch too.
   func renameBranch(from oldName: String, to newName: String) async throws
   func fetch() async throws
+  /// Whether the installed git provides `git backfill` (2.49+).
+  func supportsBackfill() async -> Bool
+  /// Downloads blobs omitted by a partial clone.
+  func backfill() async throws
   func pull() async throws
   /// Pushes the current branch; sets upstream on first push.
   func push(force: Bool) async throws
@@ -78,6 +85,11 @@ public protocol GitClient: Sendable {
   func addWorktree(path: URL, branch: String) async throws
   /// Removes a linked worktree (`--force` discards its local changes).
   func removeWorktree(path: URL, force: Bool) async throws
+
+  /// Current cone-mode sparse paths; `nil` when sparse checkout is disabled.
+  func sparseCheckoutPaths() async throws -> [String]?
+  func setSparseCheckout(paths: [String]) async throws
+  func disableSparseCheckout() async throws
 
   /// Runs a headless `rebase -i` driven by `plan`'s todo list. May return
   /// with the rebase paused (edit step or conflict) — check `sequencerState()`.

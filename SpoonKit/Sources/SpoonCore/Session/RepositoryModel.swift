@@ -16,6 +16,7 @@ public final class RepositoryModel {
   public private(set) var stashes: [Stash] = []
   public private(set) var tags: [Tag] = []
   public private(set) var worktrees: [Worktree] = []
+  public private(set) var supportsBackfill = false
   /// An in-progress rebase / cherry-pick / revert (conflict or edit pause).
   public private(set) var sequencerState: SequencerState?
   public private(set) var isRefreshing = false
@@ -41,6 +42,12 @@ public final class RepositoryModel {
 
   public func requestForcePushConfirmation() {
     isForcePushConfirmationRequested = true
+  }
+
+  public var isSparseCheckoutSheetRequested = false
+
+  public func requestSparseCheckoutSheet() {
+    isSparseCheckoutSheetRequested = true
   }
 
   private let gitClient: any GitClient
@@ -193,6 +200,7 @@ public final class RepositoryModel {
       async let tags = gitClient.tags()
       async let worktrees = gitClient.worktrees()
       async let sequencerState = gitClient.sequencerState()
+      async let supportsBackfill = gitClient.supportsBackfill()
       self.status = try await status
       self.branches = try await branches
       self.remotes = try await remotes
@@ -200,6 +208,7 @@ public final class RepositoryModel {
       self.tags = try await tags
       self.worktrees = try await worktrees
       self.sequencerState = try await sequencerState
+      self.supportsBackfill = await supportsBackfill
       changeTrees = self.status.map(ChangeTrees.init) ?? .empty
       lastErrorMessage = nil
     } catch {
@@ -386,12 +395,22 @@ public final class RepositoryModel {
     await perform { try await $0.commit(message: message, amend: amend) }
   }
 
+  public func reset(to target: ObjectID, mode: ResetMode) async {
+    await perform { try await $0.reset(to: target, mode: mode) }
+  }
+
   public func remoteBranches(of remoteName: String) async throws -> [Branch] {
     try await gitClient.remoteBranches(of: remoteName)
   }
 
   public func addRemote(name: String, url: String) async {
     await perform { try await $0.addRemote(name: name, url: url) }
+  }
+
+  public func setRemoteURL(name: String, fetchURL: String, pushURL: String?) async {
+    await perform {
+      try await $0.setRemoteURL(name: name, fetchURL: fetchURL, pushURL: pushURL)
+    }
   }
 
   public func removeRemote(name: String) async {
@@ -469,6 +488,18 @@ public final class RepositoryModel {
     await perform { try await $0.removeWorktree(path: path, force: force) }
   }
 
+  public func sparseCheckoutPaths() async throws -> [String]? {
+    try await gitClient.sparseCheckoutPaths()
+  }
+
+  public func setSparseCheckout(paths: [String]) async {
+    await perform { try await $0.setSparseCheckout(paths: paths) }
+  }
+
+  public func disableSparseCheckout() async {
+    await perform { try await $0.disableSparseCheckout() }
+  }
+
   // MARK: - Sequencer (rebase / cherry-pick / revert)
 
   public var isSequencing: Bool { sequencerState != nil }
@@ -528,6 +559,10 @@ public final class RepositoryModel {
   public func fetch() async {
     await perform { try await $0.fetch() }
     await syncPullRequests(force: true)
+  }
+
+  public func backfill() async {
+    await perform { try await $0.backfill() }
   }
 
   public func pull() async {
@@ -593,6 +628,14 @@ public final class RepositoryModel {
 
   public func loadMoreHistory() async {
     await loadMoreHistory(replacing: false)
+  }
+
+  public func fileHistory(_ query: LogQuery) async throws -> LogPage {
+    try await gitClient.log(query)
+  }
+
+  public func reflog(maxCount: Int = 500, skip: Int = 0) async throws -> [ReflogEntry] {
+    try await gitClient.reflog(maxCount: maxCount, skip: skip)
   }
 
   private func loadMoreHistory(replacing: Bool) async {

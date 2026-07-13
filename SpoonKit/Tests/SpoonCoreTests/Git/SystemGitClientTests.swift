@@ -83,12 +83,43 @@ struct SystemGitClientTests {
       arguments: [
         "-c", "color.ui=false",
         "-c", "core.quotePath=false",
+        "remote", "set-url", "origin", "https://github.com/o/new.git",
+      ]
+    )
+    runner.stub(
+      arguments: [
+        "-c", "color.ui=false",
+        "-c", "core.quotePath=false",
+        "remote", "set-url", "--push", "origin", "git@github.com:o/new.git",
+      ]
+    )
+    runner.stub(
+      arguments: [
+        "-c", "color.ui=false",
+        "-c", "core.quotePath=false",
         "remote", "remove", "origin",
       ]
     )
     let client = makeClient(runner)
     try await client.addRemote(name: "origin", url: "https://github.com/o/r.git")
+    try await client.setRemoteURL(
+      name: "origin",
+      fetchURL: "https://github.com/o/new.git",
+      pushURL: "git@github.com:o/new.git"
+    )
     try await client.removeRemote(name: "origin")
+    #expect(runner.invocations.count == 4)
+  }
+
+  @Test func backfillCapabilityAndCommandSendExactArgv() async throws {
+    let runner = FakeCommandRunner()
+    runner.stub(arguments: baseFlags + ["version"], stdout: "git version 2.49.1\n")
+    runner.stub(arguments: baseFlags + ["backfill"])
+    let client = makeClient(runner)
+
+    #expect(await client.supportsBackfill())
+    try await client.backfill()
+
     #expect(runner.invocations.count == 2)
   }
 
@@ -211,6 +242,7 @@ struct SystemGitClientTests {
         "--depth=10",
         "--single-branch",
         "--branch", "main",
+        "--recurse-submodules",
         "https://example.com/repo.git", "/tmp/clone-dest",
       ]
     )
@@ -218,7 +250,8 @@ struct SystemGitClientTests {
       filterBlobNone: true,
       depth: 10,
       singleBranch: true,
-      branch: "main"
+      branch: "main",
+      recurseSubmodules: true
     )
     try await SystemGitClient.clone(
       from: "https://example.com/repo.git",
@@ -256,6 +289,34 @@ struct SystemGitClientTests {
     runner.stub(arguments: baseFlags + ["switch", "--detach", "aaaa1111"])
     try await makeClient(runner).checkoutRevision(ObjectID(rawValue: "aaaa1111")!)
     #expect(runner.invocations.count == 1)
+  }
+
+  @Test func fileHistoryReflogAndResetSendExactArgv() async throws {
+    let runner = FakeCommandRunner()
+    runner.stub(
+      arguments: baseFlags + [
+        "log", "--topo-order", "-z",
+        "--format=\(GitLogParser.logFormat)",
+        "--max-count=11", "HEAD", "--", "Sources/App.swift",
+      ]
+    )
+    runner.stub(
+      arguments: baseFlags + [
+        "reflog", "show", "-z",
+        "--format=\(GitReflogParser.format)",
+        "--max-count=25", "--skip=5",
+      ]
+    )
+    runner.stub(arguments: baseFlags + ["reset", "--hard", "aaaa1111"])
+    let client = makeClient(runner)
+
+    _ = try await client.log(
+      LogQuery(path: "Sources/App.swift", maxCount: 10)
+    )
+    _ = try await client.reflog(maxCount: 25, skip: 5)
+    try await client.reset(to: ObjectID(rawValue: "aaaa1111")!, mode: .hard)
+
+    #expect(runner.invocations.count == 3)
   }
 
   @Test func mergeSendsExactArgv() async throws {
@@ -365,6 +426,31 @@ struct SystemGitClientTests {
     try await client.addWorktree(path: URL(filePath: "/tmp/wt"), branch: "feature")
     try await client.removeWorktree(path: URL(filePath: "/tmp/wt"), force: false)
     try await client.removeWorktree(path: URL(filePath: "/tmp/wt"), force: true)
+    #expect(runner.invocations.count == 4)
+  }
+
+  @Test func sparseCheckoutOperationsSendExactArgv() async throws {
+    let runner = FakeCommandRunner()
+    runner.stub(
+      arguments: baseFlags + ["config", "--bool", "core.sparseCheckout"],
+      stdout: "true\n"
+    )
+    runner.stub(
+      arguments: baseFlags + ["sparse-checkout", "list"],
+      stdout: "Sources\nTests\n"
+    )
+    runner.stub(
+      arguments: baseFlags + [
+        "sparse-checkout", "set", "--cone", "--", "Sources", "Tests",
+      ]
+    )
+    runner.stub(arguments: baseFlags + ["sparse-checkout", "disable"])
+    let client = makeClient(runner)
+
+    #expect(try await client.sparseCheckoutPaths() == ["Sources", "Tests"])
+    try await client.setSparseCheckout(paths: ["Sources", "Tests"])
+    try await client.disableSparseCheckout()
+
     #expect(runner.invocations.count == 4)
   }
 

@@ -9,6 +9,7 @@ struct CloneOptionsFields: View {
   @Binding var depth: Int
   @Binding var singleBranch: Bool
   @Binding var branchName: String
+  @Binding var recurseSubmodules: Bool
 
   var body: some View {
     DisclosureGroup("Clone options") {
@@ -25,6 +26,7 @@ struct CloneOptionsFields: View {
         text: $branchName,
         prompt: Text("Default branch")
       )
+      Toggle("Initialize and update submodules", isOn: $recurseSubmodules)
     }
   }
 }
@@ -35,7 +37,8 @@ extension CloneOptionsFields {
       filterBlobNone: filterBlobNone,
       depth: shallowClone ? depth : nil,
       singleBranch: singleBranch,
-      branch: branchName.isEmpty ? nil : branchName
+      branch: branchName.isEmpty ? nil : branchName,
+      recurseSubmodules: recurseSubmodules
     )
   }
 
