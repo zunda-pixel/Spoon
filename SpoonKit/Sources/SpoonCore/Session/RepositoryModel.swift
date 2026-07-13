@@ -35,6 +35,14 @@ public final class RepositoryModel {
     isNewBranchSheetRequested = true
   }
 
+  /// Set by toolbar/menu commands so the active window can confirm the
+  /// history-rewriting push before it starts.
+  public var isForcePushConfirmationRequested = false
+
+  public func requestForcePushConfirmation() {
+    isForcePushConfirmationRequested = true
+  }
+
   private let gitClient: any GitClient
   private let gitHub: GitHubAPIClient?
   /// AI providers keyed by id; injected by AppModel, empty in tests.

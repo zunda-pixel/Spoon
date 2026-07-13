@@ -503,8 +503,13 @@ public actor SystemGitClient: GitClient {
     } catch let error as CommandError {
       // First push of a new branch: set upstream and retry once.
       if error.standardErrorExcerpt.contains("--set-upstream") {
+        var upstreamArguments = ["push"]
+        if force {
+          upstreamArguments.append("--force-with-lease")
+        }
+        upstreamArguments.append(contentsOf: ["--set-upstream", "origin", "HEAD"])
         try await runVoid(
-          ["push", "--set-upstream", "origin", "HEAD"] + (force ? ["--force-with-lease"] : []),
+          upstreamArguments,
           timeout: .seconds(300)
         )
       } else {

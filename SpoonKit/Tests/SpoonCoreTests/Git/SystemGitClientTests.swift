@@ -92,6 +92,36 @@ struct SystemGitClientTests {
     #expect(runner.invocations.count == 2)
   }
 
+  @Test func pushModesSendExactArgv() async throws {
+    let runner = FakeCommandRunner()
+    runner.stub(arguments: baseFlags + ["push"])
+    runner.stub(arguments: baseFlags + ["push", "--force-with-lease"])
+    let client = makeClient(runner)
+
+    try await client.push(force: false)
+    try await client.push(force: true)
+
+    #expect(runner.invocations.count == 2)
+  }
+
+  @Test func forcePushSetsUpstreamWithLeaseOnFirstPush() async throws {
+    let runner = FakeCommandRunner()
+    runner.stub(
+      arguments: baseFlags + ["push", "--force-with-lease"],
+      stderr: "fatal: use --set-upstream\n",
+      exitCode: 128
+    )
+    runner.stub(
+      arguments: baseFlags + [
+        "push", "--force-with-lease", "--set-upstream", "origin", "HEAD",
+      ]
+    )
+
+    try await makeClient(runner).push(force: true)
+
+    #expect(runner.invocations.count == 2)
+  }
+
   private let baseFlags = ["-c", "color.ui=false", "-c", "core.quotePath=false"]
 
   private func makeCommit(_ oid: String) -> Commit {

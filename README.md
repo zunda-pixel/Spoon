@@ -105,7 +105,6 @@ are **not exposed** in Spoon’s UI or `GitClient` API today.
 
 - **Built-in 3-way merge resolver** — Spoon detects conflicts and can mark files
   resolved by staging; there is no inline merge editor or `git mergetool` UI
-- **Force push** — `--force-with-lease` exists in the API but has no UI entry
 - **Push tags** — create/delete locally; no push-to-remote for tags
 
 ### Signing & integrity

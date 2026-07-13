@@ -108,12 +108,20 @@ struct RepositorySplitView: View {
         .help("Pull (⇧⌘L)")
         .disabled(model.isBusy || model.isSequencing)
 
-        Button {
-          Task { await model.push() }
+        Menu {
+          Button("Push") {
+            Task { await model.push() }
+          }
+          Divider()
+          Button("Force Push with Lease…", role: .destructive) {
+            model.requestForcePushConfirmation()
+          }
         } label: {
           remoteCountLabel("Push", systemImage: "arrow.up.to.line", count: model.currentBranch?.ahead)
+        } primaryAction: {
+          Task { await model.push() }
         }
-        .help("Push (⇧⌘U)")
+        .help("Push (⇧⌘U); open the menu for force push")
         .disabled(model.isBusy || model.isSequencing)
       }
       ToolbarItemGroup {
@@ -171,6 +179,21 @@ struct RepositorySplitView: View {
     }
     .sheet(isPresented: $showingNewBranchSheet) {
       NewBranchSheet(model: model)
+    }
+    .confirmationDialog(
+      "Force push \(model.currentBranch?.name ?? "the current branch")?",
+      isPresented: .init(
+        get: { model.isForcePushConfirmationRequested },
+        set: { model.isForcePushConfirmationRequested = $0 }
+      )
+    ) {
+      Button("Force Push with Lease", role: .destructive) {
+        Task { await model.push(force: true) }
+      }
+    } message: {
+      Text(
+        "This rewrites the remote branch history. The push will be refused if the remote changed since your last fetch."
+      )
     }
     .focusedSceneValue(\.repositoryModel, model)
     .onChange(of: model.isNewBranchSheetRequested) {

@@ -39,7 +39,13 @@ public struct SpoonCommands: Commands {
         run { await $0.push(force: false) }
       }
       .keyboardShortcut("u", modifiers: [.shift, .command])
-      .disabled(unavailable)
+      .disabled(pushUnavailable)
+
+      Button("Force Push with Lease…") {
+        model?.requestForcePushConfirmation()
+      }
+      .keyboardShortcut("u", modifiers: [.option, .shift, .command])
+      .disabled(pushUnavailable)
 
       Divider()
 
@@ -66,6 +72,10 @@ public struct SpoonCommands: Commands {
 
   private var unavailable: Bool {
     model == nil || model?.isBusy == true
+  }
+
+  private var pushUnavailable: Bool {
+    unavailable || model?.isSequencing == true
   }
 
   private func run(_ operation: @escaping @MainActor (RepositoryModel) async -> Void) {
