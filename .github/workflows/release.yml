@@ -12,7 +12,6 @@ jobs:
   release:
     runs-on: macos-26
     env:
-      DERIVED_DATA_PATH: ${{ runner.temp }}/DerivedData
       TAG: ${{ github.ref_name }}
     steps:
       - uses: actions/checkout@v7.0.0
@@ -23,6 +22,8 @@ jobs:
 
       - name: Build
         run: |
+          echo "DERIVED_DATA_PATH=$RUNNER_TEMP/DerivedData" >> "$GITHUB_ENV"
+
           xcodebuild \
             -project Spoon.xcodeproj \
             -scheme Spoon \
