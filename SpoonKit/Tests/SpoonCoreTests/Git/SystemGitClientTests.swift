@@ -232,10 +232,32 @@ struct SystemGitClientTests {
     let runner = FakeCommandRunner()
     runner.stub(arguments: baseFlags + ["merge", "--no-edit", "feature"])
     runner.stub(arguments: baseFlags + ["merge", "--squash", "feature"])
+    runner.stub(arguments: baseFlags + ["merge", "--ff-only", "feature"])
+    runner.stub(
+      arguments: baseFlags + [
+        "merge", "--no-ff", "--no-edit",
+        "--strategy=ort", "--strategy-option=theirs", "feature",
+      ]
+    )
     let client = makeClient(runner)
-    try await client.merge(branch: "feature", squash: false)
-    try await client.merge(branch: "feature", squash: true)
-    #expect(runner.invocations.count == 2)
+    try await client.merge(branch: "feature", options: .standard)
+    try await client.merge(
+      branch: "feature",
+      options: MergeOptions(commitMode: .squash)
+    )
+    try await client.merge(
+      branch: "feature",
+      options: MergeOptions(commitMode: .fastForwardOnly)
+    )
+    try await client.merge(
+      branch: "feature",
+      options: MergeOptions(
+        commitMode: .createMergeCommit,
+        strategy: .ort,
+        conflictPreference: .theirs
+      )
+    )
+    #expect(runner.invocations.count == 4)
   }
 
   @Test func mergeSequencerControlsSendExactArgv() async throws {

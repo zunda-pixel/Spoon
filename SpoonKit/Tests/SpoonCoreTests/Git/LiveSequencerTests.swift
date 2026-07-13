@@ -227,7 +227,7 @@ struct LiveSequencerTests {
     defer { try? FileManager.default.removeItem(at: root) }
     let client = makeClient(root)
 
-    try await client.merge(branch: "side", squash: false)
+    try await client.merge(branch: "side", options: .standard)
 
     let head = try #require(try await client.log(LogQuery()).commits.first)
     #expect(head.isMerge)
@@ -241,7 +241,10 @@ struct LiveSequencerTests {
     let client = makeClient(root)
     let countBefore = try await client.log(LogQuery()).commits.count
 
-    try await client.merge(branch: "side", squash: true)
+    try await client.merge(
+      branch: "side",
+      options: MergeOptions(commitMode: .squash)
+    )
 
     let status = try await client.status()
     #expect(status.stagedEntries.map(\.path) == ["side.txt"])
@@ -251,6 +254,42 @@ struct LiveSequencerTests {
     let head = try #require(try await client.log(LogQuery()).commits.first)
     #expect(head.subject == "squash side")
     #expect(!head.isMerge)
+  }
+
+  @Test func fastForwardOnlyRefusesDivergedBranches() async throws {
+    let root = try await makeDivergedRepo()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let client = makeClient(root)
+    let headBefore = try #require(try await client.log(LogQuery()).commits.first?.oid)
+
+    await #expect(throws: CommandError.self) {
+      try await client.merge(
+        branch: "side",
+        options: MergeOptions(commitMode: .fastForwardOnly)
+      )
+    }
+
+    #expect(try await client.log(LogQuery()).commits.first?.oid == headBefore)
+    #expect(try await client.sequencerState() == nil)
+  }
+
+  @Test func mergeCanPreferTheirsForConflictingHunks() async throws {
+    let root = try await LiveRepoFixture.makeTemporaryRepo(runner: runner)
+    defer { try? FileManager.default.removeItem(at: root) }
+    try await commitFile("file.txt", "base\n", message: "base", in: root)
+    try await arrange(["switch", "-c", "side"], in: root)
+    try await commitFile("file.txt", "side\n", message: "side edit", in: root)
+    try await arrange(["switch", "main"], in: root)
+    try await commitFile("file.txt", "main\n", message: "main edit", in: root)
+    let client = makeClient(root)
+
+    try await client.merge(
+      branch: "side",
+      options: MergeOptions(strategy: .ort, conflictPreference: .theirs)
+    )
+
+    #expect(try String(contentsOf: root.appending(path: "file.txt"), encoding: .utf8) == "side\n")
+    #expect(try await client.status().conflictedEntries.isEmpty)
   }
 
   @Test func mergeConflictIsDetectedAndAbortable() async throws {
@@ -264,7 +303,7 @@ struct LiveSequencerTests {
     let client = makeClient(root)
 
     await #expect(throws: CommandError.self) {
-      try await client.merge(branch: "side", squash: false)
+      try await client.merge(branch: "side", options: .standard)
     }
     #expect(try await client.sequencerState()?.kind == .merge)
     #expect(try await client.status().conflictedEntries.map(\.path) == ["file.txt"])

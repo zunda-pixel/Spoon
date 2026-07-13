@@ -15,6 +15,7 @@ struct RepoSidebarView: View {
   @State private var deletingBranch: Branch?
   @State private var renamingBranch: Branch?
   @State private var branchingFrom: Branch?
+  @State private var mergingBranch: Branch?
   @State private var deletingTag: Tag?
   @State private var openWorktreeErrorMessage: String?
 
@@ -53,12 +54,8 @@ struct RepoSidebarView: View {
             }
             .disabled(branch.isCurrent || model.isBusy || worktree != nil)
             Divider()
-            Button("Merge into \(model.currentBranch?.name ?? "HEAD")") {
-              Task { await model.merge(branch: branch.name) }
-            }
-            .disabled(branch.isCurrent || model.isBusy || model.isSequencing)
-            Button("Squash Merge into \(model.currentBranch?.name ?? "HEAD")") {
-              Task { await model.merge(branch: branch.name, squash: true) }
+            Button("Merge into \(model.currentBranch?.name ?? "HEAD")…") {
+              mergingBranch = branch
             }
             .disabled(branch.isCurrent || model.isBusy || model.isSequencing)
             Divider()
@@ -182,6 +179,9 @@ struct RepoSidebarView: View {
     }
     .sheet(item: $branchingFrom) { branch in
       NewBranchSheet(model: model, startPoint: branch.name)
+    }
+    .sheet(item: $mergingBranch) { branch in
+      MergeSheet(model: model, branch: branch)
     }
     .confirmationDialog(
       "Remove remote \"\(removingRemote?.name ?? "")\"?",

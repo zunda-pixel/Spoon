@@ -399,10 +399,9 @@ public final class RepositoryModel {
     await perform { try await $0.checkoutRevision(oid) }
   }
 
-  /// Merges `branch` into the current branch; `squash` stages the combined
-  /// changes for a separate commit.
-  public func merge(branch: String, squash: Bool = false) async {
-    await perform { try await $0.merge(branch: branch, squash: squash) }
+  /// Merges `branch` into the current branch with explicit merge behavior.
+  public func merge(branch: String, options: MergeOptions = .standard) async {
+    await perform { try await $0.merge(branch: branch, options: options) }
   }
 
   // MARK: - Tags

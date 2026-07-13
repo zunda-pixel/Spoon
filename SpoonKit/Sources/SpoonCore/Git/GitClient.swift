@@ -48,9 +48,9 @@ public protocol GitClient: Sendable {
   /// branch like `origin/feature`.
   func checkoutRemoteBranch(_ remoteBranch: String) async throws
 
-  /// Merges `branch` into the current branch. `squash` stages the combined
-  /// changes without committing (commit separately afterwards).
-  func merge(branch: String, squash: Bool) async throws
+  /// Merges `branch` into the current branch using the selected fast-forward,
+  /// commit, strategy, and conflict-preference behavior.
+  func merge(branch: String, options: MergeOptions) async throws
 
   func tags() async throws -> [Tag]
   /// Creates a tag at `target` (HEAD when nil); a non-empty `message` makes

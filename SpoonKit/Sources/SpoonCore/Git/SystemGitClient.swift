@@ -291,12 +291,8 @@ public actor SystemGitClient: GitClient {
     try await runVoid(["switch", "--detach", oid.rawValue])
   }
 
-  public func merge(branch: String, squash: Bool) async throws {
-    if squash {
-      try await runVoid(["merge", "--squash", branch], timeout: .seconds(120))
-    } else {
-      try await runVoid(["merge", "--no-edit", branch], timeout: .seconds(120))
-    }
+  public func merge(branch: String, options: MergeOptions) async throws {
+    try await runVoid(options.arguments(branch: branch), timeout: .seconds(120))
   }
 
   // MARK: - Tags
