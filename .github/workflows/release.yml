@@ -11,6 +11,9 @@ permissions:
 jobs:
   release:
     runs-on: macos-26
+    env:
+      DERIVED_DATA_PATH: ${{ runner.temp }}/DerivedData
+      TAG: ${{ github.ref_name }}
     steps:
       - uses: actions/checkout@v7.0.0
 
@@ -18,11 +21,8 @@ jobs:
         with:
           xcode-version: "26.6"
 
-      - name: Build Spoon
+      - name: Build
         run: |
-          DERIVED_DATA_PATH="$RUNNER_TEMP/DerivedData"
-          echo "DERIVED_DATA_PATH=$DERIVED_DATA_PATH" >> "$GITHUB_ENV"
-
           xcodebuild \
             -project Spoon.xcodeproj \
             -scheme Spoon \
@@ -33,20 +33,13 @@ jobs:
             -skipMacroValidation \
             build
 
-      - name: Package app
+      - name: Package
         run: |
-          APP_PATH="$DERIVED_DATA_PATH/Build/Products/Release/Spoon.app"
-          TAG="${{ github.ref_name }}"
           ditto -c -k --sequesterRsrc --keepParent \
-            "$APP_PATH" \
+            "$DERIVED_DATA_PATH/Build/Products/Release/Spoon.app" \
             "Spoon-${TAG}-macOS.zip"
 
-      - name: Create release
+      - name: Publish release
+        run: gh release create "$TAG" --title "$TAG" --generate-notes "Spoon-${TAG}-macOS.zip"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          TAG="${{ github.ref_name }}"
-          gh release create "$TAG" \
-            --title "$TAG" \
-            --generate-notes \
-            "Spoon-${TAG}-macOS.zip"
