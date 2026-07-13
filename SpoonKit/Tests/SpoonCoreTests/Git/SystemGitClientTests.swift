@@ -106,6 +106,22 @@ struct SystemGitClientTests {
     )
   }
 
+  @Test func initializeSendsExactArgv() async throws {
+    let runner = FakeCommandRunner()
+    runner.stub(
+      arguments: baseFlags + [
+        "init", "--initial-branch", "develop", "/tmp/new-repo",
+      ]
+    )
+    try await SystemGitClient.initialize(
+      at: URL(filePath: "/tmp/new-repo"),
+      initialBranch: "develop",
+      git: git,
+      runner: runner
+    )
+    #expect(runner.invocations.count == 1)
+  }
+
   @Test func deleteBranchSendsExactArgv() async throws {
     let runner = FakeCommandRunner()
     runner.stub(arguments: baseFlags + ["branch", "-d", "feature"])

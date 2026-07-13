@@ -34,6 +34,22 @@ public actor SystemGitClient: GitClient {
     return URL(filePath: path)
   }
 
+  /// Creates a repository at `destination` with the requested initial branch.
+  public static func initialize(
+    at destination: URL,
+    initialBranch: String,
+    git: URL,
+    runner: any CommandRunning
+  ) async throws {
+    let command = GitCommand.make(
+      git: git,
+      repository: nil,
+      arguments: ["init", "--initial-branch", initialBranch, destination.path],
+      timeout: .seconds(30)
+    )
+    _ = try await runner.run(command).checkSuccess(of: command)
+  }
+
   /// Clones `remoteURL` into `destination`, reporting git's `--progress`
   /// lines (they arrive on stderr, `\r`-separated; the latest line wins).
   public static func clone(

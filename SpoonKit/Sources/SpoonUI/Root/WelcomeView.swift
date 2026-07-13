@@ -6,6 +6,7 @@ import UniformTypeIdentifiers
 struct WelcomeView: View {
   @Environment(AppModel.self) private var appModel
   @State private var isChoosingFolder = false
+  @State private var showingCreateSheet = false
   @State private var showingCloneSheet = false
   @State private var openErrorMessage: String?
 
@@ -36,6 +37,14 @@ struct WelcomeView: View {
         .padding(.top, 16)
 
         Button {
+          showingCreateSheet = true
+        } label: {
+          Label("Create Repository…", systemImage: "plus.rectangle.on.folder")
+        }
+        .controlSize(.large)
+        .keyboardShortcut("n", modifiers: [.command, .shift])
+
+        Button {
           showingCloneSheet = true
         } label: {
           Label("Clone Repository…", systemImage: "square.and.arrow.down.on.square")
@@ -57,6 +66,9 @@ struct WelcomeView: View {
       if case .success(let url) = result {
         open(url)
       }
+    }
+    .sheet(isPresented: $showingCreateSheet) {
+      CreateRepositorySheet(onOpen: onOpen)
     }
     .sheet(isPresented: $showingCloneSheet) {
       CloneRepositorySheet(onOpen: onOpen)

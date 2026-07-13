@@ -57,6 +57,21 @@ public final class AppModel {
     }
   }
 
+  /// Creates a new repository and records it in recents.
+  public func createRepository(
+    at destination: URL,
+    initialBranch: String = "main"
+  ) async throws -> Repository {
+    let git = try await resolveGit()
+    try await SystemGitClient.initialize(
+      at: destination,
+      initialBranch: initialBranch.trimmingCharacters(in: .whitespacesAndNewlines),
+      git: git,
+      runner: runner
+    )
+    return try await openRepository(at: destination)
+  }
+
   /// Clones `remoteURL` into `destination` and records it in recents.
   /// `progress` receives git's latest `--progress` line off the main actor.
   public func cloneRepository(

@@ -48,6 +48,24 @@ struct LiveGitTests {
     #expect(branches[0].subject == "initial commit")
   }
 
+  @Test func initializeCreatesRepositoryWithRequestedBranch() async throws {
+    let root = URL.temporaryDirectory.appending(path: "spoon-init-\(UUID().uuidString)")
+    defer { try? FileManager.default.removeItem(at: root) }
+
+    try await SystemGitClient.initialize(
+      at: root,
+      initialBranch: "develop",
+      git: git,
+      runner: runner
+    )
+
+    #expect(FileManager.default.fileExists(atPath: root.appending(path: ".git").path))
+    let client = SystemGitClient(repositoryRoot: root, git: git, runner: runner)
+    let status = try await client.status()
+    #expect(status.headBranch == "develop")
+    #expect(status.headOID == nil)
+  }
+
   @Test func unbornRepoHasNoHeadOID() async throws {
     let root = try await makeTemporaryRepo()
     defer { try? FileManager.default.removeItem(at: root) }
