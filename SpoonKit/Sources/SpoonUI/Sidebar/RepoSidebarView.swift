@@ -2,6 +2,13 @@ import SpoonCore
 import SwiftUI
 import UniformTypeIdentifiers
 
+private struct RemoteTagSelection: Identifiable {
+  let tag: Tag
+  let remote: Remote
+
+  var id: String { "\(remote.name)\u{0}\(tag.name)" }
+}
+
 @MainActor
 struct RepoSidebarView: View {
   let model: RepositoryModel
@@ -17,6 +24,7 @@ struct RepoSidebarView: View {
   @State private var branchingFrom: Branch?
   @State private var mergingBranch: Branch?
   @State private var deletingTag: Tag?
+  @State private var deletingRemoteTag: RemoteTagSelection?
   @State private var openWorktreeErrorMessage: String?
 
   init(model: RepositoryModel, selection: Binding<SidebarItem?>) {
@@ -136,6 +144,23 @@ struct RepoSidebarView: View {
             }
             .help(tag.isAnnotated ? "Annotated tag at \(tag.target.shortened)" : "Tag at \(tag.target.shortened)")
             .contextMenu {
+              Menu("Push to Remote") {
+                ForEach(model.remotes) { remote in
+                  Button(remote.name) {
+                    Task { await model.pushTag(name: tag.name, to: remote.name) }
+                  }
+                }
+              }
+              .disabled(model.remotes.isEmpty || model.isBusy)
+              Menu("Delete from Remote") {
+                ForEach(model.remotes) { remote in
+                  Button(remote.name, role: .destructive) {
+                    deletingRemoteTag = RemoteTagSelection(tag: tag, remote: remote)
+                  }
+                }
+              }
+              .disabled(model.remotes.isEmpty || model.isBusy)
+              Divider()
               Button("Delete Tag…", role: .destructive) {
                 deletingTag = tag
               }
@@ -159,6 +184,11 @@ struct RepoSidebarView: View {
             .help(remote.fetchURL)
             .contextMenu {
               addRemoteButton
+              Divider()
+              Button("Push All Tags") {
+                Task { await model.pushAllTags(to: remote.name) }
+              }
+              .disabled(model.tags.isEmpty || model.isBusy)
               Divider()
               Button("Remove \"\(remote.name)\"…", role: .destructive) {
                 removingRemote = remote
@@ -230,6 +260,25 @@ struct RepoSidebarView: View {
       }
     } message: {
       Text("The tag will be removed locally. Remote copies are not affected.")
+    }
+    .confirmationDialog(
+      "Delete tag “\(deletingRemoteTag?.tag.name ?? "")” from \(deletingRemoteTag?.remote.name ?? "remote")?",
+      isPresented: .init(
+        get: { deletingRemoteTag != nil },
+        set: { if !$0 { deletingRemoteTag = nil } }
+      )
+    ) {
+      Button("Delete from Remote", role: .destructive) {
+        guard let selection = deletingRemoteTag else { return }
+        Task {
+          await model.deleteRemoteTag(
+            name: selection.tag.name,
+            from: selection.remote.name
+          )
+        }
+      }
+    } message: {
+      Text("The local tag will be kept.")
     }
     .confirmationDialog(
       "Delete branch \"\(deletingBranch?.name ?? "")\"?",

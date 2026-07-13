@@ -322,6 +322,24 @@ public actor SystemGitClient: GitClient {
     try await runVoid(["tag", "-d", name])
   }
 
+  public func pushTag(name: String, to remoteName: String) async throws {
+    try await runVoid(
+      ["push", remoteName, "refs/tags/\(name)"],
+      timeout: .seconds(300)
+    )
+  }
+
+  public func pushAllTags(to remoteName: String) async throws {
+    try await runVoid(["push", remoteName, "--tags"], timeout: .seconds(300))
+  }
+
+  public func deleteRemoteTag(name: String, from remoteName: String) async throws {
+    try await runVoid(
+      ["push", remoteName, "--delete", "refs/tags/\(name)"],
+      timeout: .seconds(300)
+    )
+  }
+
   public func createBranch(name: String, from startPoint: String?, checkout: Bool) async throws {
     var arguments = checkout ? ["switch", "-c", name] : ["branch", name]
     if let startPoint {

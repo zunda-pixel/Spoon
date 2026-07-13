@@ -324,6 +324,24 @@ struct SystemGitClientTests {
     #expect(runner.invocations.count == 4)
   }
 
+  @Test func remoteTagOperationsSendExactArgv() async throws {
+    let runner = FakeCommandRunner()
+    runner.stub(arguments: baseFlags + ["push", "origin", "refs/tags/v1"])
+    runner.stub(arguments: baseFlags + ["push", "upstream", "--tags"])
+    runner.stub(
+      arguments: baseFlags + [
+        "push", "origin", "--delete", "refs/tags/v1",
+      ]
+    )
+    let client = makeClient(runner)
+
+    try await client.pushTag(name: "v1", to: "origin")
+    try await client.pushAllTags(to: "upstream")
+    try await client.deleteRemoteTag(name: "v1", from: "origin")
+
+    #expect(runner.invocations.count == 3)
+  }
+
   @Test func renameBranchSendsExactArgv() async throws {
     let runner = FakeCommandRunner()
     runner.stub(arguments: baseFlags + ["branch", "-m", "old-name", "new-name"])

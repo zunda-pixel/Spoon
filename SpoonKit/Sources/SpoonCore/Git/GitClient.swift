@@ -57,6 +57,12 @@ public protocol GitClient: Sendable {
   /// it an annotated tag.
   func createTag(name: String, at target: ObjectID?, message: String?) async throws
   func deleteTag(name: String) async throws
+  /// Pushes one local tag to a remote.
+  func pushTag(name: String, to remoteName: String) async throws
+  /// Pushes every local tag to a remote.
+  func pushAllTags(to remoteName: String) async throws
+  /// Deletes a tag from a remote without changing the local tag.
+  func deleteRemoteTag(name: String, from remoteName: String) async throws
   /// Deletes a local branch (`-d`, or `-D` when `force`).
   func deleteBranch(name: String, force: Bool) async throws
   /// Renames a local branch (`branch -m`); works on the current branch too.

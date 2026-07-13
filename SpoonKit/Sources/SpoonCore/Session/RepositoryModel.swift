@@ -422,6 +422,18 @@ public final class RepositoryModel {
     await perform { try await $0.deleteTag(name: name) }
   }
 
+  public func pushTag(name: String, to remoteName: String) async {
+    await perform { try await $0.pushTag(name: name, to: remoteName) }
+  }
+
+  public func pushAllTags(to remoteName: String) async {
+    await perform { try await $0.pushAllTags(to: remoteName) }
+  }
+
+  public func deleteRemoteTag(name: String, from remoteName: String) async {
+    await perform { try await $0.deleteRemoteTag(name: name, from: remoteName) }
+  }
+
   public func createBranch(
     name: String, from startPoint: String? = nil, checkout: Bool = true
   ) async {

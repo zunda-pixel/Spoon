@@ -339,6 +339,32 @@ struct LiveSequencerTests {
     #expect(try await client.tags().map(\.name) == ["v1.0.0"])
   }
 
+  @Test func remoteTagPushAndDeleteRoundTrip() async throws {
+    let root = try await LiveRepoFixture.makeTemporaryRepo(runner: runner)
+    let origin = URL.temporaryDirectory.appending(path: "spoon-tag-origin-\(UUID().uuidString)")
+    defer {
+      try? FileManager.default.removeItem(at: root)
+      try? FileManager.default.removeItem(at: origin)
+    }
+    try await commitFile("base.txt", "base\n", message: "base", in: root)
+    try await arrange(["init", "--bare", origin.path], in: root)
+    try await arrange(["remote", "add", "origin", origin.path], in: root)
+    let client = makeClient(root)
+    let remoteClient = makeClient(origin)
+    try await client.createTag(name: "v1", at: nil, message: nil)
+    try await client.createTag(name: "v2", at: nil, message: nil)
+
+    try await client.pushTag(name: "v1", to: "origin")
+    #expect(try await remoteClient.tags().map(\.name) == ["v1"])
+
+    try await client.pushAllTags(to: "origin")
+    #expect(Set(try await remoteClient.tags().map(\.name)) == ["v1", "v2"])
+
+    try await client.deleteRemoteTag(name: "v1", from: "origin")
+    #expect(try await remoteClient.tags().map(\.name) == ["v2"])
+    #expect(Set(try await client.tags().map(\.name)) == ["v1", "v2"])
+  }
+
   @Test func checkoutRevisionDetachesHead() async throws {
     let root = try await LiveRepoFixture.makeTemporaryRepo(runner: runner)
     defer { try? FileManager.default.removeItem(at: root) }
