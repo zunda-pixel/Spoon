@@ -70,6 +70,70 @@ available, to our knowledge).
 | AI branch review (Claude Code / Codex) | ✅ | ✅ |
 | Shortcuts / App Intents | — | ✅ |
 
+## Git features not in Spoon (yet)
+
+Spoon shells out to your system `git` and covers everyday client workflows. The
+items below exist in **modern Git** (including recent 2.4x–2.55 releases) but
+are **not exposed** in Spoon’s UI or `GitClient` API today.
+
+### Repository & remotes
+
+- **`git init`** — create a new repository from Spoon
+- **Partial / filter clones** — e.g. `--filter=blob:none`, `--depth`, `--single-branch`
+- **Sparse checkout** — `sparse-checkout` / cone mode
+- **Submodule clone** — `--recurse-submodules` at clone time
+- **Edit remote URL** — `git remote set-url` (add/remove only today)
+- **`git backfill`** (2.49+) — fetch missing blobs in partial clones
+
+### History & inspection
+
+- **Reflog** — recover “lost” commits and branch tips
+- **Blame** — `git blame` / annotate lines in a file
+- **File history** — `git log -- <path>` as a dedicated view
+- **Bisect** — binary search for the commit that introduced a bug
+- **Range diff** — `git range-diff`, including `--remerge-diff` (2.48+)
+
+### Commits & history editing
+
+- **Reset** — `git reset` (soft / mixed / hard)
+- **Interactive rebase: reword & fixup** — Spoon supports pick, squash, drop, and
+  edit only; reword/fixup are omitted until message-editing UI exists
+- **`git history reword` / `git history split`** (2.54+, experimental) — simpler
+  history edits without a full interactive rebase
+- **`git replay`** (experimental) — replay commits onto a new base without
+  touching the working tree
+
+### Merge, push & conflicts
+
+- **Built-in 3-way merge resolver** — Spoon detects conflicts and can mark files
+  resolved by staging; there is no inline merge editor or `git mergetool` UI
+- **Merge strategy selection** — ff-only, explicit strategy flags, etc.
+- **Force push** — `--force-with-lease` exists in the API but has no UI entry
+- **Push tags** — create/delete locally; no push-to-remote for tags
+
+### Signing & integrity
+
+- **GPG / SSH commit signing** — `-S`, `commit.gpgsign`, signed-tag workflows
+- **Signed-tag verification** — beyond listing tag names
+
+### Large repos & storage
+
+- **Git LFS** — `git lfs` track/fetch/push
+- **Submodules** — init/update/status in nested repos
+- **Reftable backend** (2.45+) — `init --ref-format=reftable`, `refs migrate`
+- **`git maintenance`** — configure geometric repack and other maintenance tasks
+- **`git repo info` / `git repo structure`** (2.52+) — repository size and layout
+  diagnostics
+
+### Diffs & workflows
+
+- **Image diffs** and **side-by-side diff** views
+- **Git-flow** — branch naming / release/hotfix helpers
+- **Hooks editor** — hooks may run when you commit; Spoon does not manage them
+  (Git 2.54+ also supports hooks defined in config)
+- **Git config UI** — no in-app editor for repo/user gitconfig (tool-path
+  overrides exist internally but are not wired to Settings yet)
+
 ## Requirements
 
 - macOS 27 (Golden Gate) or later
