@@ -13,6 +13,13 @@ extension RepositoryModel {
     adoptHistoryError()
   }
 
+  /// Reloads history against HEAD, dropping a reference that no longer
+  /// resolves (e.g. a branch that was just deleted).
+  func resetHistoryToHead() async {
+    await historyStore.reload(reference: nil, hasHead: status?.headOID != nil)
+    adoptHistoryError()
+  }
+
   public func loadMoreHistory() async {
     await historyStore.loadMore()
     adoptHistoryError()

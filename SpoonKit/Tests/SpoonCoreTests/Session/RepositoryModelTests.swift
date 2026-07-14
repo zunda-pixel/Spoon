@@ -253,6 +253,35 @@ struct RepositoryModelTests {
     #expect(model.lastErrorMessage == nil)
   }
 
+  @Test func refreshFallsBackToHeadHistoryWhenTheReferenceDisappears() async {
+    let client = FakeRepositoryGitClient()
+    let oid = makeOID("aaaaaaaa")
+    let page = LogPage(commits: [makeCommit("aaaaaaaa", subject: "tip")], hasMore: false)
+    await client.configure(
+      status: makeStatus(oid: oid, branch: "main"),
+      branches: [
+        makeBranch("main", oid: oid, isCurrent: true),
+        makeBranch("topic", oid: oid, isCurrent: false),
+      ],
+      logPages: [0: page]
+    )
+    let model = makeModel(client)
+    await model.refresh()
+    await model.loadHistoryIfNeeded(reference: "topic")
+    #expect(model.historyRows.count == 1)
+
+    await client.configure(
+      status: makeStatus(oid: oid, branch: "main"),
+      branches: [makeBranch("main", oid: oid, isCurrent: true)],
+      logPages: [0: page]
+    )
+    await model.refreshGitState()
+
+    #expect(await client.logQueries.map(\.reference) == ["topic", nil])
+    #expect(model.lastErrorMessage == nil)
+    #expect(model.historyRows.count == 1)
+  }
+
   @Test func refreshErrorClearsOnceRefreshRecovers() async {
     let client = FakeRepositoryGitClient()
     let oid = makeOID("99999999")

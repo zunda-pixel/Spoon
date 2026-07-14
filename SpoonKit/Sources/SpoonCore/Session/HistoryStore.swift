@@ -13,7 +13,7 @@ final class HistoryStore {
   private let gitClient: any GitClient
   private var loadedCommits: [Commit] = []
   private var nextHistoryQuery: LogQuery?
-  private var loadedReference: String?
+  private(set) var loadedReference: String?
 
   init(gitClient: any GitClient) {
     self.gitClient = gitClient

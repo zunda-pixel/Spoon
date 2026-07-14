@@ -180,6 +180,31 @@ struct RepositorySplitView: View {
     }
     .focusedSceneValue(\.repositoryModel, model)
     .focusedSceneValue(\.repositoryNavigationState, navigation)
+    .onChange(of: model.branches) {
+      resetStaleSidebarSelection()
+    }
+    .onChange(of: model.remoteBranchesByRemote) {
+      resetStaleSidebarSelection()
+    }
+  }
+
+  /// Moves the selection to HEAD history when the branch it pointed at
+  /// disappears (e.g. it was just deleted), so the content column never
+  /// keeps showing a dead reference.
+  private func resetStaleSidebarSelection() {
+    switch navigation.sidebarSelection {
+    case .branch(let name):
+      if !model.branches.contains(where: { $0.name == name }) {
+        navigation.sidebarSelection = .history
+      }
+    case .remoteBranch(let remote, let branch):
+      let remoteBranches = model.remoteBranchesByRemote[remote] ?? []
+      if !remoteBranches.contains(where: { $0.name == branch }) {
+        navigation.sidebarSelection = .history
+      }
+    default:
+      break
+    }
   }
 
   private var sequencerName: String {
