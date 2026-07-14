@@ -4,13 +4,14 @@ import SwiftUI
 @MainActor
 struct BranchRowView: View {
   let branch: Branch
+  var displayName: String?
   var pullRequest: PullRequest?
   var worktree: Worktree?
 
   var body: some View {
     Label {
       HStack(spacing: 4) {
-        Text(branch.name)
+        Text(displayName ?? branch.name)
           .fontWeight(branch.isCurrent ? .semibold : .regular)
           .lineLimit(1)
           .truncationMode(.middle)

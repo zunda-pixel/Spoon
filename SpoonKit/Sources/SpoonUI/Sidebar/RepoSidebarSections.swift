@@ -39,30 +39,166 @@ struct BranchesSidebarSection: View {
   @Binding var removingWorktree: Worktree?
   @Binding var deletingBranch: Branch?
   let openWorktree: (Worktree) -> Void
+  @State private var isExpanded = true
+  @State private var expandedFolderPaths: Set<String> = []
 
   var body: some View {
-    Section("Branches") {
-      ForEach(model.branches) { branch in
-        let worktree = model.worktree(for: branch)
-        BranchRowView(
-          branch: branch,
-          pullRequest: model.prByBranch[branch.name],
-          worktree: worktree
+    Section(isExpanded: $isExpanded) {
+      ForEach(BranchTreeNode.make(from: model.branches)) { node in
+        BranchTreeNodeView(
+          node: node,
+          model: model,
+          navigation: navigation,
+          expandedFolderPaths: $expandedFolderPaths,
+          removingWorktree: $removingWorktree,
+          deletingBranch: $deletingBranch,
+          openWorktree: openWorktree
         )
-        .tag(SidebarItem.branch(branch.name))
-        .contextMenu {
-          BranchContextMenu(
+      }
+    } header: {
+      Text("Branches")
+    }
+    .onChange(of: model.currentBranch?.name, initial: true) {
+      guard let currentBranchName = model.currentBranch?.name else { return }
+      expandedFolderPaths.formUnion(BranchTreeNode.folderPaths(in: currentBranchName))
+    }
+  }
+}
+
+private struct BranchTreeNode: Identifiable {
+  let name: String
+  let path: String
+  let branch: Branch?
+  var children: [BranchTreeNode]
+
+  var id: String {
+    branch == nil ? "folder:\(path)" : "branch:\(path)"
+  }
+
+  static func make(from branches: [Branch]) -> [BranchTreeNode] {
+    var nodes: [BranchTreeNode] = []
+    for branch in branches {
+      insert(
+        branch,
+        components: branch.name.split(separator: "/")[...],
+        parentPath: "",
+        into: &nodes
+      )
+    }
+    return nodes
+  }
+
+  static func folderPaths(in branchName: String) -> Set<String> {
+    let components = branchName.split(separator: "/")
+    guard components.count > 1 else { return [] }
+
+    var paths: Set<String> = []
+    var path = ""
+    for component in components.dropLast() {
+      path = path.isEmpty ? String(component) : "\(path)/\(component)"
+      paths.insert(path)
+    }
+    return paths
+  }
+
+  private static func insert(
+    _ branch: Branch,
+    components: ArraySlice<Substring>,
+    parentPath: String,
+    into nodes: inout [BranchTreeNode]
+  ) {
+    guard let component = components.first else { return }
+
+    let name = String(component)
+    let path = parentPath.isEmpty ? name : "\(parentPath)/\(name)"
+    if components.count == 1 {
+      nodes.append(
+        BranchTreeNode(name: name, path: branch.name, branch: branch, children: [])
+      )
+      return
+    }
+
+    if let index = nodes.firstIndex(where: { $0.branch == nil && $0.path == path }) {
+      insert(
+        branch,
+        components: components.dropFirst(),
+        parentPath: path,
+        into: &nodes[index].children
+      )
+    } else {
+      var folder = BranchTreeNode(name: name, path: path, branch: nil, children: [])
+      insert(
+        branch,
+        components: components.dropFirst(),
+        parentPath: path,
+        into: &folder.children
+      )
+      nodes.append(folder)
+    }
+  }
+}
+
+@MainActor
+private struct BranchTreeNodeView: View {
+  let node: BranchTreeNode
+  let model: RepositoryModel
+  let navigation: RepositoryNavigationState
+  @Binding var expandedFolderPaths: Set<String>
+  @Binding var removingWorktree: Worktree?
+  @Binding var deletingBranch: Branch?
+  let openWorktree: (Worktree) -> Void
+
+  var body: some View {
+    if let branch = node.branch {
+      let worktree = model.worktree(for: branch)
+      BranchRowView(
+        branch: branch,
+        displayName: node.name,
+        pullRequest: model.prByBranch[branch.name],
+        worktree: worktree
+      )
+      .tag(SidebarItem.branch(branch.name))
+      .contextMenu {
+        BranchContextMenu(
+          model: model,
+          navigation: navigation,
+          branch: branch,
+          worktree: worktree,
+          removingWorktree: $removingWorktree,
+          deletingBranch: $deletingBranch,
+          openWorktree: openWorktree
+        )
+      }
+    } else {
+      DisclosureGroup(isExpanded: isFolderExpanded) {
+        ForEach(node.children) { child in
+          BranchTreeNodeView(
+            node: child,
             model: model,
             navigation: navigation,
-            branch: branch,
-            worktree: worktree,
+            expandedFolderPaths: $expandedFolderPaths,
             removingWorktree: $removingWorktree,
             deletingBranch: $deletingBranch,
             openWorktree: openWorktree
           )
         }
+      } label: {
+        Label(node.name, systemImage: "folder")
       }
     }
+  }
+
+  private var isFolderExpanded: Binding<Bool> {
+    Binding(
+      get: { expandedFolderPaths.contains(node.path) },
+      set: { isExpanded in
+        if isExpanded {
+          expandedFolderPaths.insert(node.path)
+        } else {
+          expandedFolderPaths.remove(node.path)
+        }
+      }
+    )
   }
 }
 
@@ -110,10 +246,11 @@ private struct BranchContextMenu: View {
 @MainActor
 struct StashesSidebarSection: View {
   let model: RepositoryModel
+  @State private var isExpanded = true
 
   var body: some View {
     if !model.stashes.isEmpty {
-      Section("Stashes") {
+      Section(isExpanded: $isExpanded) {
         ForEach(model.stashes) { stash in
           Label {
             Text(stash.message)
@@ -137,6 +274,8 @@ struct StashesSidebarSection: View {
             Button("Drop…", role: .destructive) { Task { await model.dropStash(stash) } }
           }
         }
+      } header: {
+        Text("Stashes")
       }
     }
   }
@@ -147,10 +286,11 @@ struct TagsSidebarSection: View {
   let model: RepositoryModel
   @Binding var deletingTag: Tag?
   @Binding var deletingRemoteTag: RemoteTagSelection?
+  @State private var isExpanded = true
 
   var body: some View {
     if !model.tags.isEmpty {
-      Section("Tags") {
+      Section(isExpanded: $isExpanded) {
         ForEach(model.tags) { tag in
           TagSidebarRow(tag: tag)
             .contextMenu {
@@ -162,6 +302,8 @@ struct TagsSidebarSection: View {
               )
             }
         }
+      } header: {
+        Text("Tags")
       }
     }
   }
@@ -230,9 +372,10 @@ struct RemotesSidebarSection: View {
   let model: RepositoryModel
   let navigation: RepositoryNavigationState
   @Binding var removingRemote: Remote?
+  @State private var isExpanded = true
 
   var body: some View {
-    Section("Remotes") {
+    Section(isExpanded: $isExpanded) {
       if model.remotes.isEmpty {
         Label("No remotes", systemImage: "network.slash")
           .foregroundStyle(.tertiary)
@@ -251,6 +394,8 @@ struct RemotesSidebarSection: View {
             Button("Remove “\(remote.name)”…", role: .destructive) { removingRemote = remote }
           }
       }
+    } header: {
+      Text("Remotes")
     }
   }
 

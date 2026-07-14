@@ -25,15 +25,15 @@ struct RepoSidebarView: View {
         openWorktree: openWorktree
       )
       StashesSidebarSection(model: model)
-      TagsSidebarSection(
-        model: model,
-        deletingTag: $deletingTag,
-        deletingRemoteTag: $deletingRemoteTag
-      )
       RemotesSidebarSection(
         model: model,
         navigation: navigation,
         removingRemote: $removingRemote
+      )
+      TagsSidebarSection(
+        model: model,
+        deletingTag: $deletingTag,
+        deletingRemoteTag: $deletingRemoteTag
       )
     }
     .listStyle(.sidebar)
