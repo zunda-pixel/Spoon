@@ -1,3 +1,4 @@
+import AppKit
 import SpoonCore
 import SwiftUI
 
@@ -225,6 +226,9 @@ private struct BranchContextMenu: View {
     Divider()
     if let worktree {
       Button("Switch to Worktree") { openWorktree(worktree) }
+      Button("Open in Finder") {
+        NSWorkspace.shared.open(worktree.path)
+      }
       if !worktree.isMain {
         Button("Remove Worktree…", role: .destructive) { removingWorktree = worktree }
           .disabled(model.isBusy)
