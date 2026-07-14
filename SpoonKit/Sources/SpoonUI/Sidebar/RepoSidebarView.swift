@@ -6,13 +6,12 @@ struct RepoSidebarView: View {
   let model: RepositoryModel
   @Bindable var navigation: RepositoryNavigationState
   let switchRepository: (Repository.ID) -> Void
-  @Environment(AppModel.self) private var appModel
   @State private var removingRemote: Remote?
   @State private var removingWorktree: Worktree?
   @State private var deletingBranch: Branch?
   @State private var deletingTag: Tag?
   @State private var deletingRemoteTag: RemoteTagSelection?
-  @State private var openWorktreeErrorMessage: String?
+  @State private var switchWorktreeErrorMessage: String?
 
   var body: some View {
     List(selection: $navigation.sidebarSelection) {
@@ -105,15 +104,15 @@ struct RepoSidebarView: View {
       Text("Delete refuses branches that are not fully merged; Force Delete removes them anyway.")
     }
     .alert(
-      "Could Not Open Worktree",
+      "Could Not Switch Worktree",
       isPresented: .init(
-        get: { openWorktreeErrorMessage != nil },
-        set: { if !$0 { openWorktreeErrorMessage = nil } }
+        get: { switchWorktreeErrorMessage != nil },
+        set: { if !$0 { switchWorktreeErrorMessage = nil } }
       )
     ) {
       Button("OK", role: .cancel) {}
     } message: {
-      Text(openWorktreeErrorMessage ?? "")
+      Text(switchWorktreeErrorMessage ?? "")
     }
   }
 
@@ -125,15 +124,15 @@ struct RepoSidebarView: View {
   }
 
   private func openWorktree(_ worktree: Worktree) {
-    Task {
-      do {
-        let repository = try await appModel.openRepository(at: worktree.path)
-        guard repository.id != model.repository.id else { return }
-        model.stopWatching()
-        switchRepository(repository.id)
-      } catch {
-        openWorktreeErrorMessage = error.localizedDescription
-      }
+    let gitMetadataURL = worktree.path.appending(path: ".git")
+    guard FileManager.default.fileExists(atPath: gitMetadataURL.path) else {
+      switchWorktreeErrorMessage = "The worktree no longer exists at \(worktree.path.path)."
+      return
     }
+
+    let repositoryID = Repository(rootURL: worktree.path).id
+    guard repositoryID != model.repository.id else { return }
+    model.stopWatching()
+    switchRepository(repositoryID)
   }
 }

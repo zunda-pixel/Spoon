@@ -22,6 +22,35 @@ struct RepositoryModelTests {
     #expect(model.lastErrorMessage == nil)
   }
 
+  @Test func gitStateRefreshAppliesAtomicallyWithoutPullRequestSync() async {
+    let client = FakeRepositoryGitClient()
+    let originalOID = makeOID("12121212")
+    await client.configure(
+      status: makeStatus(oid: originalOID, branch: "main"),
+      branches: [makeBranch("main", oid: originalOID, isCurrent: true)]
+    )
+    let model = makeModel(client)
+
+    await model.refreshGitState()
+
+    #expect(model.status?.headOID == originalOID)
+    #expect(model.currentBranch?.name == "main")
+    #expect(model.lastErrorMessage == nil)
+
+    let replacementOID = makeOID("13131313")
+    await client.configure(
+      status: makeStatus(oid: replacementOID, branch: "replacement"),
+      branches: [makeBranch("replacement", oid: replacementOID, isCurrent: true)],
+      failBranches: true
+    )
+
+    await model.refreshGitState()
+
+    #expect(model.status?.headOID == originalOID)
+    #expect(model.currentBranch?.name == "main")
+    #expect(model.lastErrorMessage == FakeRepositoryGitClient.Failure.refresh.localizedDescription)
+  }
+
   @Test func mutationRefreshesTheWorkingTree() async {
     let client = FakeRepositoryGitClient()
     let oid = makeOID("22222222")

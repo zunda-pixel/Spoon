@@ -27,6 +27,7 @@ public final class RepositoryModel {
   let pullRequestStore: PullRequestStore
   let aiStore: AIStore
   var watchTask: Task<Void, Never>?
+  var gitRefreshTask: Task<Void, Never>?
 
   public init(repository: Repository, gitClient: any GitClient, gitHub: GitHubAPIClient? = nil) {
     self.repository = repository
@@ -44,6 +45,7 @@ public final class RepositoryModel {
 
   isolated deinit {
     watchTask?.cancel()
+    gitRefreshTask?.cancel()
   }
 
   public func clearError() {

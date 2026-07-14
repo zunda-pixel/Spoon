@@ -7,13 +7,16 @@ struct RepositoryWindowRoot: View {
   let switchRepository: (Repository.ID) -> Void
 
   @Environment(AppModel.self) private var appModel
-  @State private var model: RepositoryModel?
+  @State private var cachedModels: [Repository.ID: RepositoryModel] = [:]
+  @State private var cacheRecency: [Repository.ID] = []
+  @State private var activeModel: RepositoryModel?
   @State private var loadErrorMessage: String?
 
   var body: some View {
     Group {
-      if let model {
+      if let model = cachedModels[repositoryID] {
         RepositorySplitView(model: model, switchRepository: switchRepository)
+          .id(repositoryID)
       } else if let loadErrorMessage {
         ContentUnavailableView(
           "Could Not Open Repository",
@@ -22,12 +25,16 @@ struct RepositoryWindowRoot: View {
         )
       } else {
         ProgressView()
-          .task { await load() }
       }
     }
     .navigationTitle(Repository(rootURL: repositoryURL).name)
+    .task(id: repositoryID) {
+      await load()
+    }
     .onDisappear {
-      model?.stopWatching()
+      for model in cachedModels.values {
+        model.stopWatching()
+      }
     }
   }
 
@@ -36,14 +43,48 @@ struct RepositoryWindowRoot: View {
   }
 
   private func load() async {
+    loadErrorMessage = nil
+    if activeModel?.repository.id != repositoryID {
+      activeModel?.stopWatching()
+    }
+
+    if let cachedModel = cachedModels[repositoryID] {
+      touchCacheEntry(repositoryID)
+      cachedModel.startWatching()
+      activeModel = cachedModel
+      await cachedModel.refreshGitState()
+      guard !Task.isCancelled, activeModel === cachedModel else { return }
+      await cachedModel.syncPullRequests()
+      return
+    }
+
     do {
       let model = try await appModel.makeRepositoryModel(for: Repository(rootURL: repositoryURL))
-      await model.refresh()
+      await model.refreshGitState()
       guard !Task.isCancelled else { return }
+      insertIntoCache(model)
       model.startWatching()
-      self.model = model
+      activeModel = model
+      await model.syncPullRequests()
     } catch {
       loadErrorMessage = error.localizedDescription
+    }
+  }
+
+  private func touchCacheEntry(_ id: Repository.ID) {
+    cacheRecency.removeAll { $0 == id }
+    cacheRecency.append(id)
+  }
+
+  private func insertIntoCache(_ model: RepositoryModel) {
+    let id = model.repository.id
+    cachedModels[id] = model
+    touchCacheEntry(id)
+
+    while cachedModels.count > 6, let evictedID = cacheRecency.first {
+      cacheRecency.removeFirst()
+      guard let evictedModel = cachedModels.removeValue(forKey: evictedID) else { continue }
+      evictedModel.stopWatching()
     }
   }
 }

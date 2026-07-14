@@ -16,6 +16,8 @@ final class PullRequestStore {
   private var syncService: PullRequestSyncService?
   private var syncRepoRef: RepoRef?
   private var snapshotLoaded = false
+  private var syncTask: Task<Void, Never>?
+  private var syncGeneration = 0
 
   init(
     repositoryID: Repository.ID,
@@ -28,6 +30,24 @@ final class PullRequestStore {
   }
 
   func sync(branches: [Branch], remotes: [Remote], force: Bool) async {
+    let predecessor = syncTask
+    syncGeneration += 1
+    let generation = syncGeneration
+    let task = Task { @MainActor [weak self] in
+      if let predecessor {
+        await predecessor.value
+      }
+      guard let self else { return }
+      await self.performSync(branches: branches, remotes: remotes, force: force)
+    }
+    syncTask = task
+    await task.value
+    if syncGeneration == generation {
+      syncTask = nil
+    }
+  }
+
+  private func performSync(branches: [Branch], remotes: [Remote], force: Bool) async {
     guard let gitHub else { return }
     guard let repoRef = Self.gitHubRepoRef(remotes: remotes) else {
       syncState = .noGitHubRemote

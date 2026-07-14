@@ -56,6 +56,27 @@ public struct RepositoryGitSnapshot: Sendable, Hashable {
 
 extension RepositoryModel {
   public func refresh() async {
+    await refreshGitState()
+    await syncPullRequests()
+  }
+
+  /// Refreshes local Git state without waiting for remote pull request synchronization.
+  public func refreshGitState() async {
+    if let gitRefreshTask {
+      await gitRefreshTask.value
+      return
+    }
+
+    let task = Task { @MainActor [weak self] in
+      guard let self else { return }
+      await self.performGitStateRefresh()
+    }
+    gitRefreshTask = task
+    await task.value
+    gitRefreshTask = nil
+  }
+
+  private func performGitStateRefresh() async {
     isRefreshing = true
     defer { isRefreshing = false }
 
@@ -70,7 +91,6 @@ extension RepositoryModel {
     if !historyRows.isEmpty {
       await reloadHistory()
     }
-    await syncPullRequests()
   }
 
   private func apply(_ snapshot: RepositoryGitSnapshot) {

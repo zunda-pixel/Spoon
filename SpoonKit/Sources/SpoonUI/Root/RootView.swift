@@ -22,7 +22,6 @@ public struct RootView: View {
           repositoryID: repositoryID,
           switchRepository: { self.repositoryID = $0 }
         )
-        .id(repositoryID)
       } else {
         WelcomeView { repositoryID = $0 }
       }
