@@ -159,6 +159,11 @@ private struct BranchTreeNodeView: View {
         worktree: worktree
       )
       .tag(SidebarItem.branch(branch.name))
+      .simultaneousGesture(
+        TapGesture().onEnded {
+          handleBranchClick(branch, worktree: worktree)
+        }
+      )
       .contextMenu {
         BranchContextMenu(
           model: model,
@@ -186,6 +191,17 @@ private struct BranchTreeNodeView: View {
       } label: {
         Label(node.name, systemImage: "folder")
       }
+    }
+  }
+
+  private func handleBranchClick(_ branch: Branch, worktree: Worktree?) {
+    navigation.sidebarSelection = .branch(branch.name)
+    guard NSApp.currentEvent?.clickCount == 2 else { return }
+
+    if let worktree {
+      openWorktree(worktree)
+    } else if !branch.isCurrent && !model.isBusy && !model.isSequencing {
+      Task { await model.checkout(branch: branch.name) }
     }
   }
 
