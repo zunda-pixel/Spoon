@@ -39,10 +39,10 @@ public protocol GitHistoryClient: Sendable {
 /// Local branch operations.
 public protocol GitBranchClient: Sendable {
   func branches() async throws -> [Branch]
-  func checkout(branch: String) async throws
-  func checkoutRevision(_ oid: ObjectID) async throws
-  func createBranch(name: String, from startPoint: String?, checkout: Bool) async throws
-  func checkoutRemoteBranch(_ remoteBranch: String) async throws
+  func switchBranch(_ branch: String) async throws
+  func switchToRevision(_ oid: ObjectID) async throws
+  func createBranch(name: String, from startPoint: String?, switchToBranch: Bool) async throws
+  func switchToRemoteBranch(_ remoteBranch: String) async throws
   func merge(branch: String, options: MergeOptions) async throws
   func deleteBranch(name: String, force: Bool) async throws
   func renameBranch(from oldName: String, to newName: String) async throws

@@ -207,7 +207,7 @@ private struct BranchTreeNodeView: View {
     if let worktree {
       openWorktree(worktree)
     } else if !branch.isCurrent && !model.isBusy && !model.isSequencing {
-      Task { await model.checkout(branch: branch.name) }
+      Task { await model.switchBranch(branch.name) }
     }
   }
 
@@ -236,8 +236,8 @@ private struct BranchContextMenu: View {
   let openWorktree: (Worktree) -> Void
 
   var body: some View {
-    Button("Checkout") {
-      Task { await model.checkout(branch: branch.name) }
+    Button("Switch") {
+      Task { await model.switchBranch(branch.name) }
     }
     .disabled(branch.isCurrent || model.isBusy || worktree != nil)
     Divider()

@@ -74,12 +74,12 @@ extension RepositoryModel {
     await perform { try await $0.removeRemote(name: name) }
   }
 
-  public func checkout(branch: String) async {
-    await perform { try await $0.checkout(branch: branch) }
+  public func switchBranch(_ branch: String) async {
+    await perform { try await $0.switchBranch(branch) }
   }
 
-  public func checkoutRevision(_ oid: ObjectID) async {
-    await perform { try await $0.checkoutRevision(oid) }
+  public func switchToRevision(_ oid: ObjectID) async {
+    await perform { try await $0.switchToRevision(oid) }
   }
 
   public func merge(branch: String, options: MergeOptions = .standard) async {
@@ -107,13 +107,19 @@ extension RepositoryModel {
   }
 
   public func createBranch(
-    name: String, from startPoint: String? = nil, checkout: Bool = true
+    name: String, from startPoint: String? = nil, switchToBranch: Bool = true
   ) async {
-    await perform { try await $0.createBranch(name: name, from: startPoint, checkout: checkout) }
+    await perform {
+      try await $0.createBranch(
+        name: name,
+        from: startPoint,
+        switchToBranch: switchToBranch
+      )
+    }
   }
 
-  public func checkoutRemoteBranch(_ remoteBranch: String) async {
-    await perform { try await $0.checkoutRemoteBranch(remoteBranch) }
+  public func switchToRemoteBranch(_ remoteBranch: String) async {
+    await perform { try await $0.switchToRemoteBranch(remoteBranch) }
   }
 
   public func deleteBranch(name: String, force: Bool = false) async {

@@ -3,7 +3,7 @@ extension RepositoryModel {
   public var openPullRequests: [PullRequest] { pullRequestStore.openPullRequests }
   public var prByBranch: [String: PullRequest] { pullRequestStore.pullRequestByBranch }
 
-  /// The GitHub repository this checkout pushes to: `origin` when it is a
+  /// The GitHub repository this worktree pushes to: `origin` when it is a
   /// GitHub remote, else the first GitHub remote.
   public var gitHubRepoRef: RepoRef? {
     PullRequestStore.gitHubRepoRef(remotes: remotes)

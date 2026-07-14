@@ -22,7 +22,7 @@ public enum RepoWatcher {
           pending.formUnion(classify(batch, root: root))
           guard !pending.isEmpty else { continue }
           // FSEvents already coalesces 300 ms kernel-side; this small
-          // extra window merges callback bursts (e.g. checkout touching
+          // extra window merges callback bursts (e.g. branch switching touching
           // refs and worktree separately).
           try? await Task.sleep(for: .milliseconds(200))
           continuation.yield(pending)

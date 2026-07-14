@@ -10,8 +10,8 @@ struct RevisionContextMenu: View {
   let targetDescription: String
 
   var body: some View {
-    Button("Checkout Commit (Detached)") {
-      Task { await model.checkoutRevision(oid) }
+    Button("Switch to Commit (Detached)") {
+      Task { await model.switchToRevision(oid) }
     }
     .disabled(model.isBusy || model.isSequencing)
     Button("New Branch from Here…") {

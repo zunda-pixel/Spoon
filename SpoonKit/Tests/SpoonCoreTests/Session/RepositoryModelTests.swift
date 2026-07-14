@@ -257,12 +257,16 @@ private actor FakeRepositoryGitClient: GitClient {
   func reset(to target: ObjectID, mode: ResetMode) async throws { throw Failure.unimplemented }
   func commitDetail(_ oid: ObjectID) async throws -> CommitDetail { throw Failure.unimplemented }
   func reflog(maxCount: Int, skip: Int) async throws -> [ReflogEntry] { [] }
-  func checkout(branch: String) async throws { throw Failure.unimplemented }
-  func checkoutRevision(_ oid: ObjectID) async throws { throw Failure.unimplemented }
-  func createBranch(name: String, from startPoint: String?, checkout: Bool) async throws {
+  func switchBranch(_ branch: String) async throws { throw Failure.unimplemented }
+  func switchToRevision(_ oid: ObjectID) async throws { throw Failure.unimplemented }
+  func createBranch(
+    name: String,
+    from startPoint: String?,
+    switchToBranch: Bool
+  ) async throws {
     throw Failure.unimplemented
   }
-  func checkoutRemoteBranch(_ remoteBranch: String) async throws { throw Failure.unimplemented }
+  func switchToRemoteBranch(_ remoteBranch: String) async throws { throw Failure.unimplemented }
   func merge(branch: String, options: MergeOptions) async throws { throw Failure.unimplemented }
   func deleteBranch(name: String, force: Bool) async throws { throw Failure.unimplemented }
   func renameBranch(from oldName: String, to newName: String) async throws {

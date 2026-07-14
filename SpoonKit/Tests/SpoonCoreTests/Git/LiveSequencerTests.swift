@@ -341,7 +341,7 @@ struct LiveSequencerTests {
     #expect(try String(contentsOf: root.appending(path: "file.txt"), encoding: .utf8) == "main\n")
   }
 
-  // MARK: - Tags / revision checkout
+  // MARK: - Tags / revision switching
 
   @Test func tagLifecycleRoundTrip() async throws {
     let root = try await LiveRepoFixture.makeTemporaryRepo(runner: runner)
@@ -393,7 +393,7 @@ struct LiveSequencerTests {
     #expect(Set(try await client.tags().map(\.name)) == ["v1", "v2"])
   }
 
-  @Test func checkoutRevisionDetachesHead() async throws {
+  @Test func switchToRevisionDetachesHead() async throws {
     let root = try await LiveRepoFixture.makeTemporaryRepo(runner: runner)
     defer { try? FileManager.default.removeItem(at: root) }
     try await commitFile("file.txt", "one\n", message: "c1", in: root)
@@ -401,7 +401,7 @@ struct LiveSequencerTests {
     let client = makeClient(root)
     let first = try #require(try await client.log(LogQuery()).commits.last)
 
-    try await client.checkoutRevision(first.oid)
+    try await client.switchToRevision(first.oid)
 
     let status = try await client.status()
     #expect(status.headBranch == nil)
@@ -417,7 +417,7 @@ struct LiveSequencerTests {
     try await commitFile("base.txt", "base\n", message: "base", in: root)
     let client = makeClient(root)
 
-    try await client.createBranch(name: "merged", from: nil, checkout: false)
+    try await client.createBranch(name: "merged", from: nil, switchToBranch: false)
     try await client.deleteBranch(name: "merged", force: false)
 
     try await arrange(["switch", "-c", "unmerged"], in: root)
@@ -439,20 +439,20 @@ struct LiveSequencerTests {
     try await arrange(["switch", "main"], in: root)
     let client = makeClient(root)
 
-    // Without checkout: HEAD stays on main, the copy points at side's tip.
-    try await client.createBranch(name: "copy", from: "side", checkout: false)
+    // Without switching: HEAD stays on main, the copy points at side's tip.
+    try await client.createBranch(name: "copy", from: "side", switchToBranch: false)
     let branches = try await client.branches()
     let side = try #require(branches.first { $0.name == "side" })
     let copy = try #require(branches.first { $0.name == "copy" })
     #expect(copy.tip == side.tip)
     #expect(try await client.status().headBranch == "main")
 
-    // With checkout: HEAD moves to the new branch.
-    try await client.createBranch(name: "copy-checked-out", from: "side", checkout: true)
-    #expect(try await client.status().headBranch == "copy-checked-out")
+    // With switching: HEAD moves to the new branch.
+    try await client.createBranch(name: "copy-switched", from: "side", switchToBranch: true)
+    #expect(try await client.status().headBranch == "copy-switched")
   }
 
-  @Test func checkoutRemoteBranchCreatesTrackingLocalBranch() async throws {
+  @Test func switchToRemoteBranchCreatesTrackingLocalBranch() async throws {
     let root = try await LiveRepoFixture.makeTemporaryRepo(runner: runner)
     let origin = URL.temporaryDirectory.appending(path: "spoon-origin-\(UUID().uuidString)")
     defer {
@@ -470,7 +470,7 @@ struct LiveSequencerTests {
     try await arrange(["branch", "-D", "feature"], in: root)
     let client = makeClient(root)
 
-    try await client.checkoutRemoteBranch("origin/feature")
+    try await client.switchToRemoteBranch("origin/feature")
 
     let status = try await client.status()
     #expect(status.headBranch == "feature")
@@ -485,7 +485,7 @@ struct LiveSequencerTests {
     try await commitFile("base.txt", "base\n", message: "base", in: root)
     let client = makeClient(root)
 
-    try await client.createBranch(name: "feature", from: nil, checkout: false)
+    try await client.createBranch(name: "feature", from: nil, switchToBranch: false)
     try await client.renameBranch(from: "feature", to: "feature/renamed")
     // Renaming the current branch works too.
     try await client.renameBranch(from: "main", to: "trunk")
@@ -506,7 +506,7 @@ struct LiveSequencerTests {
     try await commitFile("base.txt", "base\n", message: "base", in: root)
     let client = makeClient(root)
 
-    try await client.createBranch(name: "feature", from: nil, checkout: false)
+    try await client.createBranch(name: "feature", from: nil, switchToBranch: false)
     try await client.addWorktree(path: worktreePath, branch: "feature")
 
     let worktrees = try await client.worktrees()

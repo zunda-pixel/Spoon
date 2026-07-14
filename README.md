@@ -53,7 +53,7 @@ available, to our knowledge).
 | Clone / add / recent repositories | ✅ | ✅ |
 | Branches: create / delete | ✅ | ✅ |
 | Branch rename / branch from branch | ✅ | ✅ |
-| Checkout branch or revision | ✅ | ✅ |
+| Switch branch or revision | ✅ | ✅ |
 | Tags | ✅ | ✅ |
 | Worktrees linked to branches | ✅ | ✅ |
 | Interactive rebase | ✅ | ✅ |

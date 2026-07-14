@@ -219,24 +219,31 @@ struct SystemGitClientTests {
     runner.stub(arguments: baseFlags + ["branch", "c"])
     runner.stub(arguments: baseFlags + ["branch", "d", "main"])
     let client = makeClient(runner)
-    try await client.createBranch(name: "a", from: nil, checkout: true)
-    try await client.createBranch(name: "b", from: "origin/b", checkout: true)
-    try await client.createBranch(name: "c", from: nil, checkout: false)
-    try await client.createBranch(name: "d", from: "main", checkout: false)
+    try await client.createBranch(name: "a", from: nil, switchToBranch: true)
+    try await client.createBranch(name: "b", from: "origin/b", switchToBranch: true)
+    try await client.createBranch(name: "c", from: nil, switchToBranch: false)
+    try await client.createBranch(name: "d", from: "main", switchToBranch: false)
     #expect(runner.invocations.count == 4)
   }
 
-  @Test func checkoutRemoteBranchSendsExactArgv() async throws {
+  @Test func switchBranchSendsExactArgv() async throws {
     let runner = FakeCommandRunner()
-    runner.stub(arguments: baseFlags + ["switch", "--track", "origin/feature"])
-    try await makeClient(runner).checkoutRemoteBranch("origin/feature")
+    runner.stub(arguments: baseFlags + ["switch", "feature"])
+    try await makeClient(runner).switchBranch("feature")
     #expect(runner.invocations.count == 1)
   }
 
-  @Test func checkoutRevisionSendsExactArgv() async throws {
+  @Test func switchToRemoteBranchSendsExactArgv() async throws {
+    let runner = FakeCommandRunner()
+    runner.stub(arguments: baseFlags + ["switch", "--track", "origin/feature"])
+    try await makeClient(runner).switchToRemoteBranch("origin/feature")
+    #expect(runner.invocations.count == 1)
+  }
+
+  @Test func switchToRevisionSendsExactArgv() async throws {
     let runner = FakeCommandRunner()
     runner.stub(arguments: baseFlags + ["switch", "--detach", "aaaa1111"])
-    try await makeClient(runner).checkoutRevision(ObjectID(rawValue: "aaaa1111")!)
+    try await makeClient(runner).switchToRevision(ObjectID(rawValue: "aaaa1111")!)
     #expect(runner.invocations.count == 1)
   }
 

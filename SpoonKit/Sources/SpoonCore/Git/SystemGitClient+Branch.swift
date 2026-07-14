@@ -11,11 +11,11 @@ extension SystemGitClient {
     return try GitRefParser.parseBranches(result.standardOutput)
   }
 
-  public func checkout(branch: String) async throws {
+  public func switchBranch(_ branch: String) async throws {
     try await runVoid(["switch", branch])
   }
 
-  public func checkoutRevision(_ oid: ObjectID) async throws {
+  public func switchToRevision(_ oid: ObjectID) async throws {
     try await runVoid(["switch", "--detach", oid.rawValue])
   }
 
@@ -23,15 +23,19 @@ extension SystemGitClient {
     try await runVoid(options.arguments(branch: branch), timeout: .seconds(120))
   }
 
-  public func createBranch(name: String, from startPoint: String?, checkout: Bool) async throws {
-    var arguments = checkout ? ["switch", "-c", name] : ["branch", name]
+  public func createBranch(
+    name: String,
+    from startPoint: String?,
+    switchToBranch: Bool
+  ) async throws {
+    var arguments = switchToBranch ? ["switch", "-c", name] : ["branch", name]
     if let startPoint {
       arguments.append(startPoint)
     }
     try await runVoid(arguments)
   }
 
-  public func checkoutRemoteBranch(_ remoteBranch: String) async throws {
+  public func switchToRemoteBranch(_ remoteBranch: String) async throws {
     try await runVoid(["switch", "--track", remoteBranch])
   }
 

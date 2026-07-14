@@ -120,8 +120,8 @@ struct RemoteDetailView: View {
           .help(branch.subject)
           .contextMenu {
             // `switch --track` derives the local name (origin/foo → foo).
-            Button("Checkout as Local Branch") {
-              Task { await model.checkoutRemoteBranch(branch.name) }
+            Button("Switch to Local Branch") {
+              Task { await model.switchToRemoteBranch(branch.name) }
             }
             .disabled(model.isBusy || model.isSequencing || hasLocalBranch(for: branch))
           }

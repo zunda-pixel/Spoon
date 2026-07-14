@@ -27,7 +27,7 @@ struct NewBranchSheet: View {
       Button("Cancel", role: .cancel) {
         dismiss()
       }
-      Button("Create and Checkout", action: create)
+      Button("Create and Switch", action: create)
         .keyboardShortcut(.defaultAction)
         .disabled(!isValidName)
     }
@@ -43,6 +43,6 @@ struct NewBranchSheet: View {
     guard isValidName else { return }
     let branchName = name.trimmingCharacters(in: .whitespaces)
     dismiss()
-    Task { await model.createBranch(name: branchName, from: startPoint, checkout: true) }
+    Task { await model.createBranch(name: branchName, from: startPoint, switchToBranch: true) }
   }
 }

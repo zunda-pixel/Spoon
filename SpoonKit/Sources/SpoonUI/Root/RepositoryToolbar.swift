@@ -97,7 +97,7 @@ struct RepositoryToolbar: ToolbarContent {
     Menu {
       ForEach(model.branches) { branch in
         Button {
-          Task { await model.checkout(branch: branch.name) }
+          Task { await model.switchBranch(branch.name) }
         } label: {
           if branch.isCurrent {
             Label(branch.name, systemImage: "checkmark")
@@ -121,7 +121,7 @@ struct RepositoryToolbar: ToolbarContent {
     .disabled(model.isBusy || model.isSequencing)
     .accessibilityLabel("Current branch")
     .accessibilityValue(model.currentBranch?.name ?? model.status?.headBranch ?? "Detached HEAD")
-    .accessibilityHint("Choose a branch to check out or create a new branch")
+    .accessibilityHint("Choose a branch to switch to or create a new branch")
   }
 
   private func remoteCountLabel(_ title: String, systemImage: String, count: Int?) -> some View {
