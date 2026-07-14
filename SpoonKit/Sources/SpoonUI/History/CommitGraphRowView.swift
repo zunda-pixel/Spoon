@@ -1,18 +1,11 @@
 import SpoonCore
 import SwiftUI
 
-struct HistoryBranchLabel: Identifiable {
-  let name: String
-  let isRemote: Bool
-  let isCurrent: Bool
-
-  var id: String { "\(isRemote ? "remote" : "local"):\(name)" }
-}
-
 @MainActor
 struct CommitGraphRowView: View {
   let row: GraphRow
-  let branchLabels: [HistoryBranchLabel]
+  let referenceLabels: [HistoryReferenceLabel]
+  let selectedReference: HistoryReferenceIdentity?
 
   private nonisolated static let laneWidth: CGFloat = 12
   private nonisolated static let rowHeight: CGFloat = 34
@@ -29,14 +22,14 @@ struct CommitGraphRowView: View {
 
       VStack(alignment: .leading, spacing: 2) {
         HStack(spacing: 6) {
-          ForEach(branchLabels.prefix(2)) { branchLabel in
-            branchBadge(branchLabel)
+          ForEach(referenceLabels.prefix(2)) { referenceLabel in
+            referenceBadge(referenceLabel)
           }
-          if branchLabels.count > 2 {
-            Text("+\(branchLabels.count - 2)")
+          if referenceLabels.count > 2 {
+            Text("+\(referenceLabels.count - 2)")
               .font(.caption2.monospacedDigit())
               .foregroundStyle(.secondary)
-              .help(remainingBranchesHelp)
+              .help(allReferencesHelp)
           }
           if row.commit.isMerge {
             Image(systemName: "arrow.triangle.merge")
@@ -76,37 +69,74 @@ struct CommitGraphRowView: View {
     if row.commit.isMerge {
       components.insert("Merge commit", at: 0)
     }
-    if !branchLabels.isEmpty {
+    if !referenceLabels.isEmpty {
       components.append(
-        "Branches: \(branchLabels.map(\.name).joined(separator: ", "))"
+        "References: \(referenceLabels.map(accessibilityDescription).joined(separator: ", "))"
       )
     }
     return components.joined(separator: ", ")
   }
 
-  private func branchBadge(_ branchLabel: HistoryBranchLabel) -> some View {
+  private func referenceBadge(_ referenceLabel: HistoryReferenceLabel) -> some View {
     Label(
-      branchLabel.name,
-      systemImage: branchLabel.isRemote ? "network" : "arrow.trianglehead.branch"
+      referenceLabel.name,
+      systemImage: symbolName(for: referenceLabel.kind)
     )
     .font(.caption2)
+    .fontWeight(referenceLabel.isCurrent ? .semibold : nil)
     .lineLimit(1)
     .truncationMode(.middle)
     .padding(.horizontal, 4)
     .padding(.vertical, 1)
     .foregroundStyle(
-      branchLabel.isCurrent ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary)
+      isSelected(referenceLabel)
+        ? AnyShapeStyle(.tint)
+        : referenceLabel.isCurrent ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary)
     )
     .background(.quaternary, in: Capsule())
-    .help(
-      branchLabel.isRemote
-        ? "Remote branch \(branchLabel.name)"
-        : "\(branchLabel.isCurrent ? "Current branch" : "Local branch") \(branchLabel.name)"
-    )
+    .help(accessibilityDescription(referenceLabel))
+    .accessibilityLabel(accessibilityDescription(referenceLabel))
+    .accessibilityAddTraits(isSelected(referenceLabel) ? .isSelected : [])
   }
 
-  private var remainingBranchesHelp: String {
-    branchLabels.dropFirst(2).map(\.name).joined(separator: ", ")
+  private func isSelected(_ label: HistoryReferenceLabel) -> Bool {
+    label.referenceIdentity != nil && label.referenceIdentity == selectedReference
+  }
+
+  private func symbolName(for kind: HistoryReferenceLabel.Kind) -> String {
+    switch kind {
+    case .localBranch:
+      "arrow.trianglehead.branch"
+    case .remoteBranch:
+      "network"
+    case .worktree:
+      "folder"
+    case .tag:
+      "tag"
+    case .stash:
+      "tray.full"
+    }
+  }
+
+  private func accessibilityDescription(_ label: HistoryReferenceLabel) -> String {
+    let prefix =
+      switch label.kind {
+      case .localBranch:
+        label.isCurrent ? "Current branch" : "Local branch"
+      case .remoteBranch:
+        "Remote branch"
+      case .worktree:
+        label.isCurrent ? "Current worktree" : "Worktree"
+      case .tag:
+        "Tag"
+      case .stash:
+        "Stash"
+      }
+    return "\(prefix) \(label.name)\(isSelected(label) ? ", selected focus" : "")"
+  }
+
+  private var allReferencesHelp: String {
+    referenceLabels.map(accessibilityDescription).joined(separator: "\n")
   }
 
   private var graphCanvas: some View {

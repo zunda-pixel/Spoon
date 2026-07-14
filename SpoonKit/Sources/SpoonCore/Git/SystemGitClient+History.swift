@@ -12,7 +12,15 @@ extension SystemGitClient {
     if query.skip > 0 {
       arguments.append("--skip=\(query.skip)")
     }
-    arguments.append(query.reference ?? "HEAD")
+    if query.allReferences {
+      arguments.append("--all")
+    }
+    if let reference = query.reference {
+      arguments.append(reference)
+    } else if !query.allReferences {
+      arguments.append("HEAD")
+    }
+    arguments.append(contentsOf: query.additionalRevisions.map(\.rawValue))
     arguments.append("--")
     if let path = query.path {
       arguments.append(path)

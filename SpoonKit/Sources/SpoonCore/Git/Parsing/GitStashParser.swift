@@ -10,18 +10,19 @@ enum GitStashParser {
   private static func parseRecord(_ record: Substring) -> Stash? {
     let fields = record.split(
       separator: "\u{1f}",
-      maxSplits: 1,
+      maxSplits: 2,
       omittingEmptySubsequences: false
     )
     guard
-      fields.count == 2,
-      let open = fields[0].firstIndex(of: "{"),
-      let close = fields[0].firstIndex(of: "}"),
-      open < close,
-      let index = Int(fields[0][fields[0].index(after: open)..<close])
+      fields.count == 3,
+      let target = ObjectID(rawValue: String(fields[0])),
+      fields[1].hasPrefix("stash@{"),
+      fields[1].hasSuffix("}"),
+      let index = Int(fields[1].dropFirst("stash@{".count).dropLast()),
+      index >= 0
     else {
       return nil
     }
-    return Stash(index: index, message: String(fields[1]))
+    return Stash(index: index, target: target, message: String(fields[2]))
   }
 }

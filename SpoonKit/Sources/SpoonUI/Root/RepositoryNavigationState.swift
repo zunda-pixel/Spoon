@@ -12,6 +12,13 @@ enum SidebarItem: Hashable {
   case stash(Int)
 }
 
+struct HistoryFocus: Hashable {
+  let tip: ObjectID
+  let reference: HistoryReferenceIdentity
+
+  var name: String { reference.name }
+}
+
 @MainActor
 @Observable
 final class RepositoryNavigationState {
@@ -75,6 +82,7 @@ final class RepositoryNavigationState {
   var selectedReflogOID: ObjectID?
   var fileSelections: Set<RepositoryModel.FileSelection> = []
   var selectedPRNumber: Int?
+  var historyFocus: HistoryFocus?
   var activeSheet: ActiveSheet?
   var confirmation: Confirmation?
 
@@ -88,5 +96,24 @@ final class RepositoryNavigationState {
 
   func select(_ item: SidebarItem) {
     sidebarSelection = item
+    if item == .history {
+      historyFocus = nil
+    }
+  }
+
+  func focusHistory(on branch: Branch) {
+    historyFocus = HistoryFocus(
+      tip: branch.tip,
+      reference: .localBranch(branch.name)
+    )
+    sidebarSelection = .branch(branch.name)
+  }
+
+  func focusHistory(on branch: Branch, remoteName: String) {
+    historyFocus = HistoryFocus(
+      tip: branch.tip,
+      reference: .remoteBranch(remote: remoteName, name: branch.name)
+    )
+    sidebarSelection = .remoteBranch(remote: remoteName, branch: branch.name)
   }
 }

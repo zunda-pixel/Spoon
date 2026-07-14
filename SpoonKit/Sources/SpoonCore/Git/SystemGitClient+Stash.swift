@@ -5,7 +5,7 @@ extension SystemGitClient {
   // MARK: - Stashes
 
   public func stashes() async throws -> [Stash] {
-    let result = try await run(["stash", "list", "-z", "--format=%gd%x1f%gs"])
+    let result = try await run(["stash", "list", "-z", "--format=%H%x1f%gd%x1f%gs"])
     return GitStashParser.parse(result.standardOutput)
   }
 

@@ -126,22 +126,8 @@ extension RepositoryModel {
     }
 
     if !historyRows.isEmpty {
-      if let reference = historyStore.loadedReference, !referenceStillExists(reference) {
-        // The reference vanished (e.g. its branch was just deleted); fall
-        // back to HEAD history instead of reloading a dead revision.
-        await resetHistoryToHead()
-      } else {
-        await reloadHistory()
-      }
+      await reloadHistory()
     }
-  }
-
-  private func referenceStillExists(_ reference: String) -> Bool {
-    branches.contains { $0.name == reference }
-      || tags.contains { $0.name == reference }
-      || remoteBranchesByRemote.values.contains { remoteBranches in
-        remoteBranches.contains { $0.name == reference }
-      }
   }
 
   private func apply(_ snapshot: RepositoryGitSnapshot) {

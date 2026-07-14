@@ -22,15 +22,18 @@ struct GitOutputHelperTests {
 
   @Test func stashParserSkipsMalformedRecords() {
     let data = Data(
-      "stash@{2}\u{1f}On main: useful\u{0}"
-        .appending("malformed\u{0}")
-        .appending("stash@{0}\u{1f}\u{0}")
+      "aaaa1111\u{1f}stash@{2}\u{1f}On main: useful\u{0}"
+        .appending("not-hex\u{1f}stash@{1}\u{1f}bad target\u{0}")
+        .appending("bbbb2222\u{1f}not-a-stash\u{1f}bad reference\u{0}")
+        .appending("cccc3333\u{1f}stash@{-1}\u{1f}bad index\u{0}")
+        .appending("dddd4444\u{1f}stash@{0}\u{1f}\u{0}")
         .utf8
     )
 
     let stashes = GitStashParser.parse(data)
 
     #expect(stashes.map(\.index) == [2, 0])
+    #expect(stashes.map(\.target.rawValue) == ["aaaa1111", "dddd4444"])
     #expect(stashes.map(\.message) == ["On main: useful", ""])
   }
 

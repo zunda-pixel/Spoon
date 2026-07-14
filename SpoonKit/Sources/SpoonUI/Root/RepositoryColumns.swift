@@ -10,12 +10,12 @@ struct RepositoryContentColumn: View {
     switch navigation.sidebarSelection {
     case .changes, nil:
       ChangesView(model: model, selection: $navigation.fileSelections, navigation: navigation)
-    case .history:
-      HistoryListView(model: model, reference: nil, navigation: navigation)
-    case .branch(let name):
-      HistoryListView(model: model, reference: name, navigation: navigation)
-    case .remoteBranch(_, let branch):
-      HistoryListView(model: model, reference: branch, navigation: navigation)
+    case .history, .branch, .remoteBranch:
+      HistoryListView(
+        model: model,
+        focus: resolvedHistoryFocus,
+        navigation: navigation
+      )
     case .reflog:
       ReflogView(model: model, navigation: navigation)
     case .pullRequests:
@@ -24,6 +24,30 @@ struct RepositoryContentColumn: View {
       RemoteDetailView(model: model, remoteName: name)
     case .stash(let index):
       StashDetailView(model: model, stashIndex: index)
+    }
+  }
+
+  private var resolvedHistoryFocus: HistoryFocus? {
+    switch navigation.sidebarSelection {
+    case .branch(let name):
+      guard let branch = model.branches.first(where: { $0.name == name }) else {
+        return navigation.historyFocus
+      }
+      return HistoryFocus(tip: branch.tip, reference: .localBranch(branch.name))
+    case .remoteBranch(let remote, let name):
+      guard
+        let branch = model.remoteBranchesByRemote[remote]?.first(where: { $0.name == name })
+      else {
+        return navigation.historyFocus
+      }
+      return HistoryFocus(
+        tip: branch.tip,
+        reference: .remoteBranch(remote: remote, name: branch.name)
+      )
+    case .history:
+      return nil
+    default:
+      return navigation.historyFocus
     }
   }
 }

@@ -19,27 +19,42 @@ public struct Commit: Sendable, Hashable, Identifiable {
 
 /// Parameters for one `git log` page.
 public struct LogQuery: Sendable, Hashable {
-  /// Ref to walk from; `nil` means HEAD.
+  /// Ref to walk from; `nil` means HEAD unless `allReferences` is enabled.
   public var reference: String?
   /// Repository-relative path to follow; `nil` means all paths.
   public var path: String?
   public var maxCount: Int
   public var skip: Int
+  /// Include commits reachable from every ref.
+  public var allReferences: Bool
+  /// Extra commit tips to walk, such as detached worktree HEADs.
+  public var additionalRevisions: [ObjectID]
 
   public init(
     reference: String? = nil,
     path: String? = nil,
     maxCount: Int = 500,
-    skip: Int = 0
+    skip: Int = 0,
+    allReferences: Bool = false,
+    additionalRevisions: [ObjectID] = []
   ) {
     self.reference = reference
     self.path = path
     self.maxCount = maxCount
     self.skip = skip
+    self.allReferences = allReferences
+    self.additionalRevisions = additionalRevisions
   }
 
   public func next() -> LogQuery {
-    LogQuery(reference: reference, path: path, maxCount: maxCount, skip: skip + maxCount)
+    LogQuery(
+      reference: reference,
+      path: path,
+      maxCount: maxCount,
+      skip: skip + maxCount,
+      allReferences: allReferences,
+      additionalRevisions: additionalRevisions
+    )
   }
 }
 

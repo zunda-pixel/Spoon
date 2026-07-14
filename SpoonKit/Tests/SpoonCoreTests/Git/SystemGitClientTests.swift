@@ -280,6 +280,75 @@ struct SystemGitClientTests {
     #expect(runner.invocations.count == 5)
   }
 
+  @Test func allReferenceLogSendsRevisionsBeforePathSeparator() async throws {
+    let runner = FakeCommandRunner()
+    let detached = ObjectID(rawValue: "aaaa1111")!
+    runner.stub(
+      arguments: baseFlags + [
+        "log", "--topo-order", "-z",
+        "--format=\(GitLogParser.logFormat)",
+        "--max-count=6", "--skip=5", "--all", detached.rawValue, "--", "Sources/App.swift",
+      ]
+    )
+
+    let page = try await makeClient(runner).log(
+      LogQuery(
+        path: "Sources/App.swift",
+        maxCount: 5,
+        skip: 5,
+        allReferences: true,
+        additionalRevisions: [detached]
+      )
+    )
+
+    #expect(page.commits.isEmpty)
+    #expect(!page.hasMore)
+    #expect(runner.invocations.count == 1)
+  }
+
+  @Test func referenceLogPreservesReferenceAndAddsRevisions() async throws {
+    let runner = FakeCommandRunner()
+    let detached = ObjectID(rawValue: "bbbb2222")!
+    runner.stub(
+      arguments: baseFlags + [
+        "log", "--topo-order", "-z",
+        "--format=\(GitLogParser.logFormat)",
+        "--max-count=11", "feature", detached.rawValue, "--",
+      ]
+    )
+
+    _ = try await makeClient(runner).log(
+      LogQuery(
+        reference: "feature",
+        maxCount: 10,
+        additionalRevisions: [detached]
+      )
+    )
+
+    #expect(runner.invocations.count == 1)
+  }
+
+  @Test func logQueryNextPreservesEveryCondition() {
+    let detached = ObjectID(rawValue: "cccc3333")!
+    let query = LogQuery(
+      reference: "feature",
+      path: "Sources/App.swift",
+      maxCount: 25,
+      skip: 50,
+      allReferences: true,
+      additionalRevisions: [detached]
+    )
+
+    let next = query.next()
+
+    #expect(next.reference == query.reference)
+    #expect(next.path == query.path)
+    #expect(next.maxCount == query.maxCount)
+    #expect(next.skip == 75)
+    #expect(next.allReferences)
+    #expect(next.additionalRevisions == [detached])
+  }
+
   @Test func mergeSendsExactArgv() async throws {
     let runner = FakeCommandRunner()
     runner.stub(arguments: baseFlags + ["merge", "--no-edit", "feature"])
@@ -563,8 +632,27 @@ struct SystemGitClientTests {
 
         """
     )
-    let diffs = try await makeClient(runner).stashDiffs(Stash(index: 1, message: "wip"))
+    let diffs = try await makeClient(runner).stashDiffs(
+      Stash(index: 1, target: ObjectID(rawValue: "aaaa1111")!, message: "wip")
+    )
     #expect(diffs.map(\.path) == ["file.txt"])
+  }
+
+  @Test func stashesSendExactArgvAndParseTargets() async throws {
+    let runner = FakeCommandRunner()
+    runner.stub(
+      arguments: baseFlags + [
+        "stash", "list", "-z", "--format=%H%x1f%gd%x1f%gs",
+      ],
+      stdout: "aaaa1111\u{1f}stash@{0}\u{1f}On main: useful\u{0}"
+    )
+
+    let stashes = try await makeClient(runner).stashes()
+
+    #expect(stashes.count == 1)
+    #expect(stashes[0].index == 0)
+    #expect(stashes[0].target.rawValue == "aaaa1111")
+    #expect(stashes[0].message == "On main: useful")
   }
 
   @Test func parsesRemoteListing() {

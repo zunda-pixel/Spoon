@@ -4,29 +4,33 @@ import SwiftUI
 @MainActor
 struct HistoryListView: View {
   let model: RepositoryModel
-  let reference: String?
+  let focus: HistoryFocus?
   @Bindable var navigation: RepositoryNavigationState
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
   var body: some View {
-    Group {
-      if model.historyRows.isEmpty {
-        if model.isLoadingHistory {
-          ProgressView()
-        } else {
-          ContentUnavailableView(
-            "No Commits",
-            systemImage: "clock",
-            description: Text("This branch has no commits yet.")
-          )
-        }
-      } else {
-        List(selection: $navigation.selectedCommitID) {
-          ForEach(model.historyRows) { row in
-            CommitGraphRowView(
-              row: row,
-              branchLabels: branchLabelsByTip[row.commit.oid] ?? []
+    ScrollViewReader { proxy in
+      Group {
+        if model.historyRows.isEmpty {
+          if model.isLoadingHistory {
+            ProgressView()
+          } else {
+            ContentUnavailableView(
+              "No Commits",
+              systemImage: "clock",
+              description: Text("This repository has no commits yet.")
             )
+          }
+        } else {
+          List(selection: $navigation.selectedCommitID) {
+            ForEach(model.historyRows) { row in
+              CommitGraphRowView(
+                row: row,
+                referenceLabels: referenceLabelsByOID[row.commit.oid] ?? [],
+                selectedReference: focus?.reference
+              )
               .tag(row.id)
+              .id(row.id)
               .listRowSeparator(.hidden)
               .contextMenu {
                 commitMenu(row.commit)
@@ -36,57 +40,71 @@ struct HistoryListView: View {
                   Task { await model.loadMoreHistory() }
                 }
               }
-          }
-          if model.hasMoreHistory {
-            HStack {
-              Spacer()
-              ProgressView()
-                .controlSize(.small)
-              Spacer()
             }
-            .listRowSeparator(.hidden)
+            if model.hasMoreHistory {
+              HStack {
+                Spacer()
+                ProgressView()
+                  .controlSize(.small)
+                Spacer()
+              }
+              .listRowSeparator(.hidden)
+            }
           }
+          .listStyle(.plain)
         }
-        .listStyle(.plain)
       }
-    }
-    .task(id: reference) {
-      navigation.selectedCommitID = nil
-      await model.loadHistoryIfNeeded(reference: reference)
-      guard !Task.isCancelled, reference != nil else { return }
-      navigation.selectedCommitID = model.historyRows.first?.id
+      .task(id: focus) {
+        await loadHistoryAndFocus(using: proxy)
+      }
     }
   }
 
-  private var branchLabelsByTip: [ObjectID: [HistoryBranchLabel]] {
-    var labelsByTip: [ObjectID: [HistoryBranchLabel]] = [:]
-    for branch in model.branches {
-      labelsByTip[branch.tip, default: []].append(
-        HistoryBranchLabel(
-          name: branch.name,
-          isRemote: false,
-          isCurrent: branch.isCurrent
-        )
-      )
+  private var referenceLabelsByOID: [ObjectID: [HistoryReferenceLabel]] {
+    HistoryReferenceLabelBuilder.build(
+      branches: model.branches,
+      remoteBranchesByRemote: model.remoteBranchesByRemote,
+      worktrees: model.worktrees,
+      tags: model.tags,
+      stashes: model.stashes,
+      activeWorktreeRoot: model.repository.rootURL,
+      selectedReference: focus?.reference
+    )
+  }
+
+  private func loadHistoryAndFocus(using proxy: ScrollViewProxy) async {
+    guard await waitForCurrentHistoryLoad() else { return }
+    await model.loadHistoryIfNeeded()
+    guard await waitForCurrentHistoryLoad(), let focus else { return }
+
+    if !model.historyRows.contains(where: { $0.commit.oid == focus.tip }) {
+      guard await model.ensureCommitLoaded(focus.tip) else { return }
     }
-    for remote in model.remotes {
-      for branch in model.remoteBranchesByRemote[remote.name] ?? [] {
-        labelsByTip[branch.tip, default: []].append(
-          HistoryBranchLabel(
-            name: branch.name,
-            isRemote: true,
-            isCurrent: false
-          )
-        )
+
+    guard
+      !Task.isCancelled,
+      model.historyRows.contains(where: { $0.commit.oid == focus.tip })
+    else {
+      return
+    }
+
+    navigation.selectedCommitID = focus.tip.rawValue
+    await Task.yield()
+    guard !Task.isCancelled else { return }
+    withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) {
+      proxy.scrollTo(focus.tip.rawValue, anchor: .center)
+    }
+  }
+
+  private func waitForCurrentHistoryLoad() async -> Bool {
+    while model.isLoadingHistory {
+      do {
+        try await Task.sleep(for: .milliseconds(20))
+      } catch {
+        return false
       }
     }
-    return labelsByTip.mapValues {
-      $0.sorted {
-        if $0.isCurrent != $1.isCurrent { return $0.isCurrent }
-        if $0.isRemote != $1.isRemote { return !$0.isRemote }
-        return $0.name.localizedStandardCompare($1.name) == .orderedAscending
-      }
-    }
+    return !Task.isCancelled
   }
 
   @ViewBuilder

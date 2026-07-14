@@ -38,7 +38,7 @@ struct BranchRowView: View {
     .accessibilityLabel(branch.name)
     .accessibilityValue(accessibilityValue)
     .accessibilityHint(
-      "Select to show this branch's history; open the context menu for branch actions")
+      "Select to move to this branch in history; open the context menu for branch actions")
   }
 
   private var accessibilityValue: String {

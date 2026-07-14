@@ -257,18 +257,81 @@ struct RepositoryModelTests {
     await model.loadHistoryIfNeeded()
     #expect(model.historyRows.map(\.commit.subject) == ["first"])
     #expect(model.hasMoreHistory)
+    let firstQuery = await client.logQueries.first
+    #expect(firstQuery?.allReferences == true)
+    #expect(firstQuery?.maxCount == 500)
 
     await model.loadMoreHistory()
     #expect(model.historyRows.map(\.commit.subject) == ["first", "second"])
     #expect(!model.hasMoreHistory)
   }
 
-  @Test func historyLoadsTheSelectedReferenceAndPreservesItAcrossPages() async {
+  @Test func referenceCompatibilityLoadDoesNotReloadUnifiedHistory() async {
     let client = FakeRepositoryGitClient()
-    let head = makeOID("77777777")
+    let head = makeOID("45454545")
     await client.configure(
       status: makeStatus(oid: head, branch: "main"),
       branches: [makeBranch("main", oid: head, isCurrent: true)],
+      logPages: [
+        0: LogPage(
+          commits: [makeCommit("45454545", subject: "tip")],
+          hasMore: false
+        )
+      ]
+    )
+    let model = makeModel(client)
+    await model.refresh()
+
+    await model.loadHistoryIfNeeded()
+    await model.loadHistoryIfNeeded(reference: "topic")
+
+    #expect(await client.logQueries.count == 1)
+    #expect(await client.logQueries.first?.allReferences == true)
+  }
+
+  @Test func emptyRepositoryDoesNotAttemptHistoryWalk() async {
+    let client = FakeRepositoryGitClient()
+    await client.configure(
+      status: WorkingTreeStatus(headOID: nil, headBranch: "main"),
+      branches: []
+    )
+    let model = makeModel(client)
+    await model.refresh()
+
+    await model.loadHistoryIfNeeded()
+
+    #expect(model.historyRows.isEmpty)
+    #expect(!model.hasMoreHistory)
+    #expect(await client.logQueries.isEmpty)
+  }
+
+  @Test func historyPreservesDeduplicatedDetachedWorktreeHeadsAcrossPages() async {
+    let client = FakeRepositoryGitClient()
+    let head = makeOID("77777777")
+    let detached = makeOID("88889999")
+    await client.configure(
+      status: makeStatus(oid: head, branch: "main"),
+      branches: [makeBranch("main", oid: head, isCurrent: true)],
+      worktrees: [
+        Worktree(
+          path: URL(filePath: "/tmp/main"),
+          branch: "main",
+          headOID: head,
+          isMain: true
+        ),
+        Worktree(
+          path: URL(filePath: "/tmp/detached-one"),
+          branch: nil,
+          headOID: detached,
+          isMain: false
+        ),
+        Worktree(
+          path: URL(filePath: "/tmp/detached-two"),
+          branch: nil,
+          headOID: detached,
+          isMain: false
+        ),
+      ],
       logPages: [
         0: LogPage(commits: [makeCommit("77777777", subject: "feature")], hasMore: true),
         500: LogPage(commits: [], hasMore: false),
@@ -280,7 +343,111 @@ struct RepositoryModelTests {
     await model.loadHistoryIfNeeded(reference: "feature/topic")
     await model.loadMoreHistory()
 
-    #expect(await client.logQueries.map(\.reference) == ["feature/topic", "feature/topic"])
+    let queries = await client.logQueries
+    #expect(queries.map(\.reference) == [nil, nil])
+    #expect(queries.map(\.allReferences) == [true, true])
+    #expect(queries.map(\.additionalRevisions) == [[detached], [detached]])
+  }
+
+  @Test func ensureCommitLoadedPagesUntilTheRequestedOIDAppears() async {
+    let client = FakeRepositoryGitClient()
+    let head = makeOID("91919191")
+    let requested = makeOID("93939393")
+    await client.configure(
+      status: makeStatus(oid: head, branch: "main"),
+      branches: [makeBranch("main", oid: head, isCurrent: true)],
+      logPages: [
+        0: LogPage(
+          commits: [makeCommit("91919191", subject: "first page")],
+          hasMore: true
+        ),
+        500: LogPage(
+          commits: [makeCommit("92929292", subject: "second page")],
+          hasMore: true
+        ),
+        1000: LogPage(
+          commits: [makeCommit("93939393", subject: "requested")],
+          hasMore: false
+        ),
+      ]
+    )
+    let model = makeModel(client)
+    await model.refresh()
+    await model.loadHistoryIfNeeded()
+
+    #expect(await model.ensureCommitLoaded(requested))
+    #expect(
+      model.historyRows.map(\.commit.oid) == [
+        makeOID("91919191"),
+        makeOID("92929292"),
+        requested,
+      ]
+    )
+    #expect(await client.logQueries.map(\.skip) == [0, 500, 1000])
+  }
+
+  @Test func ensureCommitLoadedWaitsForBackgroundPagination() async {
+    let client = FakeRepositoryGitClient()
+    let head = makeOID("a1a1a1a1")
+    let requested = makeOID("c3c3c3c3")
+    await client.configure(
+      status: makeStatus(oid: head, branch: "main"),
+      branches: [makeBranch("main", oid: head, isCurrent: true)],
+      logPages: [
+        0: LogPage(
+          commits: [makeCommit("a1a1a1a1", subject: "first page")],
+          hasMore: true
+        ),
+        500: LogPage(
+          commits: [makeCommit("b2b2b2b2", subject: "background page")],
+          hasMore: true
+        ),
+        1000: LogPage(
+          commits: [makeCommit("c3c3c3c3", subject: "requested")],
+          hasMore: false
+        ),
+      ],
+      logDelays: [500: .milliseconds(100)]
+    )
+    let model = makeModel(client)
+    await model.refresh()
+    await model.loadHistoryIfNeeded()
+
+    let backgroundLoad = Task { await model.loadMoreHistory() }
+    while await client.logQueries.count < 2 {
+      await Task.yield()
+    }
+
+    #expect(await model.ensureCommitLoaded(requested))
+    await backgroundLoad.value
+    #expect(await client.logQueries.map(\.skip) == [0, 500, 1000])
+  }
+
+  @Test func ensureCommitLoadedReturnsFalseAtTheEndOfHistory() async {
+    let client = FakeRepositoryGitClient()
+    let head = makeOID("94949494")
+    await client.configure(
+      status: makeStatus(oid: head, branch: "main"),
+      branches: [makeBranch("main", oid: head, isCurrent: true)],
+      logPages: [
+        0: LogPage(
+          commits: [makeCommit("94949494", subject: "first page")],
+          hasMore: true
+        ),
+        500: LogPage(
+          commits: [makeCommit("95959595", subject: "last page")],
+          hasMore: false
+        ),
+      ]
+    )
+    let model = makeModel(client)
+    await model.refresh()
+    await model.loadHistoryIfNeeded()
+
+    let found = await model.ensureCommitLoaded(makeOID("96969696"))
+    #expect(!found)
+    #expect(!model.hasMoreHistory)
+    #expect(await client.logQueries.map(\.skip) == [0, 500])
   }
 
   @Test func failedRefreshPreservesThePreviousSnapshot() async {
@@ -334,15 +501,24 @@ struct RepositoryModelTests {
     #expect(model.lastErrorMessage == nil)
   }
 
-  @Test func refreshFallsBackToHeadHistoryWhenTheReferenceDisappears() async {
+  @Test func refreshContinuesUsingTheUnifiedHistoryQuery() async {
     let client = FakeRepositoryGitClient()
     let oid = makeOID("aaaaaaaa")
+    let detached = makeOID("bbbbbbbb")
     let page = LogPage(commits: [makeCommit("aaaaaaaa", subject: "tip")], hasMore: false)
     await client.configure(
       status: makeStatus(oid: oid, branch: "main"),
       branches: [
         makeBranch("main", oid: oid, isCurrent: true),
         makeBranch("topic", oid: oid, isCurrent: false),
+      ],
+      worktrees: [
+        Worktree(
+          path: URL(filePath: "/tmp/detached"),
+          branch: nil,
+          headOID: detached,
+          isMain: false
+        )
       ],
       logPages: [0: page]
     )
@@ -354,11 +530,22 @@ struct RepositoryModelTests {
     await client.configure(
       status: makeStatus(oid: oid, branch: "main"),
       branches: [makeBranch("main", oid: oid, isCurrent: true)],
+      worktrees: [
+        Worktree(
+          path: URL(filePath: "/tmp/detached"),
+          branch: nil,
+          headOID: detached,
+          isMain: false
+        )
+      ],
       logPages: [0: page]
     )
     await model.refreshGitState()
 
-    #expect(await client.logQueries.map(\.reference) == ["topic", nil])
+    let queries = await client.logQueries
+    #expect(queries.map(\.reference) == [nil, nil])
+    #expect(queries.map(\.allReferences) == [true, true])
+    #expect(queries.map(\.additionalRevisions) == [[detached], [detached]])
     #expect(model.lastErrorMessage == nil)
     #expect(model.historyRows.count == 1)
   }
@@ -479,7 +666,9 @@ private actor FakeRepositoryGitClient: GitClient {
   private var currentBranches: [Branch] = []
   private var currentRemotes: [Remote] = []
   private var currentRemoteBranchesByRemote: [String: [Branch]] = [:]
+  private var currentWorktrees: [Worktree] = []
   private var pages: [Int: LogPage] = [:]
+  private var logDelays: [Int: Duration] = [:]
   private var mergeBases: [String: ObjectID] = [:]
   private var shouldFailBranches = false
   private var shouldFailRemoteBranches = false
@@ -493,7 +682,9 @@ private actor FakeRepositoryGitClient: GitClient {
     branches: [Branch],
     remotes: [Remote] = [],
     remoteBranchesByRemote: [String: [Branch]] = [:],
+    worktrees: [Worktree] = [],
     logPages: [Int: LogPage] = [:],
+    logDelays: [Int: Duration] = [:],
     mergeBases: [String: ObjectID] = [:],
     failBranches: Bool = false,
     failRemoteBranches: Bool = false,
@@ -503,7 +694,9 @@ private actor FakeRepositoryGitClient: GitClient {
     currentBranches = branches
     currentRemotes = remotes
     currentRemoteBranchesByRemote = remoteBranchesByRemote
+    currentWorktrees = worktrees
     pages = logPages
+    self.logDelays = logDelays
     self.mergeBases = mergeBases
     shouldFailBranches = failBranches
     shouldFailRemoteBranches = failRemoteBranches
@@ -520,7 +713,7 @@ private actor FakeRepositoryGitClient: GitClient {
   func remotes() async throws -> [Remote] { currentRemotes }
   func stashes() async throws -> [Stash] { [] }
   func tags() async throws -> [SpoonCore.Tag] { [] }
-  func worktrees() async throws -> [Worktree] { [] }
+  func worktrees() async throws -> [Worktree] { currentWorktrees }
   func sequencerState() async throws -> SequencerState? { nil }
   func supportsBackfill() async -> Bool { false }
 
@@ -537,6 +730,9 @@ private actor FakeRepositoryGitClient: GitClient {
 
   func log(_ query: LogQuery) async throws -> LogPage {
     logQueries.append(query)
+    if let delay = logDelays[query.skip] {
+      try await Task.sleep(for: delay)
+    }
     return pages[query.skip] ?? LogPage(commits: [], hasMore: false)
   }
 

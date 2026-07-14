@@ -80,7 +80,7 @@ private struct BranchTreeNodeView: View {
       .tag(SidebarItem.branch(branch.name))
       .simultaneousGesture(
         TapGesture().onEnded {
-          navigation.sidebarSelection = .branch(branch.name)
+          navigation.focusHistory(on: branch)
         }
       )
       .simultaneousGesture(
@@ -121,7 +121,7 @@ private struct BranchTreeNodeView: View {
   }
 
   private func activateBranch(_ branch: Branch, worktree: Worktree?) {
-    navigation.sidebarSelection = .branch(branch.name)
+    navigation.focusHistory(on: branch)
 
     if let worktree {
       openWorktree(worktree)

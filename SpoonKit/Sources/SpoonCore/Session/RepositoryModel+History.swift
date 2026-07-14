@@ -3,26 +3,39 @@ extension RepositoryModel {
   public var isLoadingHistory: Bool { historyStore.isLoadingHistory }
   public var hasMoreHistory: Bool { historyStore.hasMoreHistory }
 
-  public func loadHistoryIfNeeded(reference: String? = nil) async {
-    await historyStore.loadIfNeeded(reference: reference, hasHead: status?.headOID != nil)
+  /// Loads the single history graph spanning every repository reference.
+  public func loadHistoryIfNeeded() async {
+    await historyStore.loadIfNeeded(
+      additionalRevisions: detachedWorktreeHeads,
+      canLoadHistory: canLoadUnifiedHistory
+    )
     adoptHistoryError()
   }
 
   public func reloadHistory() async {
-    await historyStore.reloadCurrent(hasHead: status?.headOID != nil)
+    await historyStore.reload(
+      additionalRevisions: detachedWorktreeHeads,
+      canLoadHistory: canLoadUnifiedHistory
+    )
     adoptHistoryError()
   }
 
-  /// Reloads history against HEAD, dropping a reference that no longer
-  /// resolves (e.g. a branch that was just deleted).
-  func resetHistoryToHead() async {
-    await historyStore.reload(reference: nil, hasHead: status?.headOID != nil)
+  /// Ensures a commit from the unified graph has been paged into memory.
+  public func ensureCommitLoaded(_ oid: ObjectID) async -> Bool {
+    let loaded = await historyStore.ensureCommitLoaded(oid)
     adoptHistoryError()
+    return loaded
   }
 
   public func loadMoreHistory() async {
     await historyStore.loadMore()
     adoptHistoryError()
+  }
+
+  /// Temporary source-compatible bridge while History UI still passes a ref.
+  /// A branch selection no longer changes the history walk.
+  public func loadHistoryIfNeeded(reference _: String?) async {
+    await loadHistoryIfNeeded()
   }
 
   public func fileHistory(_ query: LogQuery) async throws -> LogPage {
@@ -31,6 +44,25 @@ extension RepositoryModel {
 
   public func reflog(maxCount: Int = 500, skip: Int = 0) async throws -> [ReflogEntry] {
     try await gitClient.reflog(maxCount: maxCount, skip: skip)
+  }
+
+  private var detachedWorktreeHeads: [ObjectID] {
+    var seen: Set<ObjectID> = []
+    return worktrees.compactMap { worktree in
+      guard worktree.branch == nil, let oid = worktree.headOID, seen.insert(oid).inserted else {
+        return nil
+      }
+      return oid
+    }
+  }
+
+  private var canLoadUnifiedHistory: Bool {
+    status?.headOID != nil
+      || !branches.isEmpty
+      || remoteBranchesByRemote.values.contains(where: { !$0.isEmpty })
+      || !tags.isEmpty
+      || !stashes.isEmpty
+      || !detachedWorktreeHeads.isEmpty
   }
 
   private func adoptHistoryError() {

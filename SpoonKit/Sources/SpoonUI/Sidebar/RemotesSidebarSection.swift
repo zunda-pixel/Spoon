@@ -158,10 +158,7 @@ private struct RemoteBranchTreeNodeView: View {
       .tag(SidebarItem.remoteBranch(remote: remote.name, branch: branch.name))
       .simultaneousGesture(
         TapGesture().onEnded {
-          navigation.sidebarSelection = .remoteBranch(
-            remote: remote.name,
-            branch: branch.name
-          )
+          navigation.focusHistory(on: branch, remoteName: remote.name)
         }
       )
       .simultaneousGesture(
@@ -257,10 +254,7 @@ private struct RemoteBranchTreeNodeView: View {
     localBranch: Branch?,
     worktree: Worktree?
   ) {
-    navigation.sidebarSelection = .remoteBranch(
-      remote: remote.name,
-      branch: selection.fullName
-    )
+    navigation.focusHistory(on: selection.branch, remoteName: remote.name)
     guard !model.isBusy, !model.isSequencing else { return }
 
     if let worktree {

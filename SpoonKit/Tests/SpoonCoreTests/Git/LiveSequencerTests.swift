@@ -411,6 +411,76 @@ struct LiveSequencerTests {
 
   // MARK: - Branches / worktrees
 
+  @Test func unifiedHistoryIncludesEveryReferenceAndDetachedWorktreeTip() async throws {
+    let root = try await LiveRepoFixture.makeTemporaryRepo(runner: runner)
+    let detachedWorktree = URL.temporaryDirectory
+      .appending(path: "spoon-unified-history-worktree-\(UUID().uuidString)")
+    defer {
+      try? FileManager.default.removeItem(at: detachedWorktree)
+      try? FileManager.default.removeItem(at: root)
+    }
+    try await commitFile("base.txt", "base\n", message: "base", in: root)
+    let client = makeClient(root)
+    let base = try #require(try await client.log(LogQuery(maxCount: 1)).commits.first)
+
+    try await arrange(["switch", "-c", "local-only"], in: root)
+    try await commitFile("local.txt", "local\n", message: "local-only", in: root)
+    let localTip = try #require(try await client.log(LogQuery(maxCount: 1)).commits.first?.oid)
+    try await arrange(["switch", "main"], in: root)
+
+    try await arrange(["switch", "-c", "remote-source"], in: root)
+    try await commitFile("remote.txt", "remote\n", message: "remote-only", in: root)
+    let remoteTip = try #require(try await client.log(LogQuery(maxCount: 1)).commits.first?.oid)
+    try await arrange(["switch", "main"], in: root)
+    try await arrange(
+      ["update-ref", "refs/remotes/origin/remote-only", remoteTip.rawValue],
+      in: root
+    )
+    try await arrange(["branch", "-D", "remote-source"], in: root)
+
+    try await arrange(["switch", "-c", "tag-source"], in: root)
+    try await commitFile("tag.txt", "tag\n", message: "tag-only", in: root)
+    let tagTip = try #require(try await client.log(LogQuery(maxCount: 1)).commits.first?.oid)
+    try await client.createTag(name: "history-only", at: tagTip, message: nil)
+    try await arrange(["switch", "main"], in: root)
+    try await arrange(["branch", "-D", "tag-source"], in: root)
+
+    try Data("stashed\n".utf8).write(to: root.appending(path: "base.txt"))
+    try await client.saveStash(message: "history stash", includeUntracked: false)
+    let stashTip = try #require(try await client.stashes().first?.target)
+    #expect([40, 64].contains(stashTip.rawValue.count))
+
+    try await arrange(["switch", "-c", "detached-source"], in: root)
+    try await commitFile("detached.txt", "detached\n", message: "detached-only", in: root)
+    let detachedTip = try #require(try await client.log(LogQuery(maxCount: 1)).commits.first?.oid)
+    try await arrange(["switch", "main"], in: root)
+    try await arrange(
+      ["worktree", "add", "--detach", detachedWorktree.path, detachedTip.rawValue],
+      in: root
+    )
+    try await arrange(["branch", "-D", "detached-source"], in: root)
+
+    let headOnlyOIDs = Set(try await client.log(LogQuery(maxCount: 100)).commits.map(\.oid))
+    let unreachableTips = [localTip, remoteTip, tagTip, stashTip, detachedTip]
+    #expect(unreachableTips.allSatisfy { !headOnlyOIDs.contains($0) })
+
+    let unified = try await client.log(
+      LogQuery(
+        maxCount: 100,
+        allReferences: true,
+        additionalRevisions: [detachedTip]
+      )
+    )
+    let unifiedOIDs = Set(unified.commits.map(\.oid))
+    #expect(unifiedOIDs.isSuperset(of: Set(unreachableTips + [base.oid])))
+    let baseIndex = try #require(unified.commits.firstIndex { $0.oid == base.oid })
+    #expect(
+      try unreachableTips.allSatisfy { tip in
+        try #require(unified.commits.firstIndex { $0.oid == tip }) < baseIndex
+      }
+    )
+  }
+
   @Test func deleteBranchRefusesUnmergedUnlessForced() async throws {
     let root = try await LiveRepoFixture.makeTemporaryRepo(runner: runner)
     defer { try? FileManager.default.removeItem(at: root) }

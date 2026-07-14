@@ -13,58 +13,95 @@ final class HistoryStore {
   private let gitClient: any GitClient
   private var loadedCommits: [Commit] = []
   private var nextHistoryQuery: LogQuery?
-  private(set) var loadedReference: String?
+  private var additionalRevisions: [ObjectID] = []
 
   init(gitClient: any GitClient) {
     self.gitClient = gitClient
   }
 
-  func loadIfNeeded(reference: String?, hasHead: Bool) async {
+  func loadIfNeeded(additionalRevisions: [ObjectID], canLoadHistory: Bool) async {
     guard !isLoadingHistory else { return }
-    guard historyRows.isEmpty || loadedReference != reference else { return }
-    await reload(reference: reference, hasHead: hasHead)
+    guard historyRows.isEmpty || self.additionalRevisions != additionalRevisions else { return }
+    await reload(additionalRevisions: additionalRevisions, canLoadHistory: canLoadHistory)
   }
 
-  func reloadCurrent(hasHead: Bool) async {
-    await reload(reference: loadedReference, hasHead: hasHead)
-  }
-
-  func reload(reference: String?, hasHead: Bool) async {
-    guard hasHead else {
+  func reload(additionalRevisions: [ObjectID], canLoadHistory: Bool) async {
+    guard await waitUntilIdle() else { return }
+    guard canLoadHistory else {
       historyRows = []
       loadedCommits = []
       hasMoreHistory = false
       nextHistoryQuery = nil
-      loadedReference = reference
+      self.additionalRevisions = additionalRevisions
       errorMessage = nil
       return
     }
     loadedCommits = []
-    loadedReference = reference
-    nextHistoryQuery = LogQuery(reference: reference)
+    self.additionalRevisions = additionalRevisions
+    nextHistoryQuery = LogQuery(
+      allReferences: true,
+      additionalRevisions: additionalRevisions
+    )
     await loadMore(replacing: true)
   }
 
   func loadMore() async {
-    await loadMore(replacing: false)
+    _ = await loadMore(replacing: false)
   }
 
-  private func loadMore(replacing: Bool) async {
-    guard let query = nextHistoryQuery, !isLoadingHistory else { return }
+  /// Loads subsequent pages until `oid` is available or the unified walk ends.
+  /// Cooperates with an in-flight background page load instead of racing it.
+  func ensureCommitLoaded(_ oid: ObjectID) async -> Bool {
+    while true {
+      guard await waitUntilIdle() else { return false }
+      if loadedCommits.contains(where: { $0.oid == oid }) {
+        return true
+      }
+      guard hasMoreHistory else { return false }
+      let previousCount = loadedCommits.count
+      guard await loadMore(replacing: false) else { return false }
+      if loadedCommits.contains(where: { $0.oid == oid }) {
+        return true
+      }
+      // A malformed page that claims more data without adding commits must not
+      // turn focus navigation into an infinite loop.
+      guard loadedCommits.count > previousCount else { return false }
+    }
+  }
+
+  private func waitUntilIdle() async -> Bool {
+    while isLoadingHistory {
+      do {
+        try await Task.sleep(for: .milliseconds(20))
+      } catch {
+        return false
+      }
+    }
+    return !Task.isCancelled
+  }
+
+  @discardableResult
+  private func loadMore(replacing: Bool) async -> Bool {
+    guard let query = nextHistoryQuery, !isLoadingHistory else { return false }
     isLoadingHistory = true
     defer { isLoadingHistory = false }
     do {
       let page = try await gitClient.log(query)
+      guard !Task.isCancelled else { return false }
       loadedCommits.append(contentsOf: page.commits)
       hasMoreHistory = page.hasMore
       nextHistoryQuery = page.hasMore ? query.next() : nil
       historyRows = CommitGraphLayout.assignLanes(loadedCommits)
       errorMessage = nil
+      return true
+    } catch is CancellationError {
+      return false
     } catch {
       if replacing {
         historyRows = []
       }
       errorMessage = error.localizedDescription
+      return false
     }
   }
 }
