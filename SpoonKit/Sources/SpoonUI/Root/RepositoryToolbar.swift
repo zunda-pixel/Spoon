@@ -69,15 +69,15 @@ struct RepositoryToolbar: ToolbarContent {
         ProgressView()
           .controlSize(.small)
           .accessibilityLabel("Repository operation in progress")
+      } else {
+        Button {
+          Task { await model.refresh() }
+        } label: {
+          Label("Refresh", systemImage: "arrow.clockwise")
+        }
+        .keyboardShortcut("r", modifiers: .command)
+        .accessibilityHint("Reloads repository status and related data")
       }
-      Button {
-        Task { await model.refresh() }
-      } label: {
-        Label("Refresh", systemImage: "arrow.clockwise")
-      }
-      .keyboardShortcut("r", modifiers: .command)
-      .accessibilityHint("Reloads repository status and related data")
-      .disabled(model.isRefreshing)
     }
     ToolbarItem(placement: .primaryAction) {
       Button {
