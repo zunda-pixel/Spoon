@@ -282,6 +282,34 @@ struct RepositoryModelTests {
     #expect(model.historyRows.count == 1)
   }
 
+  @Test func forceDeleteIsOnlyRequiredForUnmergedBranches() async {
+    let client = FakeRepositoryGitClient()
+    let head = makeOID("11112222")
+    let mergedOID = makeOID("33334444")
+    let unmergedOID = makeOID("55556666")
+    await client.configure(
+      status: makeStatus(oid: head, branch: "main"),
+      branches: [makeBranch("main", oid: head, isCurrent: true)],
+      mergeBases: ["merged...HEAD": mergedOID, "unmerged...HEAD": head]
+    )
+    let model = makeModel(client)
+    await model.refresh()
+
+    let pushed = makeBranch(
+      "pushed", oid: unmergedOID, isCurrent: false, upstream: "origin/pushed", ahead: 0
+    )
+    #expect(await model.requiresForceDelete(pushed) == false)
+
+    let atHead = makeBranch("at-head", oid: head, isCurrent: false)
+    #expect(await model.requiresForceDelete(atHead) == false)
+
+    let merged = makeBranch("merged", oid: mergedOID, isCurrent: false)
+    #expect(await model.requiresForceDelete(merged) == false)
+
+    let unmerged = makeBranch("unmerged", oid: unmergedOID, isCurrent: false)
+    #expect(await model.requiresForceDelete(unmerged) == true)
+  }
+
   @Test func refreshErrorClearsOnceRefreshRecovers() async {
     let client = FakeRepositoryGitClient()
     let oid = makeOID("99999999")
@@ -319,7 +347,8 @@ struct RepositoryModelTests {
     _ name: String,
     oid: ObjectID,
     isCurrent: Bool,
-    upstream: String? = nil
+    upstream: String? = nil,
+    ahead: Int? = nil
   ) -> Branch {
     Branch(
       name: name,
@@ -327,7 +356,7 @@ struct RepositoryModelTests {
       tip: oid,
       subject: name,
       upstream: upstream,
-      ahead: nil,
+      ahead: ahead,
       behind: nil,
       committedAt: nil
     )
@@ -370,6 +399,7 @@ private actor FakeRepositoryGitClient: GitClient {
   private var currentRemotes: [Remote] = []
   private var currentRemoteBranchesByRemote: [String: [Branch]] = [:]
   private var pages: [Int: LogPage] = [:]
+  private var mergeBases: [String: ObjectID] = [:]
   private var shouldFailBranches = false
   private var shouldFailRemoteBranches = false
   private(set) var stageCallCount = 0
@@ -382,6 +412,7 @@ private actor FakeRepositoryGitClient: GitClient {
     remotes: [Remote] = [],
     remoteBranchesByRemote: [String: [Branch]] = [:],
     logPages: [Int: LogPage] = [:],
+    mergeBases: [String: ObjectID] = [:],
     failBranches: Bool = false,
     failRemoteBranches: Bool = false
   ) {
@@ -390,6 +421,7 @@ private actor FakeRepositoryGitClient: GitClient {
     currentRemotes = remotes
     currentRemoteBranchesByRemote = remoteBranchesByRemote
     pages = logPages
+    self.mergeBases = mergeBases
     shouldFailBranches = failBranches
     shouldFailRemoteBranches = failRemoteBranches
   }
@@ -507,7 +539,10 @@ private actor FakeRepositoryGitClient: GitClient {
   func continueSequencer(_ kind: SequencerState.Kind) async throws { throw Failure.unimplemented }
   func skipSequencer(_ kind: SequencerState.Kind) async throws { throw Failure.unimplemented }
   func abortSequencer(_ kind: SequencerState.Kind) async throws { throw Failure.unimplemented }
-  func mergeBase(_ a: String, _ b: String) async throws -> ObjectID { throw Failure.unimplemented }
+  func mergeBase(_ a: String, _ b: String) async throws -> ObjectID {
+    guard let oid = mergeBases["\(a)...\(b)"] else { throw Failure.unimplemented }
+    return oid
+  }
   func diff(from: String, to: String) async throws -> [FileDiff] { [] }
   func diffText(from: String, to: String) async throws -> String { "" }
   func stagedDiffText() async throws -> String { "" }

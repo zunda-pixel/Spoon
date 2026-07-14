@@ -62,11 +62,18 @@ struct DeleteBranchSheet: View {
   let branch: Branch
   @Environment(\.dismiss) private var dismiss
   @State private var deleteRemoteBranch = false
+  @State private var forceDelete = false
+  /// nil while the merge check runs; the force checkbox only appears once
+  /// the branch is known to have commits a plain delete would refuse to drop.
+  @State private var requiresForce: Bool?
 
   var body: some View {
     SheetFormLayout(title: "Delete Branch “\(branch.name)”") {
-      Text("Delete refuses branches that are not fully merged. Force Delete removes them anyway.")
+      Text(explanation)
         .frame(width: 380, alignment: .leading)
+      if requiresForce == true {
+        Toggle("Force delete, discarding those commits", isOn: $forceDelete)
+      }
       if let upstream = branch.upstream {
         Toggle("Also delete remote branch “\(upstream)”", isOn: $deleteRemoteBranch)
         Text("This runs multiple Git operations and cannot be completed atomically.")
@@ -75,9 +82,20 @@ struct DeleteBranchSheet: View {
       }
     } actions: {
       Button("Cancel", role: .cancel) { dismiss() }
-      Button("Force Delete", role: .destructive) { delete(force: true) }
-      Button("Delete", role: .destructive) { delete(force: false) }
+      Button("Delete", role: .destructive) { delete(force: forceDelete) }
         .keyboardShortcut(.defaultAction)
+        .disabled(requiresForce == true && !forceDelete)
+    }
+    .task {
+      requiresForce = await model.requiresForceDelete(branch)
+    }
+  }
+
+  private var explanation: String {
+    if requiresForce == true {
+      "This branch has commits that are merged into neither HEAD nor its upstream."
+    } else {
+      "The local branch will be deleted."
     }
   }
 

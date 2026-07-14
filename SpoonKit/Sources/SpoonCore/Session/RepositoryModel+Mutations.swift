@@ -122,6 +122,21 @@ extension RepositoryModel {
     await perform { try await $0.switchToRemoteBranch(remoteBranch) }
   }
 
+  /// Whether `git branch -d` would refuse to delete `branch`: git allows a
+  /// plain delete when the tip is reachable from HEAD or from the branch's
+  /// own upstream; anything else discards commits and needs `-D`.
+  public func requiresForceDelete(_ branch: Branch) async -> Bool {
+    if branch.upstream != nil, !branch.upstreamGone, branch.ahead == 0 {
+      return false
+    }
+    guard let head = status?.headOID else { return true }
+    if branch.tip == head { return false }
+    if let base = try? await gitClient.mergeBase(branch.name, "HEAD"), base == branch.tip {
+      return false
+    }
+    return true
+  }
+
   public func deleteBranch(
     name: String,
     force: Bool = false,
