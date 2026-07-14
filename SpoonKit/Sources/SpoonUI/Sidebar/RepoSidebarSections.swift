@@ -83,6 +83,7 @@ struct StashesSidebarSection: View {
 @MainActor
 struct TagsSidebarSection: View {
   let model: RepositoryModel
+  let navigation: RepositoryNavigationState
   @Binding var deletingTag: Tag?
   @Binding var deletingRemoteTag: RemoteTagSelection?
   let searchText: String
@@ -96,7 +97,7 @@ struct TagsSidebarSection: View {
             .foregroundStyle(.tertiary)
         }
         ForEach(filteredTags) { tag in
-          TagSidebarRow(tag: tag, model: model)
+          TagSidebarRow(tag: tag, model: model, navigation: navigation)
             .contextMenu {
               TagContextMenu(
                 model: model,
@@ -129,6 +130,7 @@ struct TagsSidebarSection: View {
 private struct TagSidebarRow: View {
   let tag: Tag
   let model: RepositoryModel
+  let navigation: RepositoryNavigationState
   @State private var isHovered = false
 
   var body: some View {
@@ -144,6 +146,12 @@ private struct TagSidebarRow: View {
       }
     }
     .onHover { isHovered = $0 }
+    .tag(SidebarItem.tag(tag.name))
+    .simultaneousGesture(
+      TapGesture().onEnded {
+        navigation.focusHistory(on: tag)
+      }
+    )
   }
 
   private var tagLabel: some View {

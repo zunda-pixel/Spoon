@@ -7,6 +7,7 @@ enum SidebarItem: Hashable {
   case reflog
   case branch(String)
   case remoteBranch(remote: String, branch: String)
+  case tag(String)
   case pullRequests
   case remote(String)
   case stash(Int)
@@ -115,5 +116,13 @@ final class RepositoryNavigationState {
       reference: .remoteBranch(remote: remoteName, name: branch.name)
     )
     sidebarSelection = .remoteBranch(remote: remoteName, branch: branch.name)
+  }
+
+  func focusHistory(on tag: Tag) {
+    historyFocus = HistoryFocus(
+      tip: tag.target,
+      reference: .tag(tag.name)
+    )
+    sidebarSelection = .tag(tag.name)
   }
 }

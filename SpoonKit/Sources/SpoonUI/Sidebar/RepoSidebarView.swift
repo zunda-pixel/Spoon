@@ -37,6 +37,7 @@ struct RepoSidebarView: View {
       )
       TagsSidebarSection(
         model: model,
+        navigation: navigation,
         deletingTag: $deletingTag,
         deletingRemoteTag: $deletingRemoteTag,
         searchText: searchText

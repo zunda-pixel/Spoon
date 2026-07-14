@@ -86,8 +86,19 @@ extension RepositoryModel {
     await perform { try await $0.merge(branch: branch, options: options) }
   }
 
-  public func createTag(name: String, at target: ObjectID?, message: String?) async {
-    await perform { try await $0.createTag(name: name, at: target, message: message) }
+  public func createTag(
+    name: String,
+    at target: ObjectID?,
+    message: String?,
+    pushToRemotes: Bool = false
+  ) async {
+    let remoteNames = pushToRemotes ? remotes.map(\.name) : []
+    await perform {
+      try await $0.createTag(name: name, at: target, message: message)
+      for remoteName in remoteNames {
+        try await $0.pushTag(name: name, to: remoteName)
+      }
+    }
   }
 
   public func deleteTag(name: String) async {

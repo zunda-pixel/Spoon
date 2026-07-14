@@ -10,7 +10,7 @@ struct RepositoryContentColumn: View {
     switch navigation.sidebarSelection {
     case .changes, nil:
       ChangesView(model: model, selection: $navigation.fileSelections, navigation: navigation)
-    case .history, .branch, .remoteBranch:
+    case .history, .branch, .remoteBranch, .tag:
       HistoryListView(
         model: model,
         focus: resolvedHistoryFocus,
@@ -44,6 +44,11 @@ struct RepositoryContentColumn: View {
         tip: branch.tip,
         reference: .remoteBranch(remote: remote, name: branch.name)
       )
+    case .tag(let name):
+      guard let tag = model.tags.first(where: { $0.name == name }) else {
+        return navigation.historyFocus
+      }
+      return HistoryFocus(tip: tag.target, reference: .tag(tag.name))
     case .history:
       return nil
     default:
@@ -61,7 +66,7 @@ struct RepositoryDetailColumn: View {
     switch navigation.sidebarSelection {
     case .changes, nil:
       changeDetail
-    case .history, .branch, .remoteBranch:
+    case .history, .branch, .remoteBranch, .tag:
       if let selectedCommitID = navigation.selectedCommitID,
         let oid = ObjectID(rawValue: selectedCommitID)
       {

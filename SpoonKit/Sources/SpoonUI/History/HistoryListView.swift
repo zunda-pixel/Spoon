@@ -148,6 +148,7 @@ struct TagCommitSheet: View {
   @Environment(\.dismiss) private var dismiss
   @State private var name = ""
   @State private var message = ""
+  @State private var pushToRemotes = false
 
   init(model: RepositoryModel, commit: Commit) {
     self.model = model
@@ -164,6 +165,8 @@ struct TagCommitSheet: View {
         TextField("Tag name", text: $name, prompt: Text("v1.0.0"))
           .onSubmit(create)
         TextField("Message (optional; makes the tag annotated)", text: $message)
+        Toggle("Push to all remotes", isOn: $pushToRemotes)
+          .disabled(model.remotes.isEmpty)
       }
       .textFieldStyle(.roundedBorder)
       .frame(width: 380)
@@ -195,7 +198,8 @@ struct TagCommitSheet: View {
       await model.createTag(
         name: tagName,
         at: commit.oid,
-        message: trimmedMessage.isEmpty ? nil : trimmedMessage
+        message: trimmedMessage.isEmpty ? nil : trimmedMessage,
+        pushToRemotes: pushToRemotes
       )
     }
   }

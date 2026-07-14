@@ -4,10 +4,11 @@ public import Foundation
 public enum HistoryReferenceIdentity: Sendable, Hashable {
   case localBranch(String)
   case remoteBranch(remote: String, name: String)
+  case tag(String)
 
   public var name: String {
     switch self {
-    case .localBranch(let name), .remoteBranch(_, let name):
+    case .localBranch(let name), .remoteBranch(_, let name), .tag(let name):
       name
     }
   }
@@ -121,7 +122,8 @@ public enum HistoryReferenceLabelBuilder {
         HistoryReferenceLabel(
           id: "tag:\(tag.name)",
           name: tag.name,
-          kind: .tag
+          kind: .tag,
+          referenceIdentity: .tag(tag.name)
         )
       )
     }
