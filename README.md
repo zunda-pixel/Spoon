@@ -21,8 +21,8 @@ An AI-first git client for macOS, built with SwiftUI for macOS 26 or later.
 - **Branches** — create (from HEAD or any branch), delete, rename, and check
   out branches (or any commit, detached); merge or squash-merge a branch
   into the current one; check out a remote branch as a local tracking
-  branch; link a branch to its own worktree (add / open in a new window /
-  remove).
+  branch; link a branch to its own worktree (add / switch in the current
+  window / remove).
 - **Tags** — list in the sidebar, tag any commit (lightweight or annotated),
   push to remotes, and delete locally or remotely.
 - **Stashes** — save (including untracked files), browse a stash's diff,

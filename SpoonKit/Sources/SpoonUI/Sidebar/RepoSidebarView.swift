@@ -5,8 +5,8 @@ import SwiftUI
 struct RepoSidebarView: View {
   let model: RepositoryModel
   @Bindable var navigation: RepositoryNavigationState
+  let switchRepository: (Repository.ID) -> Void
   @Environment(AppModel.self) private var appModel
-  @Environment(\.openWindow) private var openWindow
   @State private var removingRemote: Remote?
   @State private var removingWorktree: Worktree?
   @State private var deletingBranch: Branch?
@@ -128,7 +128,9 @@ struct RepoSidebarView: View {
     Task {
       do {
         let repository = try await appModel.openRepository(at: worktree.path)
-        openWindow(value: repository.id)
+        guard repository.id != model.repository.id else { return }
+        model.stopWatching()
+        switchRepository(repository.id)
       } catch {
         openWorktreeErrorMessage = error.localizedDescription
       }

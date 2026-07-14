@@ -4,6 +4,7 @@ import SwiftUI
 @MainActor
 struct RepositoryWindowRoot: View {
   let repositoryID: Repository.ID
+  let switchRepository: (Repository.ID) -> Void
 
   @Environment(AppModel.self) private var appModel
   @State private var model: RepositoryModel?
@@ -12,7 +13,7 @@ struct RepositoryWindowRoot: View {
   var body: some View {
     Group {
       if let model {
-        RepositorySplitView(model: model)
+        RepositorySplitView(model: model, switchRepository: switchRepository)
       } else if let loadErrorMessage {
         ContentUnavailableView(
           "Could Not Open Repository",
@@ -25,6 +26,9 @@ struct RepositoryWindowRoot: View {
       }
     }
     .navigationTitle(Repository(rootURL: repositoryURL).name)
+    .onDisappear {
+      model?.stopWatching()
+    }
   }
 
   private var repositoryURL: URL {
@@ -35,6 +39,7 @@ struct RepositoryWindowRoot: View {
     do {
       let model = try await appModel.makeRepositoryModel(for: Repository(rootURL: repositoryURL))
       await model.refresh()
+      guard !Task.isCancelled else { return }
       model.startWatching()
       self.model = model
     } catch {
@@ -46,11 +51,16 @@ struct RepositoryWindowRoot: View {
 @MainActor
 struct RepositorySplitView: View {
   let model: RepositoryModel
+  let switchRepository: (Repository.ID) -> Void
   @State private var navigation = RepositoryNavigationState()
 
   var body: some View {
     NavigationSplitView {
-      RepoSidebarView(model: model, navigation: navigation)
+      RepoSidebarView(
+        model: model,
+        navigation: navigation,
+        switchRepository: switchRepository
+      )
         .navigationSplitViewColumnWidth(min: 220, ideal: 260)
     } content: {
       RepositoryContentColumn(model: model, navigation: navigation)

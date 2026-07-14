@@ -224,7 +224,7 @@ private struct BranchContextMenu: View {
     .disabled(branch.isCurrent || model.isBusy || model.isSequencing)
     Divider()
     if let worktree {
-      Button("Open Worktree") { openWorktree(worktree) }
+      Button("Switch to Worktree") { openWorktree(worktree) }
       if !worktree.isMain {
         Button("Remove Worktree…", role: .destructive) { removingWorktree = worktree }
           .disabled(model.isBusy)

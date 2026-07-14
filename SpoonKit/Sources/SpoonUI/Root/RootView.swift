@@ -18,7 +18,11 @@ public struct RootView: View {
   public var body: some View {
     Group {
       if let repositoryID {
-        RepositoryWindowRoot(repositoryID: repositoryID)
+        RepositoryWindowRoot(
+          repositoryID: repositoryID,
+          switchRepository: { self.repositoryID = $0 }
+        )
+        .id(repositoryID)
       } else {
         WelcomeView { repositoryID = $0 }
       }
