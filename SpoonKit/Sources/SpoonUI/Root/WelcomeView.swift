@@ -9,6 +9,8 @@ struct WelcomeView: View {
   @State private var showingCreateSheet = false
   @State private var showingCloneSheet = false
   @State private var openErrorMessage: String?
+  @State private var selectedRecentID: Repository.ID?
+  @State private var armedRecentID: Repository.ID?
 
   let onOpen: (Repository.ID) -> Void
 
@@ -87,7 +89,7 @@ struct WelcomeView: View {
   }
 
   private var recentsList: some View {
-    List {
+    List(selection: $selectedRecentID) {
       Section("Recent") {
         if appModel.recentRepositories.isEmpty {
           Text("No recent repositories")
@@ -95,7 +97,7 @@ struct WelcomeView: View {
         }
         ForEach(appModel.recentRepositories) { repository in
           Button {
-            onOpen(repository.id)
+            activateRecent(repository)
           } label: {
             VStack(alignment: .leading, spacing: 2) {
               Text(repository.name)
@@ -112,15 +114,35 @@ struct WelcomeView: View {
             .contentShape(Rectangle())
           }
           .buttonStyle(.plain)
+          .tag(repository.id)
+          .accessibilityHint("Select this repository; activate it again to open")
           .contextMenu {
             Button("Remove from Recents") {
               appModel.removeRecent(repository)
+              if selectedRecentID == repository.id {
+                selectedRecentID = nil
+                armedRecentID = nil
+              }
             }
           }
         }
       }
     }
     .scrollContentBackground(.hidden)
+    .onChange(of: selectedRecentID) {
+      if selectedRecentID != armedRecentID {
+        armedRecentID = nil
+      }
+    }
+  }
+
+  private func activateRecent(_ repository: Repository) {
+    if armedRecentID == repository.id {
+      onOpen(repository.id)
+    } else {
+      selectedRecentID = repository.id
+      armedRecentID = repository.id
+    }
   }
 
   private func open(_ url: URL) {
