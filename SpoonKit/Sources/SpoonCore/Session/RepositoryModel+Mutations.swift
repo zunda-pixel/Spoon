@@ -218,12 +218,18 @@ extension RepositoryModel {
     path: URL,
     force: Bool = false,
     deleteBranch branchName: String? = nil,
-    forceDeleteBranch: Bool = false
+    forceDeleteBranch: Bool = false,
+    deleteRemoteUpstream upstream: String? = nil
   ) async {
     await perform {
       try await $0.removeWorktree(path: path, force: force)
       if let branchName {
         try await $0.deleteBranch(name: branchName, force: forceDeleteBranch)
+        if let upstream,
+          let (remoteName, remoteBranch) = Self.remoteBranchComponents(of: upstream)
+        {
+          try await $0.deleteRemoteBranch(name: remoteBranch, from: remoteName)
+        }
       }
     }
   }

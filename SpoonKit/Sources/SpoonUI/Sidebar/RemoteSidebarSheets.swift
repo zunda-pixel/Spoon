@@ -10,6 +10,7 @@ struct AddRemoteBranchWorktreeSheet: View {
   @State private var localBranchName: String
   @State private var parentPath: String
   @State private var folderName: String
+  @State private var switchAfterCreation = true
 
   init(
     model: RepositoryModel,
@@ -27,7 +28,7 @@ struct AddRemoteBranchWorktreeSheet: View {
   }
 
   var body: some View {
-    SheetFormLayout(title: "Add Worktree for “\(selection.fullName)”") {
+    SheetFormLayout(title: "Create Worktree for “\(selection.fullName)”") {
       Form {
         TextField("Local branch", text: $localBranchName)
         DestinationFolderFields(
@@ -43,9 +44,10 @@ struct AddRemoteBranchWorktreeSheet: View {
         .foregroundStyle(.secondary)
         .lineLimit(1)
         .truncationMode(.middle)
+      Toggle("Switch to new worktree", isOn: $switchAfterCreation)
     } actions: {
       Button("Cancel", role: .cancel) { dismiss() }
-      Button("Add and Switch", action: create)
+      Button(switchAfterCreation ? "Create and Switch" : "Create", action: create)
         .keyboardShortcut(.defaultAction)
         .disabled(!isValid)
     }
@@ -73,6 +75,7 @@ struct AddRemoteBranchWorktreeSheet: View {
     guard isValid else { return }
     let destination = destination
     let localBranchName = trimmedLocalBranchName
+    let shouldSwitch = switchAfterCreation
     dismiss()
     Task {
       guard
@@ -82,7 +85,9 @@ struct AddRemoteBranchWorktreeSheet: View {
           localBranch: localBranchName
         )
       else { return }
-      switchToWorktree(destination)
+      if shouldSwitch {
+        switchToWorktree(destination)
+      }
     }
   }
 }

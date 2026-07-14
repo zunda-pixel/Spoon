@@ -200,14 +200,19 @@ struct RepositoryModelTests {
     )
   }
 
-  @Test func worktreeRemovalCanDeleteItsBranchInOrder() async {
+  @Test func worktreeRemovalCanDeleteItsLocalAndRemoteBranchesInOrder() async {
     let client = FakeRepositoryGitClient()
     let oid = makeOID("28282828")
     await client.configure(
       status: makeStatus(oid: oid, branch: "main"),
       branches: [
         makeBranch("main", oid: oid, isCurrent: true),
-        makeBranch("topic", oid: oid, isCurrent: false),
+        makeBranch(
+          "topic",
+          oid: oid,
+          isCurrent: false,
+          upstream: "origin/topic"
+        ),
       ]
     )
     let model = makeModel(client)
@@ -219,7 +224,8 @@ struct RepositoryModelTests {
       path: secondPath,
       force: true,
       deleteBranch: "topic",
-      forceDeleteBranch: true
+      forceDeleteBranch: true,
+      deleteRemoteUpstream: "origin/topic"
     )
 
     #expect(
@@ -227,6 +233,7 @@ struct RepositoryModelTests {
         "remove-worktree:\(firstPath.path):false",
         "remove-worktree:\(secondPath.path):true",
         "delete-local:topic:true",
+        "delete-remote:origin:topic",
       ]
     )
   }

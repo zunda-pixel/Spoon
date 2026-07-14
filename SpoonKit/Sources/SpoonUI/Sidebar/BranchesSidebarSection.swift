@@ -184,7 +184,7 @@ private struct BranchContextMenu: View {
           .disabled(model.isBusy)
       }
     } else if !branch.isCurrent {
-      Button("Add Worktree…") { navigation.present(.addWorktree(branch)) }
+      Button("Create Worktree…") { navigation.present(.addWorktree(branch)) }
         .disabled(model.isBusy)
     }
     Divider()

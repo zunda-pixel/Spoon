@@ -119,6 +119,7 @@ struct DeleteWorktreeSheet: View {
   @Environment(\.dismiss) private var dismiss
   @State private var forceRemove = false
   @State private var deleteBranch = false
+  @State private var deleteRemoteBranch = false
   @State private var forceDeleteBranch = false
   @State private var branchRequiresForce: Bool?
 
@@ -130,6 +131,12 @@ struct DeleteWorktreeSheet: View {
 
       if let branch {
         Toggle("Also delete branch “\(branch.name)”", isOn: $deleteBranch)
+        if deleteBranch, let upstream = branch.upstream {
+          Toggle(
+            "Also delete remote branch “\(upstream)”",
+            isOn: $deleteRemoteBranch
+          )
+        }
         if deleteBranch, branchRequiresForce == true {
           Text("This branch has commits that are merged into neither HEAD nor its upstream.")
             .frame(width: 420, alignment: .leading)
@@ -167,6 +174,7 @@ struct DeleteWorktreeSheet: View {
 
   private func remove() {
     let branchName = deleteBranch ? branch?.name : nil
+    let upstream = deleteBranch && deleteRemoteBranch ? branch?.upstream : nil
     let shouldForceRemove = forceRemove
     let shouldForceDeleteBranch = forceDeleteBranch
     dismiss()
@@ -175,7 +183,8 @@ struct DeleteWorktreeSheet: View {
         path: worktree.path,
         force: shouldForceRemove,
         deleteBranch: branchName,
-        forceDeleteBranch: shouldForceDeleteBranch
+        forceDeleteBranch: shouldForceDeleteBranch,
+        deleteRemoteUpstream: upstream
       )
     }
   }
@@ -189,6 +198,7 @@ struct AddWorktreeSheet: View {
   @Environment(\.dismiss) private var dismiss
   @State private var parentPath: String
   @State private var folderName: String
+  @State private var switchAfterCreation = true
 
   init(
     model: RepositoryModel,
@@ -205,7 +215,7 @@ struct AddWorktreeSheet: View {
   }
 
   var body: some View {
-    SheetFormLayout(title: "Add Worktree for “\(branch.name)”") {
+    SheetFormLayout(title: "Create Worktree for “\(branch.name)”") {
       Form {
         DestinationFolderFields(
           parentPath: $parentPath,
@@ -220,9 +230,10 @@ struct AddWorktreeSheet: View {
         .foregroundStyle(.secondary)
         .lineLimit(1)
         .truncationMode(.middle)
+      Toggle("Switch to new worktree", isOn: $switchAfterCreation)
     } actions: {
       Button("Cancel", role: .cancel) { dismiss() }
-      Button("Add and Switch", action: create)
+      Button(switchAfterCreation ? "Create and Switch" : "Create", action: create)
         .keyboardShortcut(.defaultAction)
         .disabled(!isValid)
     }
@@ -241,10 +252,13 @@ struct AddWorktreeSheet: View {
   private func create() {
     guard isValid else { return }
     let destination = destination
+    let shouldSwitch = switchAfterCreation
     dismiss()
     Task {
       guard await model.addWorktree(path: destination, branch: branch.name) else { return }
-      switchToWorktree(destination)
+      if shouldSwitch {
+        switchToWorktree(destination)
+      }
     }
   }
 }

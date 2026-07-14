@@ -227,12 +227,12 @@ private struct RemoteBranchTreeNodeView: View {
         .disabled(model.isBusy)
       }
     } else if let localBranch {
-      Button("Add Worktree…") {
+      Button("Create Worktree…") {
         navigation.present(.addWorktree(localBranch))
       }
       .disabled(localBranch.isCurrent || model.isBusy)
     } else {
-      Button("Add Worktree…") {
+      Button("Create Worktree…") {
         navigation.present(.addRemoteWorktree(selection))
       }
       .disabled(model.isBusy)
