@@ -19,8 +19,8 @@ jobs:
 
       - name: Build SpoonUI
         working-directory: SpoonKit
-        run: swift build --target SpoonUI
+        run: swift build
 
       - name: Test SpoonCore
         working-directory: SpoonKit
-        run: swift test --test-product SpoonCoreTests
+        run: swift test
