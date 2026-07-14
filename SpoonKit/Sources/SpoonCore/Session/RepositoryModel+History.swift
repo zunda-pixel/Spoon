@@ -34,6 +34,12 @@ extension RepositoryModel {
     adoptHistoryError()
   }
 
+  /// Whether reverting this commit is meaningful on the currently checked-out history.
+  public func canRevert(_ oid: ObjectID) -> Bool {
+    guard let headOID = status?.headOID else { return false }
+    return historyStore.isAncestor(oid, of: headOID)
+  }
+
   /// Temporary source-compatible bridge while History UI still passes a ref.
   /// A branch selection no longer changes the history walk.
   public func loadHistoryIfNeeded(reference _: String?) async {

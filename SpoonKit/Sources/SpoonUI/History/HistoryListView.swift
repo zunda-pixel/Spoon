@@ -131,10 +131,12 @@ struct HistoryListView: View {
       Task { await model.cherryPick(commit.oid) }
     }
     .disabled(model.isBusy || model.isSequencing)
-    Button("Revert Commit") {
-      Task { await model.revert(commit.oid) }
+    if !commit.isMerge, model.canRevert(commit.oid) {
+      Button("Revert Commit") {
+        Task { await model.revert(commit.oid) }
+      }
+      .disabled(model.isBusy || model.isSequencing)
     }
-    .disabled(commit.isMerge || model.isBusy || model.isSequencing)
   }
 }
 

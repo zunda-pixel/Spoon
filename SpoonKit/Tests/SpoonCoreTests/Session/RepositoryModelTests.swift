@@ -311,6 +311,48 @@ struct RepositoryModelTests {
     #expect(await client.logQueries.map(\.skip) == [0, 500, 1000])
   }
 
+  @Test func revertIsAvailableOnlyForCommitsReachableFromCurrentHead() async {
+    let client = FakeRepositoryGitClient()
+    let head = makeOID("aaaa1111")
+    let otherBranch = makeOID("bbbb2222")
+    let base = makeOID("cccc3333")
+    func commit(_ oid: ObjectID, parent: ObjectID?, subject: String) -> Commit {
+      Commit(
+        oid: oid,
+        parents: parent.map { [$0] } ?? [],
+        subject: subject,
+        authorName: "Tester",
+        authorEmail: "tester@example.com",
+        authoredAt: .distantPast,
+        committedAt: .distantPast
+      )
+    }
+    await client.configure(
+      status: makeStatus(oid: head, branch: "A"),
+      branches: [
+        makeBranch("A", oid: head, isCurrent: true),
+        makeBranch("B", oid: otherBranch, isCurrent: false),
+      ],
+      logPages: [
+        0: LogPage(
+          commits: [
+            commit(head, parent: base, subject: "A change"),
+            commit(otherBranch, parent: base, subject: "B change"),
+            commit(base, parent: nil, subject: "base"),
+          ],
+          hasMore: false
+        )
+      ]
+    )
+    let model = makeModel(client)
+    await model.refresh()
+    await model.loadHistoryIfNeeded()
+
+    #expect(model.canRevert(head))
+    #expect(model.canRevert(base))
+    #expect(!model.canRevert(otherBranch))
+  }
+
   @Test func referenceCompatibilityLoadDoesNotReloadUnifiedHistory() async {
     let client = FakeRepositoryGitClient()
     let head = makeOID("45454545")

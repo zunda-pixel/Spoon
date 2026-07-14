@@ -67,6 +67,25 @@ final class HistoryStore {
     _ = await loadMore(replacing: false)
   }
 
+  func isAncestor(_ candidate: ObjectID, of descendant: ObjectID) -> Bool {
+    guard loadedCommits.contains(where: { $0.oid == candidate }) else { return false }
+    var commitsByOID = Dictionary(
+      loadedCommits.map { ($0.oid, $0) },
+      uniquingKeysWith: { first, _ in first }
+    )
+    var pending = [descendant]
+    var visited: Set<ObjectID> = []
+
+    while let oid = pending.popLast() {
+      guard visited.insert(oid).inserted else { continue }
+      if oid == candidate { return true }
+      if let commit = commitsByOID.removeValue(forKey: oid) {
+        pending.append(contentsOf: commit.parents)
+      }
+    }
+    return false
+  }
+
   /// Loads subsequent pages until `oid` is available or the unified walk ends.
   /// Cooperates with an in-flight background page load instead of racing it.
   func ensureCommitLoaded(_ oid: ObjectID) async -> Bool {
