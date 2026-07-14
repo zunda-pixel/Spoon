@@ -27,7 +27,7 @@ struct RepositoryWindowRoot: View {
         ProgressView()
       }
     }
-    .navigationTitle(Repository(rootURL: repositoryURL).name)
+    .navigationTitle(windowTitle)
     .task(id: repositoryID) {
       await load()
     }
@@ -40,6 +40,13 @@ struct RepositoryWindowRoot: View {
 
   private var repositoryURL: URL {
     URL(filePath: repositoryID, directoryHint: .isDirectory)
+  }
+
+  private var windowTitle: String {
+    guard let model = cachedModels[repositoryID] else {
+      return Repository(rootURL: repositoryURL).name
+    }
+    return model.commonWorktreeName
   }
 
   private func load() async {
@@ -114,8 +121,8 @@ struct RepositorySplitView: View {
         SequencerBannerView(model: model, state: state)
       }
     }
-    .navigationTitle(model.repository.name)
-    .navigationSubtitle(sectionTitle)
+    .navigationTitle(model.commonWorktreeName)
+    .navigationSubtitle(model.repository.rootURL.path(percentEncoded: false))
     .navigationDocument(model.repository.rootURL)
     .toolbar {
       RepositoryToolbar(model: model, navigation: navigation)
@@ -175,19 +182,6 @@ struct RepositorySplitView: View {
     .focusedSceneValue(\.repositoryNavigationState, navigation)
   }
 
-  private var sectionTitle: String {
-    switch navigation.sidebarSelection {
-    case .changes, nil: "Changes"
-    case .history: "History"
-    case .reflog: "Reflog"
-    case .branch(let name): name
-    case .remoteBranch(_, let branch): branch
-    case .pullRequests: "Pull Requests"
-    case .remote(let name): name
-    case .stash(let index): "stash@{\(index)}"
-    }
-  }
-
   private var sequencerName: String {
     switch model.sequencerState?.kind {
     case .rebase: "Rebase"
@@ -196,5 +190,11 @@ struct RepositorySplitView: View {
     case .merge: "Merge"
     case nil: "Operation"
     }
+  }
+}
+
+private extension RepositoryModel {
+  var commonWorktreeName: String {
+    worktrees.first(where: \.isMain)?.name ?? repository.name
   }
 }
