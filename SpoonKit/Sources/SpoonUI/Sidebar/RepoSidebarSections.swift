@@ -158,10 +158,17 @@ private struct BranchTreeNodeView: View {
         pullRequest: model.prByBranch[branch.name],
         worktree: worktree
       )
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .contentShape(Rectangle())
       .tag(SidebarItem.branch(branch.name))
       .simultaneousGesture(
         TapGesture().onEnded {
-          handleBranchClick(branch, worktree: worktree)
+          navigation.sidebarSelection = .branch(branch.name)
+        }
+      )
+      .simultaneousGesture(
+        TapGesture(count: 2).onEnded {
+          activateBranch(branch, worktree: worktree)
         }
       )
       .contextMenu {
@@ -194,9 +201,8 @@ private struct BranchTreeNodeView: View {
     }
   }
 
-  private func handleBranchClick(_ branch: Branch, worktree: Worktree?) {
+  private func activateBranch(_ branch: Branch, worktree: Worktree?) {
     navigation.sidebarSelection = .branch(branch.name)
-    guard NSApp.currentEvent?.clickCount == 2 else { return }
 
     if let worktree {
       openWorktree(worktree)
