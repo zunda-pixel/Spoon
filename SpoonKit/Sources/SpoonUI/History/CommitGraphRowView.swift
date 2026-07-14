@@ -1,9 +1,18 @@
 import SpoonCore
 import SwiftUI
 
+struct HistoryBranchLabel: Identifiable {
+  let name: String
+  let isRemote: Bool
+  let isCurrent: Bool
+
+  var id: String { "\(isRemote ? "remote" : "local"):\(name)" }
+}
+
 @MainActor
 struct CommitGraphRowView: View {
   let row: GraphRow
+  let branchLabels: [HistoryBranchLabel]
 
   private nonisolated static let laneWidth: CGFloat = 12
   private nonisolated static let rowHeight: CGFloat = 34
@@ -20,6 +29,15 @@ struct CommitGraphRowView: View {
 
       VStack(alignment: .leading, spacing: 2) {
         HStack(spacing: 6) {
+          ForEach(branchLabels.prefix(2)) { branchLabel in
+            branchBadge(branchLabel)
+          }
+          if branchLabels.count > 2 {
+            Text("+\(branchLabels.count - 2)")
+              .font(.caption2.monospacedDigit())
+              .foregroundStyle(.secondary)
+              .help(remainingBranchesHelp)
+          }
           if row.commit.isMerge {
             Image(systemName: "arrow.triangle.merge")
               .font(.caption2)
@@ -58,7 +76,38 @@ struct CommitGraphRowView: View {
     if row.commit.isMerge {
       components.insert("Merge commit", at: 0)
     }
+    if !branchLabels.isEmpty {
+      components.append(
+        "Branches: \(branchLabels.map(\.name).joined(separator: ", "))"
+      )
+    }
     return components.joined(separator: ", ")
+  }
+
+  private func branchBadge(_ branchLabel: HistoryBranchLabel) -> some View {
+    Label(
+      branchLabel.name,
+      systemImage: branchLabel.isRemote ? "network" : "arrow.trianglehead.branch"
+    )
+    .font(.caption2)
+    .lineLimit(1)
+    .truncationMode(.middle)
+    .frame(maxWidth: 120)
+    .padding(.horizontal, 4)
+    .padding(.vertical, 1)
+    .foregroundStyle(
+      branchLabel.isCurrent ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary)
+    )
+    .background(.quaternary, in: Capsule())
+    .help(
+      branchLabel.isRemote
+        ? "Remote branch \(branchLabel.name)"
+        : "\(branchLabel.isCurrent ? "Current branch" : "Local branch") \(branchLabel.name)"
+    )
+  }
+
+  private var remainingBranchesHelp: String {
+    branchLabels.dropFirst(2).map(\.name).joined(separator: ", ")
   }
 
   private var graphCanvas: some View {

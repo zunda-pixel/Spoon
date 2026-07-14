@@ -22,7 +22,10 @@ struct HistoryListView: View {
       } else {
         List(selection: $navigation.selectedCommitID) {
           ForEach(model.historyRows) { row in
-            CommitGraphRowView(row: row)
+            CommitGraphRowView(
+              row: row,
+              branchLabels: branchLabelsByTip[row.commit.oid] ?? []
+            )
               .tag(row.id)
               .listRowSeparator(.hidden)
               .contextMenu {
@@ -50,6 +53,39 @@ struct HistoryListView: View {
     .task(id: reference) {
       navigation.selectedCommitID = nil
       await model.loadHistoryIfNeeded(reference: reference)
+      guard !Task.isCancelled, reference != nil else { return }
+      navigation.selectedCommitID = model.historyRows.first?.id
+    }
+  }
+
+  private var branchLabelsByTip: [ObjectID: [HistoryBranchLabel]] {
+    var labelsByTip: [ObjectID: [HistoryBranchLabel]] = [:]
+    for branch in model.branches {
+      labelsByTip[branch.tip, default: []].append(
+        HistoryBranchLabel(
+          name: branch.name,
+          isRemote: false,
+          isCurrent: branch.isCurrent
+        )
+      )
+    }
+    for remote in model.remotes {
+      for branch in model.remoteBranchesByRemote[remote.name] ?? [] {
+        labelsByTip[branch.tip, default: []].append(
+          HistoryBranchLabel(
+            name: branch.name,
+            isRemote: true,
+            isCurrent: false
+          )
+        )
+      }
+    }
+    return labelsByTip.mapValues {
+      $0.sorted {
+        if $0.isCurrent != $1.isCurrent { return $0.isCurrent }
+        if $0.isRemote != $1.isRemote { return !$0.isRemote }
+        return $0.name.localizedStandardCompare($1.name) == .orderedAscending
+      }
     }
   }
 
