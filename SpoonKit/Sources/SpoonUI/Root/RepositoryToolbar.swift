@@ -8,9 +8,6 @@ struct RepositoryToolbar: ToolbarContent {
   let navigation: RepositoryNavigationState
 
   var body: some ToolbarContent {
-    ToolbarItem(placement: .navigation) {
-      branchMenu
-    }
     ToolbarItemGroup {
       Button {
         Task { await model.fetch() }
@@ -91,37 +88,6 @@ struct RepositoryToolbar: ToolbarContent {
       .help("Open the repository directory in Finder")
       .accessibilityHint("Opens the repository directory in Finder")
     }
-  }
-
-  private var branchMenu: some View {
-    Menu {
-      ForEach(model.branches) { branch in
-        Button {
-          Task { await model.switchBranch(branch.name) }
-        } label: {
-          if branch.isCurrent {
-            Label(branch.name, systemImage: "checkmark")
-          } else {
-            Text(branch.name)
-          }
-        }
-        .disabled(branch.isCurrent)
-      }
-      Divider()
-      Button("New Branch…") {
-        navigation.present(.newBranch(startPoint: nil))
-      }
-    } label: {
-      Label(
-        model.currentBranch?.name ?? model.status?.headBranch ?? "detached HEAD",
-        systemImage: "arrow.trianglehead.branch"
-      )
-      .labelStyle(.titleAndIcon)
-    }
-    .disabled(model.isBusy || model.isSequencing)
-    .accessibilityLabel("Current branch")
-    .accessibilityValue(model.currentBranch?.name ?? model.status?.headBranch ?? "Detached HEAD")
-    .accessibilityHint("Choose a branch to switch to or create a new branch")
   }
 
   private func remoteCountLabel(_ title: String, systemImage: String, count: Int?) -> some View {
