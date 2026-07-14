@@ -122,12 +122,57 @@ extension RepositoryModel {
     await perform { try await $0.switchToRemoteBranch(remoteBranch) }
   }
 
-  public func deleteBranch(name: String, force: Bool = false) async {
-    await perform { try await $0.deleteBranch(name: name, force: force) }
+  public func deleteBranch(
+    name: String,
+    force: Bool = false,
+    deleteRemoteUpstream upstream: String? = nil
+  ) async {
+    await perform {
+      try await $0.deleteBranch(name: name, force: force)
+      if let upstream,
+        let (remoteName, remoteBranch) = Self.remoteBranchComponents(of: upstream)
+      {
+        try await $0.deleteRemoteBranch(name: remoteBranch, from: remoteName)
+      }
+    }
   }
 
-  public func renameBranch(from oldName: String, to newName: String) async {
-    await perform { try await $0.renameBranch(from: oldName, to: newName) }
+  public func renameBranch(
+    from oldName: String,
+    to newName: String,
+    renameRemoteUpstream upstream: String? = nil
+  ) async {
+    await perform {
+      try await $0.renameBranch(from: oldName, to: newName)
+      if let upstream,
+        let (remoteName, oldRemoteBranch) = Self.remoteBranchComponents(of: upstream)
+      {
+        try await $0.renameRemoteBranch(
+          remoteName: remoteName,
+          from: oldRemoteBranch,
+          to: newName
+        )
+        try await $0.setUpstream(of: newName, to: "\(remoteName)/\(newName)")
+      }
+    }
+  }
+
+  public func renameRemoteBranch(
+    remoteName: String,
+    from oldName: String,
+    to newName: String
+  ) async {
+    await perform {
+      try await $0.renameRemoteBranch(
+        remoteName: remoteName,
+        from: oldName,
+        to: newName
+      )
+    }
+  }
+
+  public func deleteRemoteBranch(name: String, from remoteName: String) async {
+    await perform { try await $0.deleteRemoteBranch(name: name, from: remoteName) }
   }
 
   public func worktree(for branch: Branch) -> Worktree? {
@@ -136,6 +181,20 @@ extension RepositoryModel {
 
   public func addWorktree(path: URL, branch: String) async {
     await perform { try await $0.addWorktree(path: path, branch: branch) }
+  }
+
+  public func addWorktree(
+    path: URL,
+    remoteBranch: String,
+    localBranch: String
+  ) async {
+    await perform {
+      try await $0.addWorktree(
+        path: path,
+        remoteBranch: remoteBranch,
+        localBranch: localBranch
+      )
+    }
   }
 
   public func removeWorktree(path: URL, force: Bool = false) async {
@@ -191,6 +250,16 @@ extension RepositoryModel {
 
   public func stashDiffs(_ stash: Stash) async throws -> [FileDiff] {
     try await gitClient.stashDiffs(stash)
+  }
+
+  private static func remoteBranchComponents(
+    of upstream: String
+  ) -> (remoteName: String, branchName: String)? {
+    guard let separator = upstream.firstIndex(of: "/") else { return nil }
+    let remoteName = String(upstream[..<separator])
+    let branchName = String(upstream[upstream.index(after: separator)...])
+    guard !remoteName.isEmpty, !branchName.isEmpty else { return nil }
+    return (remoteName, branchName)
   }
 
   @discardableResult

@@ -9,6 +9,7 @@ struct RepoSidebarView: View {
   @State private var removingRemote: Remote?
   @State private var removingWorktree: Worktree?
   @State private var deletingBranch: Branch?
+  @State private var deletingRemoteBranch: RemoteBranchSelection?
   @State private var deletingTag: Tag?
   @State private var deletingRemoteTag: RemoteTagSelection?
   @State private var switchWorktreeErrorMessage: String?
@@ -29,7 +30,11 @@ struct RepoSidebarView: View {
       RemotesSidebarSection(
         model: model,
         navigation: navigation,
-        removingRemote: $removingRemote
+        removingRemote: $removingRemote,
+        removingWorktree: $removingWorktree,
+        deletingRemoteBranch: $deletingRemoteBranch,
+        searchText: searchText,
+        openWorktree: openWorktree
       )
       TagsSidebarSection(
         model: model,
@@ -42,8 +47,11 @@ struct RepoSidebarView: View {
     .searchable(
       text: $searchText,
       placement: .sidebar,
-      prompt: "Search branches, stashes, and tags"
+      prompt: "Search branches, remotes, stashes, and tags"
     )
+    .sheet(item: $deletingBranch) { branch in
+      DeleteBranchSheet(model: model, branch: branch)
+    }
     .confirmationDialog(
       "Remove remote “\(removingRemote?.name ?? "")”?",
       isPresented: binding(for: $removingRemote)
@@ -97,19 +105,20 @@ struct RepoSidebarView: View {
       Text("The local tag will be kept.")
     }
     .confirmationDialog(
-      "Delete branch “\(deletingBranch?.name ?? "")”?",
-      isPresented: binding(for: $deletingBranch)
+      "Delete remote branch “\(deletingRemoteBranch?.fullName ?? "")”?",
+      isPresented: binding(for: $deletingRemoteBranch)
     ) {
-      Button("Delete", role: .destructive) {
-        guard let branch = deletingBranch else { return }
-        Task { await model.deleteBranch(name: branch.name, force: false) }
-      }
-      Button("Force Delete", role: .destructive) {
-        guard let branch = deletingBranch else { return }
-        Task { await model.deleteBranch(name: branch.name, force: true) }
+      Button("Delete from Remote", role: .destructive) {
+        guard let selection = deletingRemoteBranch else { return }
+        Task {
+          await model.deleteRemoteBranch(
+            name: selection.localName,
+            from: selection.remote.name
+          )
+        }
       }
     } message: {
-      Text("Delete refuses branches that are not fully merged; Force Delete removes them anyway.")
+      Text("The remote branch will be permanently deleted. A matching local branch is not affected.")
     }
     .alert(
       "Could Not Switch Worktree",

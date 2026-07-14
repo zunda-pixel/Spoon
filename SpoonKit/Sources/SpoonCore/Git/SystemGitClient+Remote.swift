@@ -31,6 +31,29 @@ extension SystemGitClient {
     try await runVoid(["remote", "remove", name])
   }
 
+  public func renameRemoteBranch(
+    remoteName: String,
+    from oldName: String,
+    to newName: String
+  ) async throws {
+    try await runVoid(
+      [
+        "push",
+        remoteName,
+        "refs/remotes/\(remoteName)/\(oldName):refs/heads/\(newName)",
+      ],
+      timeout: .seconds(300)
+    )
+    try await deleteRemoteBranch(name: oldName, from: remoteName)
+  }
+
+  public func deleteRemoteBranch(name: String, from remoteName: String) async throws {
+    try await runVoid(
+      ["push", remoteName, "--delete", name],
+      timeout: .seconds(300)
+    )
+  }
+
   public func fetch() async throws {
     try await runVoid(["fetch", "--all", "--prune"], timeout: .seconds(300))
   }

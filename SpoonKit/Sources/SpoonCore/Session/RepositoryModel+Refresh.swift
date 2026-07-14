@@ -5,6 +5,7 @@ public struct RepositoryGitSnapshot: Sendable, Hashable {
   public var status: WorkingTreeStatus
   public var branches: [Branch]
   public var remotes: [Remote]
+  public var remoteBranchesByRemote: [String: [Branch]]
   public var stashes: [Stash]
   public var tags: [Tag]
   public var worktrees: [Worktree]
@@ -15,6 +16,7 @@ public struct RepositoryGitSnapshot: Sendable, Hashable {
     status: WorkingTreeStatus,
     branches: [Branch],
     remotes: [Remote],
+    remoteBranchesByRemote: [String: [Branch]],
     stashes: [Stash],
     tags: [Tag],
     worktrees: [Worktree],
@@ -24,6 +26,7 @@ public struct RepositoryGitSnapshot: Sendable, Hashable {
     self.status = status
     self.branches = branches
     self.remotes = remotes
+    self.remoteBranchesByRemote = remoteBranchesByRemote
     self.stashes = stashes
     self.tags = tags
     self.worktrees = worktrees
@@ -41,16 +44,45 @@ public struct RepositoryGitSnapshot: Sendable, Hashable {
     async let sequencerState = gitClient.sequencerState()
     async let supportsBackfill = gitClient.supportsBackfill()
 
+    let loadedRemotes = try await remotes
+    let remoteBranchesByRemote = try await loadRemoteBranches(
+      for: loadedRemotes,
+      from: gitClient
+    )
+
     return try await Self(
       status: status,
       branches: branches,
-      remotes: remotes,
+      remotes: loadedRemotes,
+      remoteBranchesByRemote: remoteBranchesByRemote,
       stashes: stashes,
       tags: tags,
       worktrees: worktrees,
       sequencerState: sequencerState,
       supportsBackfill: supportsBackfill
     )
+  }
+
+  private static func loadRemoteBranches(
+    for remotes: [Remote],
+    from gitClient: any GitClient
+  ) async throws -> [String: [Branch]] {
+    try await withThrowingTaskGroup(
+      of: (String, [Branch]).self,
+      returning: [String: [Branch]].self
+    ) { group in
+      for remote in remotes {
+        group.addTask {
+          (remote.name, try await gitClient.remoteBranches(of: remote.name))
+        }
+      }
+
+      var branchesByRemote: [String: [Branch]] = [:]
+      for try await (remoteName, branches) in group {
+        branchesByRemote[remoteName] = branches
+      }
+      return branchesByRemote
+    }
   }
 }
 
@@ -98,6 +130,7 @@ extension RepositoryModel {
     changeTrees = ChangeTrees(status: snapshot.status)
     branches = snapshot.branches
     remotes = snapshot.remotes
+    remoteBranchesByRemote = snapshot.remoteBranchesByRemote
     stashes = snapshot.stashes
     tags = snapshot.tags
     worktrees = snapshot.worktrees

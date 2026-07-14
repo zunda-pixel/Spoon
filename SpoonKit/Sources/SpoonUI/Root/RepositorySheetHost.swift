@@ -23,8 +23,12 @@ struct RepositorySheetHost: ViewModifier {
         AddRemoteSheet(model: model)
       case .addWorktree(let branch):
         AddWorktreeSheet(model: model, branch: branch)
+      case .addRemoteWorktree(let selection):
+        AddRemoteBranchWorktreeSheet(model: model, selection: selection)
       case .renameBranch(let branch):
         RenameBranchSheet(model: model, branch: branch)
+      case .renameRemoteBranch(let selection):
+        RenameRemoteBranchSheet(model: model, selection: selection)
       case .mergeBranch(let branch):
         MergeSheet(model: model, branch: branch)
       case .rebase(let commit):

@@ -181,6 +181,7 @@ struct RepositorySplitView: View {
     case .history: "History"
     case .reflog: "Reflog"
     case .branch(let name): name
+    case .remoteBranch(_, let branch): branch
     case .pullRequests: "Pull Requests"
     case .remote(let name): name
     case .stash(let index): "stash@{\(index)}"

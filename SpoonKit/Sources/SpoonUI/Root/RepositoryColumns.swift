@@ -14,6 +14,8 @@ struct RepositoryContentColumn: View {
       HistoryListView(model: model, reference: nil, navigation: navigation)
     case .branch(let name):
       HistoryListView(model: model, reference: name, navigation: navigation)
+    case .remoteBranch(_, let branch):
+      HistoryListView(model: model, reference: branch, navigation: navigation)
     case .reflog:
       ReflogView(model: model, navigation: navigation)
     case .pullRequests:
@@ -35,7 +37,7 @@ struct RepositoryDetailColumn: View {
     switch navigation.sidebarSelection {
     case .changes, nil:
       changeDetail
-    case .history, .branch:
+    case .history, .branch, .remoteBranch:
       if let selectedCommitID = navigation.selectedCommitID,
         let oid = ObjectID(rawValue: selectedCommitID)
       {

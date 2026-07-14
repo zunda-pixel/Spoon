@@ -13,6 +13,17 @@ extension SystemGitClient {
     try await runVoid(["worktree", "add", path.path, branch], timeout: .seconds(120))
   }
 
+  public func addWorktree(
+    path: URL,
+    remoteBranch: String,
+    localBranch: String
+  ) async throws {
+    try await runVoid(
+      ["worktree", "add", "--track", "-b", localBranch, path.path, remoteBranch],
+      timeout: .seconds(120)
+    )
+  }
+
   public func removeWorktree(path: URL, force: Bool) async throws {
     var arguments = ["worktree", "remove"]
     if force {

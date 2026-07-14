@@ -283,6 +283,7 @@ struct SystemGitClientTests {
   @Test func mergeSendsExactArgv() async throws {
     let runner = FakeCommandRunner()
     runner.stub(arguments: baseFlags + ["merge", "--no-edit", "feature"])
+    runner.stub(arguments: baseFlags + ["merge", "--no-edit", "origin/feature"])
     runner.stub(arguments: baseFlags + ["merge", "--squash", "feature"])
     runner.stub(arguments: baseFlags + ["merge", "--ff-only", "feature"])
     runner.stub(
@@ -293,6 +294,7 @@ struct SystemGitClientTests {
     )
     let client = makeClient(runner)
     try await client.merge(branch: "feature", options: .standard)
+    try await client.merge(branch: "origin/feature", options: .standard)
     try await client.merge(
       branch: "feature",
       options: MergeOptions(commitMode: .squash)
@@ -309,7 +311,7 @@ struct SystemGitClientTests {
         conflictPreference: .theirs
       )
     )
-    #expect(runner.invocations.count == 4)
+    #expect(runner.invocations.count == 5)
   }
 
   @Test func mergeSequencerControlsSendExactArgv() async throws {
@@ -367,8 +369,37 @@ struct SystemGitClientTests {
   @Test func renameBranchSendsExactArgv() async throws {
     let runner = FakeCommandRunner()
     runner.stub(arguments: baseFlags + ["branch", "-m", "old-name", "new-name"])
-    try await makeClient(runner).renameBranch(from: "old-name", to: "new-name")
-    #expect(runner.invocations.count == 1)
+    runner.stub(
+      arguments: baseFlags + [
+        "branch", "--set-upstream-to", "origin/new-name", "new-name",
+      ]
+    )
+    let client = makeClient(runner)
+    try await client.renameBranch(from: "old-name", to: "new-name")
+    try await client.setUpstream(of: "new-name", to: "origin/new-name")
+    #expect(runner.invocations.count == 2)
+  }
+
+  @Test func remoteBranchMutationsSendExactArgv() async throws {
+    let runner = FakeCommandRunner()
+    runner.stub(
+      arguments: baseFlags + [
+        "push", "origin",
+        "refs/remotes/origin/feature/old:refs/heads/feature/new",
+      ]
+    )
+    runner.stub(arguments: baseFlags + ["push", "origin", "--delete", "feature/old"])
+    runner.stub(arguments: baseFlags + ["push", "upstream", "--delete", "obsolete"])
+    let client = makeClient(runner)
+
+    try await client.renameRemoteBranch(
+      remoteName: "origin",
+      from: "feature/old",
+      to: "feature/new"
+    )
+    try await client.deleteRemoteBranch(name: "obsolete", from: "upstream")
+
+    #expect(runner.invocations.count == 3)
   }
 
   @Test func worktreeOperationsSendExactArgv() async throws {
@@ -378,6 +409,11 @@ struct SystemGitClientTests {
       stdout: "worktree /tmp/fake-repo\nHEAD 1234abcd\nbranch refs/heads/main\n\n"
     )
     runner.stub(arguments: baseFlags + ["worktree", "add", "/tmp/wt", "feature"])
+    runner.stub(
+      arguments: baseFlags + [
+        "worktree", "add", "--track", "-b", "topic", "/tmp/remote-wt", "origin/topic",
+      ]
+    )
     runner.stub(arguments: baseFlags + ["worktree", "remove", "/tmp/wt"])
     runner.stub(arguments: baseFlags + ["worktree", "remove", "--force", "/tmp/wt"])
 
@@ -385,9 +421,14 @@ struct SystemGitClientTests {
     let worktrees = try await client.worktrees()
     #expect(worktrees.map(\.branch) == ["main"])
     try await client.addWorktree(path: URL(filePath: "/tmp/wt"), branch: "feature")
+    try await client.addWorktree(
+      path: URL(filePath: "/tmp/remote-wt"),
+      remoteBranch: "origin/topic",
+      localBranch: "topic"
+    )
     try await client.removeWorktree(path: URL(filePath: "/tmp/wt"), force: false)
     try await client.removeWorktree(path: URL(filePath: "/tmp/wt"), force: true)
-    #expect(runner.invocations.count == 4)
+    #expect(runner.invocations.count == 5)
   }
 
   @Test func sparseCheckoutOperationsSendExactArgv() async throws {

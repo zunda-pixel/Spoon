@@ -47,6 +47,10 @@ extension SystemGitClient {
     try await runVoid(["branch", "-m", oldName, newName])
   }
 
+  public func setUpstream(of branch: String, to upstream: String) async throws {
+    try await runVoid(["branch", "--set-upstream-to", upstream, branch])
+  }
+
   public func defaultBranch() async throws -> String {
     if let result = try? await run(["symbolic-ref", "--short", "refs/remotes/origin/HEAD"]) {
       let name = result.standardOutputText.trimmingCharacters(in: .whitespacesAndNewlines)

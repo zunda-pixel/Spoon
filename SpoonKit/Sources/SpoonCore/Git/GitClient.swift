@@ -46,6 +46,7 @@ public protocol GitBranchClient: Sendable {
   func merge(branch: String, options: MergeOptions) async throws
   func deleteBranch(name: String, force: Bool) async throws
   func renameBranch(from oldName: String, to newName: String) async throws
+  func setUpstream(of branch: String, to upstream: String) async throws
   func defaultBranch() async throws -> String
 }
 
@@ -57,6 +58,14 @@ public protocol GitRemoteClient: Sendable {
   func addRemote(name: String, url: String) async throws
   func setRemoteURL(name: String, fetchURL: String, pushURL: String?) async throws
   func removeRemote(name: String) async throws
+  /// Pushes the existing remote-tracking ref under a new name, then deletes the old ref.
+  /// This is intentionally non-atomic: a delete failure leaves both remote refs.
+  func renameRemoteBranch(
+    remoteName: String,
+    from oldName: String,
+    to newName: String
+  ) async throws
+  func deleteRemoteBranch(name: String, from remoteName: String) async throws
   func fetch() async throws
   /// Whether the installed git provides `git backfill` (2.49+).
   func supportsBackfill() async -> Bool
@@ -83,6 +92,8 @@ public protocol GitWorktreeClient: Sendable {
   func worktrees() async throws -> [Worktree]
   /// Creates a linked worktree at `path` checked out to existing `branch`.
   func addWorktree(path: URL, branch: String) async throws
+  /// Creates a local tracking branch and checks it out in a linked worktree.
+  func addWorktree(path: URL, remoteBranch: String, localBranch: String) async throws
   /// Removes a linked worktree (`--force` discards its local changes).
   func removeWorktree(path: URL, force: Bool) async throws
 }

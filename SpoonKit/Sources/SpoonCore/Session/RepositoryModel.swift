@@ -11,6 +11,7 @@ public final class RepositoryModel {
   public internal(set) var changeTrees = ChangeTrees.empty
   public internal(set) var branches: [Branch] = []
   public internal(set) var remotes: [Remote] = []
+  public internal(set) var remoteBranchesByRemote: [String: [Branch]] = [:]
   public internal(set) var stashes: [Stash] = []
   public internal(set) var tags: [Tag] = []
   public internal(set) var worktrees: [Worktree] = []

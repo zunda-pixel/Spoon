@@ -6,6 +6,7 @@ enum SidebarItem: Hashable {
   case history
   case reflog
   case branch(String)
+  case remoteBranch(remote: String, branch: String)
   case pullRequests
   case remote(String)
   case stash(Int)
@@ -20,7 +21,9 @@ final class RepositoryNavigationState {
     case fileHistory(path: String)
     case addRemote
     case addWorktree(Branch)
+    case addRemoteWorktree(RemoteBranchSelection)
     case renameBranch(Branch)
+    case renameRemoteBranch(RemoteBranchSelection)
     case mergeBranch(Branch)
     case rebase(Commit)
     case tag(Commit)
@@ -39,8 +42,12 @@ final class RepositoryNavigationState {
         "add-remote"
       case .addWorktree(let branch):
         "add-worktree:\(branch.id)"
+      case .addRemoteWorktree(let selection):
+        "add-remote-worktree:\(selection.id)"
       case .renameBranch(let branch):
         "rename-branch:\(branch.id)"
+      case .renameRemoteBranch(let selection):
+        "rename-remote-branch:\(selection.id)"
       case .mergeBranch(let branch):
         "merge-branch:\(branch.id)"
       case .rebase(let commit):

@@ -72,6 +72,91 @@ struct RepositoryModelTests {
     #expect(model.status?.untrackedEntries.isEmpty == true)
   }
 
+  @Test func remoteBranchesRefreshAtomicallyWithRepositoryState() async {
+    let client = FakeRepositoryGitClient()
+    let originalOID = makeOID("23232323")
+    let originalRemoteBranch = makeBranch(
+      "origin/main",
+      oid: originalOID,
+      isCurrent: false
+    )
+    await client.configure(
+      status: makeStatus(oid: originalOID, branch: "main"),
+      branches: [makeBranch("main", oid: originalOID, isCurrent: true)],
+      remotes: [Remote(name: "origin", fetchURL: "https://example.com/repo.git")],
+      remoteBranchesByRemote: ["origin": [originalRemoteBranch]]
+    )
+    let model = makeModel(client)
+
+    await model.refreshGitState()
+
+    #expect(model.remoteBranchesByRemote["origin"] == [originalRemoteBranch])
+
+    let replacementOID = makeOID("24242424")
+    await client.configure(
+      status: makeStatus(oid: replacementOID, branch: "replacement"),
+      branches: [makeBranch("replacement", oid: replacementOID, isCurrent: true)],
+      remotes: [Remote(name: "origin", fetchURL: "https://example.com/repo.git")],
+      remoteBranchesByRemote: [
+        "origin": [makeBranch("origin/replacement", oid: replacementOID, isCurrent: false)]
+      ],
+      failRemoteBranches: true
+    )
+
+    await model.refreshGitState()
+
+    #expect(model.status?.headOID == originalOID)
+    #expect(model.remoteBranchesByRemote["origin"] == [originalRemoteBranch])
+    #expect(model.lastErrorMessage == FakeRepositoryGitClient.Failure.refresh.localizedDescription)
+  }
+
+  @Test func localRenameCanRenameItsRemoteUpstream() async {
+    let client = FakeRepositoryGitClient()
+    let oid = makeOID("25252525")
+    await client.configure(
+      status: makeStatus(oid: oid, branch: "old"),
+      branches: [makeBranch("old", oid: oid, isCurrent: true, upstream: "origin/old")]
+    )
+    let model = makeModel(client)
+
+    await model.renameBranch(
+      from: "old",
+      to: "new",
+      renameRemoteUpstream: "origin/old"
+    )
+
+    #expect(
+      await client.mutationCalls == [
+        "rename-local:old:new",
+        "rename-remote:origin:old:new",
+        "upstream:new:origin/new",
+      ]
+    )
+  }
+
+  @Test func localDeleteCanDeleteItsRemoteUpstream() async {
+    let client = FakeRepositoryGitClient()
+    let oid = makeOID("26262626")
+    await client.configure(
+      status: makeStatus(oid: oid, branch: "main"),
+      branches: [makeBranch("topic", oid: oid, isCurrent: false, upstream: "origin/topic")]
+    )
+    let model = makeModel(client)
+
+    await model.deleteBranch(
+      name: "topic",
+      force: true,
+      deleteRemoteUpstream: "origin/topic"
+    )
+
+    #expect(
+      await client.mutationCalls == [
+        "delete-local:topic:true",
+        "delete-remote:origin:topic",
+      ]
+    )
+  }
+
   @Test func historyLoadsSubsequentPages() async {
     let client = FakeRepositoryGitClient()
     let head = makeOID("33333333")
@@ -151,13 +236,18 @@ struct RepositoryModelTests {
     WorkingTreeStatus(headOID: oid, headBranch: branch)
   }
 
-  private func makeBranch(_ name: String, oid: ObjectID, isCurrent: Bool) -> Branch {
+  private func makeBranch(
+    _ name: String,
+    oid: ObjectID,
+    isCurrent: Bool,
+    upstream: String? = nil
+  ) -> Branch {
     Branch(
       name: name,
       isCurrent: isCurrent,
       tip: oid,
       subject: name,
-      upstream: nil,
+      upstream: upstream,
       ahead: nil,
       behind: nil,
       committedAt: nil
@@ -198,21 +288,31 @@ private actor FakeRepositoryGitClient: GitClient {
 
   private var currentStatus = WorkingTreeStatus()
   private var currentBranches: [Branch] = []
+  private var currentRemotes: [Remote] = []
+  private var currentRemoteBranchesByRemote: [String: [Branch]] = [:]
   private var pages: [Int: LogPage] = [:]
   private var shouldFailBranches = false
+  private var shouldFailRemoteBranches = false
   private(set) var stageCallCount = 0
   private(set) var logQueries: [LogQuery] = []
+  private(set) var mutationCalls: [String] = []
 
   func configure(
     status: WorkingTreeStatus,
     branches: [Branch],
+    remotes: [Remote] = [],
+    remoteBranchesByRemote: [String: [Branch]] = [:],
     logPages: [Int: LogPage] = [:],
-    failBranches: Bool = false
+    failBranches: Bool = false,
+    failRemoteBranches: Bool = false
   ) {
     currentStatus = status
     currentBranches = branches
+    currentRemotes = remotes
+    currentRemoteBranchesByRemote = remoteBranchesByRemote
     pages = logPages
     shouldFailBranches = failBranches
+    shouldFailRemoteBranches = failRemoteBranches
   }
 
   func status() async throws -> WorkingTreeStatus { currentStatus }
@@ -222,7 +322,7 @@ private actor FakeRepositoryGitClient: GitClient {
     return currentBranches
   }
 
-  func remotes() async throws -> [Remote] { [] }
+  func remotes() async throws -> [Remote] { currentRemotes }
   func stashes() async throws -> [Stash] { [] }
   func tags() async throws -> [SpoonCore.Tag] { [] }
   func worktrees() async throws -> [Worktree] { [] }
@@ -268,17 +368,35 @@ private actor FakeRepositoryGitClient: GitClient {
   }
   func switchToRemoteBranch(_ remoteBranch: String) async throws { throw Failure.unimplemented }
   func merge(branch: String, options: MergeOptions) async throws { throw Failure.unimplemented }
-  func deleteBranch(name: String, force: Bool) async throws { throw Failure.unimplemented }
+  func deleteBranch(name: String, force: Bool) async throws {
+    mutationCalls.append("delete-local:\(name):\(force)")
+  }
   func renameBranch(from oldName: String, to newName: String) async throws {
-    throw Failure.unimplemented
+    mutationCalls.append("rename-local:\(oldName):\(newName)")
+  }
+  func setUpstream(of branch: String, to upstream: String) async throws {
+    mutationCalls.append("upstream:\(branch):\(upstream)")
   }
   func defaultBranch() async throws -> String { "main" }
-  func remoteBranches(of remoteName: String) async throws -> [Branch] { [] }
+  func remoteBranches(of remoteName: String) async throws -> [Branch] {
+    if shouldFailRemoteBranches { throw Failure.refresh }
+    return currentRemoteBranchesByRemote[remoteName] ?? []
+  }
   func addRemote(name: String, url: String) async throws { throw Failure.unimplemented }
   func setRemoteURL(name: String, fetchURL: String, pushURL: String?) async throws {
     throw Failure.unimplemented
   }
   func removeRemote(name: String) async throws { throw Failure.unimplemented }
+  func renameRemoteBranch(
+    remoteName: String,
+    from oldName: String,
+    to newName: String
+  ) async throws {
+    mutationCalls.append("rename-remote:\(remoteName):\(oldName):\(newName)")
+  }
+  func deleteRemoteBranch(name: String, from remoteName: String) async throws {
+    mutationCalls.append("delete-remote:\(remoteName):\(name)")
+  }
   func fetch() async throws { throw Failure.unimplemented }
   func backfill() async throws { throw Failure.unimplemented }
   func pull() async throws { throw Failure.unimplemented }
@@ -293,6 +411,13 @@ private actor FakeRepositoryGitClient: GitClient {
     throw Failure.unimplemented
   }
   func addWorktree(path: URL, branch: String) async throws { throw Failure.unimplemented }
+  func addWorktree(
+    path: URL,
+    remoteBranch: String,
+    localBranch: String
+  ) async throws {
+    throw Failure.unimplemented
+  }
   func removeWorktree(path: URL, force: Bool) async throws { throw Failure.unimplemented }
   func sparseCheckoutPaths() async throws -> [String]? { nil }
   func setSparseCheckout(paths: [String]) async throws { throw Failure.unimplemented }
