@@ -14,18 +14,34 @@ final class HistoryStore {
   private var loadedCommits: [Commit] = []
   private var nextHistoryQuery: LogQuery?
   private var additionalRevisions: [ObjectID] = []
+  private var hiddenCommitOIDs: Set<ObjectID> = []
 
   init(gitClient: any GitClient) {
     self.gitClient = gitClient
   }
 
-  func loadIfNeeded(additionalRevisions: [ObjectID], canLoadHistory: Bool) async {
+  func loadIfNeeded(
+    additionalRevisions: [ObjectID],
+    hiddenCommitOIDs: Set<ObjectID>,
+    canLoadHistory: Bool
+  ) async {
     guard !isLoadingHistory else { return }
-    guard historyRows.isEmpty || self.additionalRevisions != additionalRevisions else { return }
-    await reload(additionalRevisions: additionalRevisions, canLoadHistory: canLoadHistory)
+    guard
+      historyRows.isEmpty || self.additionalRevisions != additionalRevisions
+        || self.hiddenCommitOIDs != hiddenCommitOIDs
+    else { return }
+    await reload(
+      additionalRevisions: additionalRevisions,
+      hiddenCommitOIDs: hiddenCommitOIDs,
+      canLoadHistory: canLoadHistory
+    )
   }
 
-  func reload(additionalRevisions: [ObjectID], canLoadHistory: Bool) async {
+  func reload(
+    additionalRevisions: [ObjectID],
+    hiddenCommitOIDs: Set<ObjectID>,
+    canLoadHistory: Bool
+  ) async {
     guard await waitUntilIdle() else { return }
     guard canLoadHistory else {
       historyRows = []
@@ -33,11 +49,13 @@ final class HistoryStore {
       hasMoreHistory = false
       nextHistoryQuery = nil
       self.additionalRevisions = additionalRevisions
+      self.hiddenCommitOIDs = hiddenCommitOIDs
       errorMessage = nil
       return
     }
     loadedCommits = []
     self.additionalRevisions = additionalRevisions
+    self.hiddenCommitOIDs = hiddenCommitOIDs
     nextHistoryQuery = LogQuery(
       allReferences: true,
       additionalRevisions: additionalRevisions
@@ -82,18 +100,29 @@ final class HistoryStore {
 
   @discardableResult
   private func loadMore(replacing: Bool) async -> Bool {
-    guard let query = nextHistoryQuery, !isLoadingHistory else { return false }
+    guard nextHistoryQuery != nil, !isLoadingHistory else { return false }
     isLoadingHistory = true
     defer { isLoadingHistory = false }
     do {
-      let page = try await gitClient.log(query)
-      guard !Task.isCancelled else { return false }
-      loadedCommits.append(contentsOf: page.commits)
-      hasMoreHistory = page.hasMore
-      nextHistoryQuery = page.hasMore ? query.next() : nil
-      historyRows = CommitGraphLayout.assignLanes(loadedCommits)
-      errorMessage = nil
-      return true
+      while let query = nextHistoryQuery {
+        let page = try await gitClient.log(query)
+        guard !Task.isCancelled else { return false }
+        hasMoreHistory = page.hasMore
+        nextHistoryQuery = page.hasMore ? query.next() : nil
+        let visibleCommits = page.commits.compactMap { commit -> Commit? in
+          guard !hiddenCommitOIDs.contains(commit.oid) else { return nil }
+          var commit = commit
+          commit.parents.removeAll(where: hiddenCommitOIDs.contains)
+          return commit
+        }
+        loadedCommits.append(contentsOf: visibleCommits)
+        if !visibleCommits.isEmpty || !page.hasMore {
+          historyRows = CommitGraphLayout.assignLanes(loadedCommits)
+          errorMessage = nil
+          return true
+        }
+      }
+      return false
     } catch is CancellationError {
       return false
     } catch {

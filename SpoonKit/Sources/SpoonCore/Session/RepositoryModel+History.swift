@@ -7,6 +7,7 @@ extension RepositoryModel {
   public func loadHistoryIfNeeded() async {
     await historyStore.loadIfNeeded(
       additionalRevisions: detachedWorktreeHeads,
+      hiddenCommitOIDs: stashHelperCommitOIDs,
       canLoadHistory: canLoadUnifiedHistory
     )
     adoptHistoryError()
@@ -15,6 +16,7 @@ extension RepositoryModel {
   public func reloadHistory() async {
     await historyStore.reload(
       additionalRevisions: detachedWorktreeHeads,
+      hiddenCommitOIDs: stashHelperCommitOIDs,
       canLoadHistory: canLoadUnifiedHistory
     )
     adoptHistoryError()
@@ -63,6 +65,10 @@ extension RepositoryModel {
       || !tags.isEmpty
       || !stashes.isEmpty
       || !detachedWorktreeHeads.isEmpty
+  }
+
+  private var stashHelperCommitOIDs: Set<ObjectID> {
+    Set(stashes.flatMap(\.helperCommitOIDs))
   }
 
   private func adoptHistoryError() {

@@ -266,6 +266,51 @@ struct RepositoryModelTests {
     #expect(!model.hasMoreHistory)
   }
 
+  @Test func historyHidesStashHelperCommitsAndSkipsEmptyVisiblePages() async {
+    let client = FakeRepositoryGitClient()
+    let head = makeOID("11111111")
+    let stashOID = makeOID("22222222")
+    let indexOID = makeOID("33333333")
+    let stashCommit = Commit(
+      oid: stashOID,
+      parents: [head, indexOID],
+      subject: "On main: work",
+      authorName: "Tester",
+      authorEmail: "tester@example.com",
+      authoredAt: .distantPast,
+      committedAt: .distantPast
+    )
+    await client.configure(
+      status: makeStatus(oid: head, branch: "main"),
+      branches: [makeBranch("main", oid: head, isCurrent: true)],
+      stashes: [
+        Stash(
+          index: 0,
+          target: stashOID,
+          helperCommitOIDs: [indexOID],
+          message: "On main: work"
+        )
+      ],
+      logPages: [
+        0: LogPage(commits: [stashCommit], hasMore: true),
+        500: LogPage(
+          commits: [makeCommit("33333333", subject: "index on main")],
+          hasMore: true
+        ),
+        1000: LogPage(commits: [makeCommit("11111111", subject: "base")], hasMore: false),
+      ]
+    )
+    let model = makeModel(client)
+    await model.refresh()
+
+    await model.loadHistoryIfNeeded()
+    await model.loadMoreHistory()
+
+    #expect(model.historyRows.map(\.commit.oid) == [stashOID, head])
+    #expect(model.historyRows.first?.commit.parents == [head])
+    #expect(await client.logQueries.map(\.skip) == [0, 500, 1000])
+  }
+
   @Test func referenceCompatibilityLoadDoesNotReloadUnifiedHistory() async {
     let client = FakeRepositoryGitClient()
     let head = makeOID("45454545")
@@ -666,6 +711,7 @@ private actor FakeRepositoryGitClient: GitClient {
   private var currentBranches: [Branch] = []
   private var currentRemotes: [Remote] = []
   private var currentRemoteBranchesByRemote: [String: [Branch]] = [:]
+  private var currentStashes: [Stash] = []
   private var currentWorktrees: [Worktree] = []
   private var pages: [Int: LogPage] = [:]
   private var logDelays: [Int: Duration] = [:]
@@ -682,6 +728,7 @@ private actor FakeRepositoryGitClient: GitClient {
     branches: [Branch],
     remotes: [Remote] = [],
     remoteBranchesByRemote: [String: [Branch]] = [:],
+    stashes: [Stash] = [],
     worktrees: [Worktree] = [],
     logPages: [Int: LogPage] = [:],
     logDelays: [Int: Duration] = [:],
@@ -694,6 +741,7 @@ private actor FakeRepositoryGitClient: GitClient {
     currentBranches = branches
     currentRemotes = remotes
     currentRemoteBranchesByRemote = remoteBranchesByRemote
+    currentStashes = stashes
     currentWorktrees = worktrees
     pages = logPages
     self.logDelays = logDelays
@@ -711,7 +759,7 @@ private actor FakeRepositoryGitClient: GitClient {
   }
 
   func remotes() async throws -> [Remote] { currentRemotes }
-  func stashes() async throws -> [Stash] { [] }
+  func stashes() async throws -> [Stash] { currentStashes }
   func tags() async throws -> [SpoonCore.Tag] { [] }
   func worktrees() async throws -> [Worktree] { currentWorktrees }
   func sequencerState() async throws -> SequencerState? { nil }

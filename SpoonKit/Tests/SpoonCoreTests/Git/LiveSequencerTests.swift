@@ -447,8 +447,10 @@ struct LiveSequencerTests {
 
     try Data("stashed\n".utf8).write(to: root.appending(path: "base.txt"))
     try await client.saveStash(message: "history stash", includeUntracked: false)
-    let stashTip = try #require(try await client.stashes().first?.target)
+    let stash = try #require(try await client.stashes().first)
+    let stashTip = stash.target
     #expect([40, 64].contains(stashTip.rawValue.count))
+    #expect(stash.helperCommitOIDs.count == 1)
 
     try await arrange(["switch", "-c", "detached-source"], in: root)
     try await commitFile("detached.txt", "detached\n", message: "detached-only", in: root)

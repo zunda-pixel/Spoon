@@ -642,9 +642,10 @@ struct SystemGitClientTests {
     let runner = FakeCommandRunner()
     runner.stub(
       arguments: baseFlags + [
-        "stash", "list", "-z", "--format=%H%x1f%gd%x1f%gs",
+        "stash", "list", "-z", "--format=%H%x1f%P%x1f%gd%x1f%gs",
       ],
-      stdout: "aaaa1111\u{1f}stash@{0}\u{1f}On main: useful\u{0}"
+      stdout:
+        "aaaa1111\u{1f}11111111 bbbb2222 cccc3333\u{1f}stash@{0}\u{1f}On main: useful\u{0}"
     )
 
     let stashes = try await makeClient(runner).stashes()
@@ -652,6 +653,7 @@ struct SystemGitClientTests {
     #expect(stashes.count == 1)
     #expect(stashes[0].index == 0)
     #expect(stashes[0].target.rawValue == "aaaa1111")
+    #expect(stashes[0].helperCommitOIDs.map(\.rawValue) == ["bbbb2222", "cccc3333"])
     #expect(stashes[0].message == "On main: useful")
   }
 
