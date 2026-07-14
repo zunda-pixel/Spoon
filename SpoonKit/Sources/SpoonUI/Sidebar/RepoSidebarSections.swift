@@ -85,7 +85,7 @@ private struct BranchTreeNode: Identifiable {
         into: &nodes
       )
     }
-    return nodes
+    return nodes.filter { $0.branch != nil } + nodes.filter { $0.branch == nil }
   }
 
   static func folderPaths(in branchName: String) -> Set<String> {
@@ -225,8 +225,10 @@ private struct BranchContextMenu: View {
     Divider()
     if let worktree {
       Button("Open Worktree") { openWorktree(worktree) }
-      Button("Remove Worktree…", role: .destructive) { removingWorktree = worktree }
-        .disabled(model.isBusy)
+      if !worktree.isMain {
+        Button("Remove Worktree…", role: .destructive) { removingWorktree = worktree }
+          .disabled(model.isBusy)
+      }
     } else if !branch.isCurrent {
       Button("Add Worktree…") { navigation.present(.addWorktree(branch)) }
         .disabled(model.isBusy)

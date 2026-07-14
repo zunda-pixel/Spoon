@@ -125,7 +125,7 @@ extension RepositoryModel {
   }
 
   public func worktree(for branch: Branch) -> Worktree? {
-    worktrees.first { !$0.isMain && $0.branch == branch.name }
+    worktrees.first { $0.branch == branch.name }
   }
 
   public func addWorktree(path: URL, branch: String) async {

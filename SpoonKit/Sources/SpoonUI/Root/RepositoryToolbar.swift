@@ -1,3 +1,4 @@
+import AppKit
 import SpoonCore
 import SwiftUI
 
@@ -80,6 +81,15 @@ struct RepositoryToolbar: ToolbarContent {
       .keyboardShortcut("r", modifiers: .command)
       .accessibilityHint("Reloads repository status and related data")
       .disabled(model.isRefreshing)
+    }
+    ToolbarItem(placement: .primaryAction) {
+      Button {
+        NSWorkspace.shared.open(model.repository.rootURL)
+      } label: {
+        Label("Open Directory", systemImage: "folder")
+      }
+      .help("Open the repository directory in Finder")
+      .accessibilityHint("Opens the repository directory in Finder")
     }
   }
 
