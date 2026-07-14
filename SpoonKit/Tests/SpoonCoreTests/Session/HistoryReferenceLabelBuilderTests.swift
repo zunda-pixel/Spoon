@@ -108,6 +108,35 @@ struct HistoryReferenceLabelBuilderTests {
     #expect(labels.isEmpty)
   }
 
+  @Test func filtersBranchAndTagLabelsByReferenceID() throws {
+    let oid = try #require(ObjectID(rawValue: String(repeating: "c", count: 40)))
+    let main = branch(name: "main", oid: oid)
+    let topic = branch(name: "topic", oid: oid)
+
+    let labels = HistoryReferenceLabelBuilder.build(
+      branches: [main, topic],
+      remoteBranchesByRemote: [:],
+      worktrees: [],
+      tags: [Tag(name: "v1.0", target: oid, isAnnotated: false, createdAt: nil)],
+      stashes: [],
+      visibleReferenceIDs: [
+        HistoryReferenceFilterID.localBranch("topic").id,
+        HistoryReferenceFilterID.tag("v1.0").id,
+      ]
+    )
+
+    #expect(Set(labels[oid]?.map(\.name) ?? []) == ["topic", "v1.0"])
+  }
+
+  @Test func remoteReferenceIDUsesTheRemoteRefPath() {
+    let reference = HistoryReferenceFilterID.remoteBranch(
+      remote: "origin",
+      name: "origin/topic"
+    )
+
+    #expect(reference.gitReference == "refs/remotes/origin/topic")
+  }
+
   private func branch(name: String, oid: ObjectID) -> Branch {
     Branch(
       name: name,

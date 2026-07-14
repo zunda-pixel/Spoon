@@ -96,7 +96,7 @@ struct TagsSidebarSection: View {
             .foregroundStyle(.tertiary)
         }
         ForEach(filteredTags) { tag in
-          TagSidebarRow(tag: tag)
+          TagSidebarRow(tag: tag, model: model)
             .contextMenu {
               TagContextMenu(
                 model: model,
@@ -125,10 +125,28 @@ struct TagsSidebarSection: View {
   }
 }
 
+@MainActor
 private struct TagSidebarRow: View {
   let tag: Tag
+  let model: RepositoryModel
+  @State private var isHovered = false
 
   var body: some View {
+    HStack(spacing: 4) {
+      tagLabel
+      if isHovered
+        || model.isHistoryReferenceFocused(HistoryReferenceFilterID.tag(tag.name).id)
+        || model.isHistoryReferenceHidden(HistoryReferenceFilterID.tag(tag.name).id) {
+        HistoryReferenceFilterButtons(
+          model: model,
+          referenceID: HistoryReferenceFilterID.tag(tag.name).id
+        )
+      }
+    }
+    .onHover { isHovered = $0 }
+  }
+
+  private var tagLabel: some View {
     Label {
       HStack {
         Text(tag.name)

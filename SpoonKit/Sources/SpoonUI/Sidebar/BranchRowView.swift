@@ -8,8 +8,28 @@ struct BranchRowView: View {
   var pullRequest: PullRequest?
   var worktree: Worktree?
   var showsTrackingStatus = true
+  var historyReferenceID: String?
+  var historyModel: RepositoryModel?
+  @State private var isHovered = false
 
   var body: some View {
+    HStack(spacing: 4) {
+      branchLabel
+      if showsHistoryFilterButtons, let historyReferenceID, let historyModel {
+        HistoryReferenceFilterButtons(model: historyModel, referenceID: historyReferenceID)
+      }
+    }
+    .onHover { isHovered = $0 }
+  }
+
+  private var showsHistoryFilterButtons: Bool {
+    guard let historyReferenceID, let historyModel else { return isHovered }
+    return isHovered
+      || historyModel.isHistoryReferenceFocused(historyReferenceID)
+      || historyModel.isHistoryReferenceHidden(historyReferenceID)
+  }
+
+  private var branchLabel: some View {
     Label {
       HStack(spacing: 4) {
         Text(displayName ?? branch.name)

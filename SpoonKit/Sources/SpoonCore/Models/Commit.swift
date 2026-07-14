@@ -27,6 +27,10 @@ public struct LogQuery: Sendable, Hashable {
   public var skip: Int
   /// Include commits reachable from every ref.
   public var allReferences: Bool
+  /// Explicit reference tips to walk when `allReferences` is false.
+  public var references: [String]
+  /// References to subtract from an `--all` walk.
+  public var excludedReferences: [String]
   /// Extra commit tips to walk, such as detached worktree HEADs.
   public var additionalRevisions: [ObjectID]
 
@@ -36,7 +40,9 @@ public struct LogQuery: Sendable, Hashable {
     maxCount: Int = 500,
     skip: Int = 0,
     allReferences: Bool = false,
-    additionalRevisions: [ObjectID] = []
+    additionalRevisions: [ObjectID] = [],
+    references: [String] = [],
+    excludedReferences: [String] = []
   ) {
     self.reference = reference
     self.path = path
@@ -44,6 +50,8 @@ public struct LogQuery: Sendable, Hashable {
     self.skip = skip
     self.allReferences = allReferences
     self.additionalRevisions = additionalRevisions
+    self.references = references
+    self.excludedReferences = excludedReferences
   }
 
   public func next() -> LogQuery {
@@ -53,7 +61,9 @@ public struct LogQuery: Sendable, Hashable {
       maxCount: maxCount,
       skip: skip + maxCount,
       allReferences: allReferences,
-      additionalRevisions: additionalRevisions
+      additionalRevisions: additionalRevisions,
+      references: references,
+      excludedReferences: excludedReferences
     )
   }
 }

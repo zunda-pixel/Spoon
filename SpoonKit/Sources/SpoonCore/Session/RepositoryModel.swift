@@ -1,4 +1,5 @@
 public import Observation
+import Defaults
 
 /// Per-window facade tying one repository's git state and feature stores to the UI.
 @MainActor
@@ -22,6 +23,8 @@ public final class RepositoryModel {
   /// A long-running mutation (fetch/pull/push/commit/…) is in flight.
   public internal(set) var isBusy = false
   public internal(set) var lastErrorMessage: String?
+  public internal(set) var focusedHistoryReferenceIDs: Set<String> = []
+  public internal(set) var hiddenHistoryReferenceIDs: Set<String> = []
   /// Whether `lastErrorMessage` came from a background read (git refresh or
   /// history load). Background errors clear automatically once the read
   /// recovers; mutation errors stay until the user dismisses them.
@@ -45,6 +48,12 @@ public final class RepositoryModel {
     self.aiStore = AIStore(
       repositoryURL: repository.rootURL,
       gitClient: gitClient
+    )
+    self.focusedHistoryReferenceIDs = Set(
+      Defaults[.historyFocusedReferenceIDs][repository.id] ?? []
+    )
+    self.hiddenHistoryReferenceIDs = Set(
+      Defaults[.historyHiddenReferenceIDs][repository.id] ?? []
     )
   }
 

@@ -68,7 +68,8 @@ struct HistoryListView: View {
       tags: model.tags,
       stashes: model.stashes,
       activeWorktreeRoot: model.repository.rootURL,
-      selectedReference: focus?.reference
+      selectedReference: focus?.reference,
+      visibleReferenceIDs: model.visibleHistoryReferenceIDs
     )
   }
 

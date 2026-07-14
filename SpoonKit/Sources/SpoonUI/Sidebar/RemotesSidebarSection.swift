@@ -151,7 +151,12 @@ private struct RemoteBranchTreeNodeView: View {
         displayName: node.name,
         pullRequest: nil,
         worktree: worktree,
-        showsTrackingStatus: false
+        showsTrackingStatus: false,
+        historyReferenceID: HistoryReferenceFilterID.remoteBranch(
+          remote: remote.name,
+          name: branch.name
+        ).id,
+        historyModel: model
       )
       .frame(maxWidth: .infinity, alignment: .leading)
       .contentShape(Rectangle())

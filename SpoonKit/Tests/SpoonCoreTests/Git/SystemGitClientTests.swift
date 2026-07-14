@@ -328,6 +328,45 @@ struct SystemGitClientTests {
     #expect(runner.invocations.count == 1)
   }
 
+  @Test func filteredAllReferenceLogSendsIncludedAndExcludedReferences() async throws {
+    let runner = FakeCommandRunner()
+    runner.stub(
+      arguments: baseFlags + [
+        "log", "--topo-order", "-z",
+        "--format=\(GitLogParser.logFormat)",
+        "--max-count=501", "--all",
+        "refs/remotes/origin/topic", "--not", "refs/heads/main", "refs/tags/v1.0", "--",
+      ]
+    )
+
+    _ = try await makeClient(runner).log(
+      LogQuery(
+        allReferences: true,
+        references: ["refs/remotes/origin/topic"],
+        excludedReferences: ["refs/heads/main", "refs/tags/v1.0"]
+      )
+    )
+
+    #expect(runner.invocations.count == 1)
+  }
+
+  @Test func focusedReferenceLogWalksMultipleReferences() async throws {
+    let runner = FakeCommandRunner()
+    runner.stub(
+      arguments: baseFlags + [
+        "log", "--topo-order", "-z",
+        "--format=\(GitLogParser.logFormat)",
+        "--max-count=501", "refs/heads/main", "refs/tags/v1.0", "--",
+      ]
+    )
+
+    _ = try await makeClient(runner).log(
+      LogQuery(references: ["refs/heads/main", "refs/tags/v1.0"])
+    )
+
+    #expect(runner.invocations.count == 1)
+  }
+
   @Test func logQueryNextPreservesEveryCondition() {
     let detached = ObjectID(rawValue: "cccc3333")!
     let query = LogQuery(

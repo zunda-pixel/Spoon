@@ -1,13 +1,57 @@
+import Defaults
+
 extension RepositoryModel {
   public var historyRows: [GraphRow] { historyStore.historyRows }
   public var isLoadingHistory: Bool { historyStore.isLoadingHistory }
   public var hasMoreHistory: Bool { historyStore.hasMoreHistory }
+
+  public func isHistoryReferenceFocused(_ id: String) -> Bool {
+    focusedHistoryReferenceIDs.contains(id)
+  }
+
+  public func isHistoryReferenceHidden(_ id: String) -> Bool {
+    hiddenHistoryReferenceIDs.contains(id)
+  }
+
+  /// The reference IDs whose labels should remain visible in the history.
+  /// `nil` means that all references should be shown.
+  public var visibleHistoryReferenceIDs: Set<String>? {
+    if !effectiveFocusedHistoryReferenceIDs.isEmpty {
+      return effectiveFocusedHistoryReferenceIDs
+    }
+    guard !effectiveHiddenHistoryReferenceIDs.isEmpty else { return nil }
+    return allHistoryReferenceIDs.subtracting(effectiveHiddenHistoryReferenceIDs)
+  }
+
+  public func toggleHistoryFocus(_ id: String) async {
+    if focusedHistoryReferenceIDs.contains(id) {
+      focusedHistoryReferenceIDs.remove(id)
+    } else {
+      focusedHistoryReferenceIDs.insert(id)
+      hiddenHistoryReferenceIDs.remove(id)
+    }
+    persistHistoryReferenceFilters()
+    await reloadHistory()
+  }
+
+  public func toggleHistoryHidden(_ id: String) async {
+    if hiddenHistoryReferenceIDs.contains(id) {
+      hiddenHistoryReferenceIDs.remove(id)
+    } else {
+      hiddenHistoryReferenceIDs.insert(id)
+      focusedHistoryReferenceIDs.removeAll()
+    }
+    persistHistoryReferenceFilters()
+    await reloadHistory()
+  }
 
   /// Loads the single history graph spanning every repository reference.
   public func loadHistoryIfNeeded() async {
     await historyStore.loadIfNeeded(
       additionalRevisions: detachedWorktreeHeads,
       hiddenCommitOIDs: stashHelperCommitOIDs,
+      references: historyReferenceURLs(for: effectiveFocusedHistoryReferenceIDs),
+      excludedReferences: historyReferenceURLs(for: effectiveHiddenHistoryReferenceIDs),
       canLoadHistory: canLoadUnifiedHistory
     )
     adoptHistoryError()
@@ -17,6 +61,8 @@ extension RepositoryModel {
     await historyStore.reload(
       additionalRevisions: detachedWorktreeHeads,
       hiddenCommitOIDs: stashHelperCommitOIDs,
+      references: historyReferenceURLs(for: effectiveFocusedHistoryReferenceIDs),
+      excludedReferences: historyReferenceURLs(for: effectiveHiddenHistoryReferenceIDs),
       canLoadHistory: canLoadUnifiedHistory
     )
     adoptHistoryError()
@@ -75,6 +121,39 @@ extension RepositoryModel {
 
   private var stashHelperCommitOIDs: Set<ObjectID> {
     Set(stashes.flatMap(\.helperCommitOIDs))
+  }
+
+  private func historyReferenceURLs(for ids: Set<String>) -> [String] {
+    ids.compactMap { HistoryReferenceFilterID(id: $0)?.gitReference }.sorted()
+  }
+
+  private var allHistoryReferenceIDs: Set<String> {
+    var ids = Set(branches.map { HistoryReferenceFilterID.localBranch($0.name).id })
+    for (remote, branches) in remoteBranchesByRemote {
+      ids.formUnion(branches.map {
+        HistoryReferenceFilterID.remoteBranch(remote: remote, name: $0.name).id
+      })
+    }
+    ids.formUnion(tags.map { HistoryReferenceFilterID.tag($0.name).id })
+    return ids
+  }
+
+  private var effectiveFocusedHistoryReferenceIDs: Set<String> {
+    focusedHistoryReferenceIDs.intersection(allHistoryReferenceIDs)
+  }
+
+  private var effectiveHiddenHistoryReferenceIDs: Set<String> {
+    hiddenHistoryReferenceIDs.intersection(allHistoryReferenceIDs)
+  }
+
+  private func persistHistoryReferenceFilters() {
+    var focused = Defaults[.historyFocusedReferenceIDs]
+    focused[repository.id] = focusedHistoryReferenceIDs.sorted()
+    Defaults[.historyFocusedReferenceIDs] = focused
+
+    var hidden = Defaults[.historyHiddenReferenceIDs]
+    hidden[repository.id] = hiddenHistoryReferenceIDs.sorted()
+    Defaults[.historyHiddenReferenceIDs] = hidden
   }
 
   private func adoptHistoryError() {

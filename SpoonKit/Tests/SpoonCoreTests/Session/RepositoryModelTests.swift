@@ -22,6 +22,41 @@ struct RepositoryModelTests {
     #expect(model.lastErrorMessage == nil)
   }
 
+  @Test func historyReferenceModesAreExclusiveAndSupportMultipleFocuses() async {
+    let client = FakeRepositoryGitClient()
+    let mainOID = makeOID("a1a1a1a1")
+    let topicOID = makeOID("b2b2b2b2")
+    await client.configure(
+      status: makeStatus(oid: mainOID, branch: "main"),
+      branches: [
+        makeBranch("main", oid: mainOID, isCurrent: true),
+        makeBranch("topic", oid: topicOID, isCurrent: false),
+      ],
+      logPages: [0: LogPage(commits: [], hasMore: false)]
+    )
+    let model = RepositoryModel(
+      repository: Repository(rootURL: URL(filePath: "/tmp/history-filter-" + UUID().uuidString)),
+      gitClient: client
+    )
+    await model.refresh()
+
+    let mainID = HistoryReferenceFilterID.localBranch("main").id
+    let topicID = HistoryReferenceFilterID.localBranch("topic").id
+    await model.toggleHistoryFocus(mainID)
+    await model.toggleHistoryFocus(topicID)
+
+    #expect(model.focusedHistoryReferenceIDs == [mainID, topicID])
+    #expect(model.hiddenHistoryReferenceIDs.isEmpty)
+
+    await model.toggleHistoryHidden(mainID)
+
+    #expect(model.focusedHistoryReferenceIDs.isEmpty)
+    #expect(model.hiddenHistoryReferenceIDs == [mainID])
+
+    await model.toggleHistoryHidden(mainID)
+    #expect(model.hiddenHistoryReferenceIDs.isEmpty)
+  }
+
   @Test func gitStateRefreshAppliesAtomicallyWithoutPullRequestSync() async {
     let client = FakeRepositoryGitClient()
     let originalOID = makeOID("12121212")

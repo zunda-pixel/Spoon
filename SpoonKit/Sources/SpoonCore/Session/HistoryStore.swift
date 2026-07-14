@@ -15,6 +15,8 @@ final class HistoryStore {
   private var nextHistoryQuery: LogQuery?
   private var additionalRevisions: [ObjectID] = []
   private var hiddenCommitOIDs: Set<ObjectID> = []
+  private var references: [String] = []
+  private var excludedReferences: [String] = []
 
   init(gitClient: any GitClient) {
     self.gitClient = gitClient
@@ -23,16 +25,22 @@ final class HistoryStore {
   func loadIfNeeded(
     additionalRevisions: [ObjectID],
     hiddenCommitOIDs: Set<ObjectID>,
+    references: [String],
+    excludedReferences: [String],
     canLoadHistory: Bool
   ) async {
     guard !isLoadingHistory else { return }
     guard
       historyRows.isEmpty || self.additionalRevisions != additionalRevisions
         || self.hiddenCommitOIDs != hiddenCommitOIDs
+        || self.references != references
+        || self.excludedReferences != excludedReferences
     else { return }
     await reload(
       additionalRevisions: additionalRevisions,
       hiddenCommitOIDs: hiddenCommitOIDs,
+      references: references,
+      excludedReferences: excludedReferences,
       canLoadHistory: canLoadHistory
     )
   }
@@ -40,6 +48,8 @@ final class HistoryStore {
   func reload(
     additionalRevisions: [ObjectID],
     hiddenCommitOIDs: Set<ObjectID>,
+    references: [String],
+    excludedReferences: [String],
     canLoadHistory: Bool
   ) async {
     guard await waitUntilIdle() else { return }
@@ -50,15 +60,21 @@ final class HistoryStore {
       nextHistoryQuery = nil
       self.additionalRevisions = additionalRevisions
       self.hiddenCommitOIDs = hiddenCommitOIDs
+      self.references = references
+      self.excludedReferences = excludedReferences
       errorMessage = nil
       return
     }
     loadedCommits = []
     self.additionalRevisions = additionalRevisions
     self.hiddenCommitOIDs = hiddenCommitOIDs
+    self.references = references
+    self.excludedReferences = excludedReferences
     nextHistoryQuery = LogQuery(
-      allReferences: true,
-      additionalRevisions: additionalRevisions
+      allReferences: references.isEmpty,
+      additionalRevisions: additionalRevisions,
+      references: references,
+      excludedReferences: excludedReferences
     )
     await loadMore(replacing: true)
   }

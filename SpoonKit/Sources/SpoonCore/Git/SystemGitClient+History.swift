@@ -15,10 +15,16 @@ extension SystemGitClient {
     if query.allReferences {
       arguments.append("--all")
     }
-    if let reference = query.reference {
+    if !query.references.isEmpty {
+      arguments.append(contentsOf: query.references)
+    } else if let reference = query.reference {
       arguments.append(reference)
     } else if !query.allReferences {
       arguments.append("HEAD")
+    }
+    if !query.excludedReferences.isEmpty {
+      arguments.append("--not")
+      arguments.append(contentsOf: query.excludedReferences)
     }
     arguments.append(contentsOf: query.additionalRevisions.map(\.rawValue))
     arguments.append("--")

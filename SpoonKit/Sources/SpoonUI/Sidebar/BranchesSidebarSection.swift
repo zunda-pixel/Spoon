@@ -73,7 +73,9 @@ private struct BranchTreeNodeView: View {
         branch: branch,
         displayName: node.name,
         pullRequest: pullRequest,
-        worktree: worktree
+        worktree: worktree,
+        historyReferenceID: HistoryReferenceFilterID.localBranch(branch.name).id,
+        historyModel: model
       )
       .frame(maxWidth: .infinity, alignment: .leading)
       .contentShape(Rectangle())
