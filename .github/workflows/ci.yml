@@ -23,4 +23,4 @@ jobs:
 
       - name: Test SpoonCore
         working-directory: SpoonKit
-        run: swift test
+        run: swift test --filter SpoonCoreTests

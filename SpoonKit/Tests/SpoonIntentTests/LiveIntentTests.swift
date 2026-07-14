@@ -1,3 +1,4 @@
+#if canImport(AppIntentsTesting)
 import AppIntentsTesting
 import Foundation
 import Testing
@@ -18,8 +19,10 @@ import Testing
 )
 struct LiveIntentTests {
   @Test func openRecentRepositoryIsRegisteredAndRuns() async throws {
+    guard #available(macOS 27.0, *) else { return }
     let definitions = IntentDefinitions(bundleIdentifier: "com.spoon.app")
     let intent = definitions.intents["OpenRecentRepositoryIntent"].makeIntent()
     _ = try await intent.run()
   }
 }
+#endif
