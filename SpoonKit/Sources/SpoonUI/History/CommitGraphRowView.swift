@@ -92,7 +92,6 @@ struct CommitGraphRowView: View {
     .font(.caption2)
     .lineLimit(1)
     .truncationMode(.middle)
-    .frame(maxWidth: 120)
     .padding(.horizontal, 4)
     .padding(.vertical, 1)
     .foregroundStyle(
