@@ -12,6 +12,7 @@ struct RepoSidebarView: View {
   @State private var deletingTag: Tag?
   @State private var deletingRemoteTag: RemoteTagSelection?
   @State private var switchWorktreeErrorMessage: String?
+  @State private var searchText = ""
 
   var body: some View {
     List(selection: $navigation.sidebarSelection) {
@@ -21,9 +22,10 @@ struct RepoSidebarView: View {
         navigation: navigation,
         removingWorktree: $removingWorktree,
         deletingBranch: $deletingBranch,
+        searchText: searchText,
         openWorktree: openWorktree
       )
-      StashesSidebarSection(model: model)
+      StashesSidebarSection(model: model, searchText: searchText)
       RemotesSidebarSection(
         model: model,
         navigation: navigation,
@@ -32,10 +34,16 @@ struct RepoSidebarView: View {
       TagsSidebarSection(
         model: model,
         deletingTag: $deletingTag,
-        deletingRemoteTag: $deletingRemoteTag
+        deletingRemoteTag: $deletingRemoteTag,
+        searchText: searchText
       )
     }
     .listStyle(.sidebar)
+    .searchable(
+      text: $searchText,
+      placement: .sidebar,
+      prompt: "Search branches, stashes, and tags"
+    )
     .confirmationDialog(
       "Remove remote “\(removingRemote?.name ?? "")”?",
       isPresented: binding(for: $removingRemote)

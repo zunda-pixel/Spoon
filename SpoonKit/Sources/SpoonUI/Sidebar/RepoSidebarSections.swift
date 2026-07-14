@@ -39,17 +39,23 @@ struct BranchesSidebarSection: View {
   let navigation: RepositoryNavigationState
   @Binding var removingWorktree: Worktree?
   @Binding var deletingBranch: Branch?
+  let searchText: String
   let openWorktree: (Worktree) -> Void
   @State private var isExpanded = true
   @State private var expandedFolderPaths: Set<String> = []
 
   var body: some View {
     Section(isExpanded: $isExpanded) {
-      ForEach(BranchTreeNode.make(from: model.branches)) { node in
+      if filteredBranches.isEmpty, searchText.hasSidebarSearchQuery {
+        Label("No matching branches", systemImage: "magnifyingglass")
+          .foregroundStyle(.tertiary)
+      }
+      ForEach(BranchTreeNode.make(from: filteredBranches)) { node in
         BranchTreeNodeView(
           node: node,
           model: model,
           navigation: navigation,
+          isSearching: searchText.hasSidebarSearchQuery,
           expandedFolderPaths: $expandedFolderPaths,
           removingWorktree: $removingWorktree,
           deletingBranch: $deletingBranch,
@@ -62,6 +68,19 @@ struct BranchesSidebarSection: View {
     .onChange(of: model.currentBranch?.name, initial: true) {
       guard let currentBranchName = model.currentBranch?.name else { return }
       expandedFolderPaths.formUnion(BranchTreeNode.folderPaths(in: currentBranchName))
+    }
+    .onChange(of: searchText) {
+      if searchText.hasSidebarSearchQuery {
+        isExpanded = true
+      }
+    }
+  }
+
+  private var filteredBranches: [Branch] {
+    model.branches.filter { branch in
+      branch.name.matchesSidebarSearch(searchText)
+        || branch.subject.matchesSidebarSearch(searchText)
+        || branch.upstream?.matchesSidebarSearch(searchText) == true
     }
   }
 }
@@ -144,6 +163,7 @@ private struct BranchTreeNodeView: View {
   let node: BranchTreeNode
   let model: RepositoryModel
   let navigation: RepositoryNavigationState
+  let isSearching: Bool
   @Binding var expandedFolderPaths: Set<String>
   @Binding var removingWorktree: Worktree?
   @Binding var deletingBranch: Branch?
@@ -189,6 +209,7 @@ private struct BranchTreeNodeView: View {
             node: child,
             model: model,
             navigation: navigation,
+            isSearching: isSearching,
             expandedFolderPaths: $expandedFolderPaths,
             removingWorktree: $removingWorktree,
             deletingBranch: $deletingBranch,
@@ -212,7 +233,10 @@ private struct BranchTreeNodeView: View {
   }
 
   private var isFolderExpanded: Binding<Bool> {
-    Binding(
+    if isSearching {
+      return .constant(true)
+    }
+    return Binding(
       get: { expandedFolderPaths.contains(node.path) },
       set: { isExpanded in
         if isExpanded {
@@ -274,12 +298,17 @@ private struct BranchContextMenu: View {
 @MainActor
 struct StashesSidebarSection: View {
   let model: RepositoryModel
+  let searchText: String
   @State private var isExpanded = true
 
   var body: some View {
     if !model.stashes.isEmpty {
       Section(isExpanded: $isExpanded) {
-        ForEach(model.stashes) { stash in
+        if filteredStashes.isEmpty {
+          Label("No matching stashes", systemImage: "magnifyingglass")
+            .foregroundStyle(.tertiary)
+        }
+        ForEach(filteredStashes) { stash in
           Label {
             Text(stash.message)
               .lineLimit(1)
@@ -305,6 +334,18 @@ struct StashesSidebarSection: View {
       } header: {
         Text("Stashes")
       }
+      .onChange(of: searchText) {
+        if searchText.hasSidebarSearchQuery {
+          isExpanded = true
+        }
+      }
+    }
+  }
+
+  private var filteredStashes: [Stash] {
+    model.stashes.filter {
+      $0.message.matchesSidebarSearch(searchText)
+        || $0.reference.matchesSidebarSearch(searchText)
     }
   }
 }
@@ -314,12 +355,17 @@ struct TagsSidebarSection: View {
   let model: RepositoryModel
   @Binding var deletingTag: Tag?
   @Binding var deletingRemoteTag: RemoteTagSelection?
+  let searchText: String
   @State private var isExpanded = true
 
   var body: some View {
     if !model.tags.isEmpty {
       Section(isExpanded: $isExpanded) {
-        ForEach(model.tags) { tag in
+        if filteredTags.isEmpty {
+          Label("No matching tags", systemImage: "magnifyingglass")
+            .foregroundStyle(.tertiary)
+        }
+        ForEach(filteredTags) { tag in
           TagSidebarRow(tag: tag)
             .contextMenu {
               TagContextMenu(
@@ -333,6 +379,18 @@ struct TagsSidebarSection: View {
       } header: {
         Text("Tags")
       }
+      .onChange(of: searchText) {
+        if searchText.hasSidebarSearchQuery {
+          isExpanded = true
+        }
+      }
+    }
+  }
+
+  private var filteredTags: [Tag] {
+    model.tags.filter {
+      $0.name.matchesSidebarSearch(searchText)
+        || $0.target.rawValue.matchesSidebarSearch(searchText)
     }
   }
 }
@@ -392,6 +450,17 @@ private struct TagContextMenu: View {
     Divider()
     Button("Delete Tag…", role: .destructive) { deletingTag = tag }
       .disabled(model.isBusy)
+  }
+}
+
+private extension String {
+  var hasSidebarSearchQuery: Bool {
+    !trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+  }
+
+  func matchesSidebarSearch(_ searchText: String) -> Bool {
+    let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+    return query.isEmpty || localizedCaseInsensitiveContains(query)
   }
 }
 
