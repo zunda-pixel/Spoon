@@ -356,7 +356,7 @@ struct TagsSidebarSection: View {
   @Binding var deletingTag: Tag?
   @Binding var deletingRemoteTag: RemoteTagSelection?
   let searchText: String
-  @State private var isExpanded = true
+  @State private var isExpanded = false
 
   var body: some View {
     if !model.tags.isEmpty {
