@@ -37,9 +37,11 @@ public final class AppModel {
       runner: runner,
       override: { tool in Defaults[.toolPathOverrides][tool.rawValue] }
     )
-    self.recentRepositories = Defaults[.recentRepositoryPaths].map {
+    let persistedRepositories = Defaults[.recentRepositoryPaths].map {
       Repository(rootURL: URL(filePath: $0, directoryHint: .isDirectory))
     }
+    self.recentRepositories = Self.compactRecents(persistedRepositories)
+    persistRecents()
   }
 
   public enum OpenError: LocalizedError {
@@ -137,7 +139,10 @@ public final class AppModel {
   }
 
   private func addRecent(_ repository: Repository) {
-    var updated = recentRepositories.filter { $0.id != repository.id }
+    let groupID = Self.recentGroupID(for: repository)
+    var updated = recentRepositories.filter {
+      $0.id != repository.id && Self.recentGroupID(for: $0) != groupID
+    }
     updated.insert(repository, at: 0)
     recentRepositories = Array(updated.prefix(Self.maxRecents))
     persistRecents()
@@ -145,5 +150,73 @@ public final class AppModel {
 
   private func persistRecents() {
     Defaults[.recentRepositoryPaths] = recentRepositories.map(\.id)
+  }
+
+  static func compactRecents(_ repositories: [Repository]) -> [Repository] {
+    var seenGroupIDs: Set<String> = []
+    return repositories.filter {
+      seenGroupIDs.insert(recentGroupID(for: $0)).inserted
+    }
+  }
+
+  static func recentGroupID(for repository: Repository) -> String {
+    guard let gitDirectory = gitDirectory(at: repository.rootURL) else {
+      return repository.id
+    }
+
+    let commonDirectoryFile = gitDirectory.appending(path: "commondir")
+    guard
+      let commonDirectoryPath = try? String(
+        contentsOf: commonDirectoryFile,
+        encoding: .utf8
+      ).trimmingCharacters(in: .whitespacesAndNewlines),
+      !commonDirectoryPath.isEmpty
+    else {
+      return canonicalPath(of: gitDirectory)
+    }
+
+    return canonicalPath(
+      of: resolvedURL(path: commonDirectoryPath, relativeTo: gitDirectory)
+    )
+  }
+
+  private static func gitDirectory(at repositoryRoot: URL) -> URL? {
+    let dotGit = repositoryRoot.appending(path: ".git")
+    guard
+      let resourceValues = try? dotGit.resourceValues(forKeys: [.isDirectoryKey])
+    else {
+      return nil
+    }
+    if resourceValues.isDirectory == true {
+      return dotGit
+    }
+
+    guard
+      let contents = try? String(contentsOf: dotGit, encoding: .utf8),
+      let firstLine = contents.split(whereSeparator: \.isNewline).first,
+      firstLine.hasPrefix("gitdir:")
+    else {
+      return nil
+    }
+
+    let path = firstLine.dropFirst("gitdir:".count)
+      .trimmingCharacters(in: .whitespaces)
+    guard !path.isEmpty else { return nil }
+    return resolvedURL(path: path, relativeTo: repositoryRoot)
+  }
+
+  private static func resolvedURL(path: String, relativeTo baseURL: URL) -> URL {
+    if path.hasPrefix("/") {
+      return URL(filePath: path, directoryHint: .isDirectory)
+    }
+    return baseURL.appending(path: path, directoryHint: .isDirectory)
+  }
+
+  private static func canonicalPath(of url: URL) -> String {
+    var path = url.standardizedFileURL.resolvingSymlinksInPath().path(percentEncoded: false)
+    while path.count > 1, path.hasSuffix("/") {
+      path.removeLast()
+    }
+    return path
   }
 }
