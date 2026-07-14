@@ -150,7 +150,8 @@ private struct RemoteBranchTreeNodeView: View {
         branch: branch,
         displayName: node.name,
         pullRequest: nil,
-        worktree: worktree
+        worktree: worktree,
+        showsTrackingStatus: false
       )
       .frame(maxWidth: .infinity, alignment: .leading)
       .contentShape(Rectangle())

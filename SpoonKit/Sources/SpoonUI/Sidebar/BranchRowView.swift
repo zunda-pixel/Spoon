@@ -7,6 +7,7 @@ struct BranchRowView: View {
   var displayName: String?
   var pullRequest: PullRequest?
   var worktree: Worktree?
+  var showsTrackingStatus = true
 
   var body: some View {
     Label {
@@ -24,7 +25,9 @@ struct BranchRowView: View {
             .foregroundStyle(.secondary)
             .help("Checked out in worktree: \(worktree.path.path)")
         }
-        trackingIndicator
+        if showsTrackingStatus {
+          trackingIndicator
+        }
       }
     } icon: {
       Image(systemName: branch.isCurrent ? "checkmark.circle.fill" : "arrow.trianglehead.branch")
@@ -39,18 +42,23 @@ struct BranchRowView: View {
   }
 
   private var accessibilityValue: String {
-    var values: [String] = []
+    var values = [showsTrackingStatus ? "Local branch" : "Remote branch"]
     if branch.isCurrent {
       values.append("Current branch")
     }
-    if branch.upstreamGone {
-      values.append("Upstream branch is gone")
-    } else {
-      if let ahead = branch.ahead, ahead > 0 {
-        values.append("\(ahead) commit(s) ahead")
-      }
-      if let behind = branch.behind, behind > 0 {
-        values.append("\(behind) commit(s) behind")
+    if showsTrackingStatus {
+      if branch.upstreamGone {
+        values.append("Upstream branch is gone")
+      } else if let upstream = branch.upstream {
+        values.append("Tracks \(upstream)")
+        if let ahead = branch.ahead, ahead > 0 {
+          values.append("\(ahead) commit(s) ahead")
+        }
+        if let behind = branch.behind, behind > 0 {
+          values.append("\(behind) commit(s) behind")
+        }
+      } else {
+        values.append("No remote branch linked")
       }
     }
     if let worktree {
@@ -63,7 +71,7 @@ struct BranchRowView: View {
           : "Open pull request \(pullRequest.number)"
       )
     }
-    return values.isEmpty ? "Local branch" : values.joined(separator: ", ")
+    return values.joined(separator: ", ")
   }
 
   @ViewBuilder
@@ -72,8 +80,11 @@ struct BranchRowView: View {
       Image(systemName: "exclamationmark.triangle")
         .foregroundStyle(.orange)
         .help("Upstream branch is gone")
-    } else if (branch.ahead ?? 0) > 0 || (branch.behind ?? 0) > 0 {
+    } else if let upstream = branch.upstream {
       HStack(spacing: 2) {
+        if pullRequest == nil {
+          Image(systemName: "link")
+        }
         if let ahead = branch.ahead, ahead > 0 {
           Text("↑\(ahead)")
         }
@@ -83,6 +94,7 @@ struct BranchRowView: View {
       }
       .font(.caption.monospacedDigit())
       .foregroundStyle(.secondary)
+      .help("Tracking \(upstream)")
     }
   }
 }
