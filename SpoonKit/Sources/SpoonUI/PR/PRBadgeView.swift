@@ -8,6 +8,23 @@ struct PRBadgeView: View {
   let pullRequest: PullRequest
 
   var body: some View {
+    Group {
+      if let url = URL(string: pullRequest.url) {
+        Link(destination: url) {
+          badgeContent
+        }
+        .buttonStyle(.plain)
+        .accessibilityHint("Opens the pull request in your browser")
+      } else {
+        badgeContent
+      }
+    }
+    .accessibilityElement(children: .ignore)
+    .accessibilityLabel("Pull request \(pullRequest.number)")
+    .accessibilityValue(accessibilityValue)
+  }
+
+  private var badgeContent: some View {
     HStack(spacing: 3) {
       if let checksState = pullRequest.checksState {
         Circle()
@@ -23,9 +40,6 @@ struct PRBadgeView: View {
     .padding(.vertical, 1)
     .background(.quaternary, in: Capsule())
     .help(pullRequest.title)
-    .accessibilityElement(children: .ignore)
-    .accessibilityLabel("Pull request \(pullRequest.number)")
-    .accessibilityValue(accessibilityValue)
   }
 
   private var accessibilityValue: String {
@@ -74,5 +88,21 @@ struct PRBadgeView: View {
     if state.isFailure { return "Checks failing" }
     if state.isRunning { return "Checks running" }
     return "Checks passing"
+  }
+}
+
+@MainActor
+struct PRNumberLink: View {
+  let pullRequest: PullRequest
+
+  var body: some View {
+    if let url = URL(string: pullRequest.url) {
+      Link("#\(pullRequest.number)", destination: url)
+        .buttonStyle(.plain)
+        .help("Open pull request \(pullRequest.number) on GitHub")
+        .accessibilityHint("Opens the pull request in your browser")
+    } else {
+      Text("#\(pullRequest.number)")
+    }
   }
 }

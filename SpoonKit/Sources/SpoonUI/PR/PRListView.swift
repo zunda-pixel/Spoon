@@ -81,7 +81,7 @@ struct PRRowView: View {
           .lineLimit(1)
       }
       HStack(spacing: 6) {
-        Text("#\(pullRequest.number)")
+        PRNumberLink(pullRequest: pullRequest)
           .monospacedDigit()
         if let author = pullRequest.authorLogin {
           Text(author)

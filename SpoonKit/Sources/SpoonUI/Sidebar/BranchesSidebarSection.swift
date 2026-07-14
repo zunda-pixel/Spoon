@@ -68,10 +68,11 @@ private struct BranchTreeNodeView: View {
   var body: some View {
     if let branch = node.branch {
       let worktree = model.worktree(for: branch)
+      let pullRequest = model.prByBranch[branch.name]
       BranchRowView(
         branch: branch,
         displayName: node.name,
-        pullRequest: model.prByBranch[branch.name],
+        pullRequest: pullRequest,
         worktree: worktree
       )
       .frame(maxWidth: .infinity, alignment: .leading)
@@ -92,6 +93,7 @@ private struct BranchTreeNodeView: View {
           model: model,
           navigation: navigation,
           branch: branch,
+          pullRequest: pullRequest,
           worktree: worktree,
           removingWorktree: $removingWorktree,
           deletingBranch: $deletingBranch,
@@ -150,6 +152,7 @@ private struct BranchContextMenu: View {
   let model: RepositoryModel
   let navigation: RepositoryNavigationState
   let branch: Branch
+  let pullRequest: PullRequest?
   let worktree: Worktree?
   @Binding var removingWorktree: Worktree?
   @Binding var deletingBranch: Branch?
@@ -160,6 +163,11 @@ private struct BranchContextMenu: View {
       Task { await model.switchBranch(branch.name) }
     }
     .disabled(branch.isCurrent || model.isBusy || worktree != nil)
+    if let pullRequest, let url = URL(string: pullRequest.url) {
+      Button("Open Pull Request #\(pullRequest.number)", systemImage: "arrow.up.right.square") {
+        NSWorkspace.shared.open(url)
+      }
+    }
     Divider()
     Button("Merge into \(model.currentBranch?.name ?? "HEAD")…") {
       navigation.present(.mergeBranch(branch))
