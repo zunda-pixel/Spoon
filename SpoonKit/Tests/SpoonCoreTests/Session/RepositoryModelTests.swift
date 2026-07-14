@@ -225,6 +225,56 @@ struct RepositoryModelTests {
     #expect(model.lastErrorMessage == FakeRepositoryGitClient.Failure.refresh.localizedDescription)
   }
 
+  @Test func failedMutationErrorSurvivesTheFollowUpRefresh() async {
+    let client = FakeRepositoryGitClient()
+    let oid = makeOID("88888888")
+    await client.configure(
+      status: makeStatus(oid: oid, branch: "main"),
+      branches: [makeBranch("main", oid: oid, isCurrent: true)]
+    )
+    let model = makeModel(client)
+    await model.refresh()
+
+    let succeeded = await model.commit(message: "message")
+
+    #expect(!succeeded)
+    #expect(
+      model.lastErrorMessage
+        == FakeRepositoryGitClient.Failure.unimplemented.localizedDescription
+    )
+
+    await model.refresh()
+    #expect(
+      model.lastErrorMessage
+        == FakeRepositoryGitClient.Failure.unimplemented.localizedDescription
+    )
+
+    model.clearError()
+    #expect(model.lastErrorMessage == nil)
+  }
+
+  @Test func refreshErrorClearsOnceRefreshRecovers() async {
+    let client = FakeRepositoryGitClient()
+    let oid = makeOID("99999999")
+    await client.configure(
+      status: makeStatus(oid: oid, branch: "main"),
+      branches: [makeBranch("main", oid: oid, isCurrent: true)],
+      failBranches: true
+    )
+    let model = makeModel(client)
+
+    await model.refresh()
+    #expect(model.lastErrorMessage == FakeRepositoryGitClient.Failure.refresh.localizedDescription)
+
+    await client.configure(
+      status: makeStatus(oid: oid, branch: "main"),
+      branches: [makeBranch("main", oid: oid, isCurrent: true)]
+    )
+
+    await model.refresh()
+    #expect(model.lastErrorMessage == nil)
+  }
+
   private func makeModel(_ client: FakeRepositoryGitClient) -> RepositoryModel {
     RepositoryModel(
       repository: Repository(rootURL: URL(filePath: "/tmp/repository-model-tests")),

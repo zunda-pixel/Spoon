@@ -114,10 +114,15 @@ extension RepositoryModel {
 
     do {
       apply(try await RepositoryGitSnapshot.load(from: gitClient))
-      lastErrorMessage = nil
+      // Only clear errors this refresh path produced; a mutation error must
+      // survive the refresh that follows the failed operation.
+      if lastErrorIsFromBackgroundRead {
+        clearError()
+      }
     } catch {
       // No snapshot field is applied until every throwing read succeeds.
       lastErrorMessage = error.localizedDescription
+      lastErrorIsFromBackgroundRead = true
     }
 
     if !historyRows.isEmpty {

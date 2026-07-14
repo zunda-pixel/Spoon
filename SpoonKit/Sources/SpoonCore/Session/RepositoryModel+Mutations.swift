@@ -209,6 +209,7 @@ extension RepositoryModel {
     guard paths.contains(where: { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty })
     else {
       lastErrorMessage = SparseCheckoutError.emptyPaths.localizedDescription
+      lastErrorIsFromBackgroundRead = false
       return
     }
     await perform { try await $0.setSparseCheckout(paths: paths) }
@@ -268,10 +269,11 @@ extension RepositoryModel {
     var succeeded = false
     do {
       try await operation(gitClient)
-      lastErrorMessage = nil
+      clearError()
       succeeded = true
     } catch {
       lastErrorMessage = error.localizedDescription
+      lastErrorIsFromBackgroundRead = false
     }
     isBusy = false
     await refresh()

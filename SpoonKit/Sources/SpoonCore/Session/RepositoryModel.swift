@@ -22,6 +22,10 @@ public final class RepositoryModel {
   /// A long-running mutation (fetch/pull/push/commit/…) is in flight.
   public internal(set) var isBusy = false
   public internal(set) var lastErrorMessage: String?
+  /// Whether `lastErrorMessage` came from a background read (git refresh or
+  /// history load). Background errors clear automatically once the read
+  /// recovers; mutation errors stay until the user dismisses them.
+  var lastErrorIsFromBackgroundRead = false
 
   let gitClient: any GitClient
   let historyStore: HistoryStore
@@ -51,6 +55,7 @@ public final class RepositoryModel {
 
   public func clearError() {
     lastErrorMessage = nil
+    lastErrorIsFromBackgroundRead = false
   }
 
   public var currentBranch: Branch? {

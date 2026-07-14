@@ -27,6 +27,13 @@ extension RepositoryModel {
   }
 
   private func adoptHistoryError() {
-    lastErrorMessage = historyStore.errorMessage
+    if let message = historyStore.errorMessage {
+      lastErrorMessage = message
+      lastErrorIsFromBackgroundRead = true
+    } else if lastErrorIsFromBackgroundRead {
+      // Only clear errors background reads produced; a mutation error must
+      // survive the history reload that follows the failed operation.
+      clearError()
+    }
   }
 }
