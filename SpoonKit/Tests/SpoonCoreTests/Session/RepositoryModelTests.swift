@@ -157,6 +157,80 @@ struct RepositoryModelTests {
     )
   }
 
+  @Test func worktreeCreationReportsSuccessAndFailure() async {
+    let client = FakeRepositoryGitClient()
+    let oid = makeOID("27272727")
+    let status = makeStatus(oid: oid, branch: "main")
+    let branches = [makeBranch("main", oid: oid, isCurrent: true)]
+    await client.configure(status: status, branches: branches)
+    let model = makeModel(client)
+    let firstPath = URL(filePath: "/tmp/worktree-success")
+
+    let succeeded = await model.addWorktree(path: firstPath, branch: "topic")
+    let remotePath = URL(filePath: "/tmp/remote-worktree-success")
+    let remoteSucceeded = await model.addWorktree(
+      path: remotePath,
+      remoteBranch: "origin/remote-topic",
+      localBranch: "remote-topic"
+    )
+
+    #expect(succeeded)
+    #expect(remoteSucceeded)
+    #expect(
+      await client.mutationCalls == [
+        "add-worktree:\(firstPath.path):topic",
+        "add-remote-worktree:\(remotePath.path):origin/remote-topic:remote-topic",
+      ]
+    )
+
+    await client.configure(
+      status: status,
+      branches: branches,
+      failWorktreeMutations: true
+    )
+    let failed = await model.addWorktree(
+      path: URL(filePath: "/tmp/worktree-failure"),
+      branch: "other"
+    )
+
+    #expect(!failed)
+    #expect(
+      model.lastErrorMessage
+        == FakeRepositoryGitClient.Failure.unimplemented.localizedDescription
+    )
+  }
+
+  @Test func worktreeRemovalCanDeleteItsBranchInOrder() async {
+    let client = FakeRepositoryGitClient()
+    let oid = makeOID("28282828")
+    await client.configure(
+      status: makeStatus(oid: oid, branch: "main"),
+      branches: [
+        makeBranch("main", oid: oid, isCurrent: true),
+        makeBranch("topic", oid: oid, isCurrent: false),
+      ]
+    )
+    let model = makeModel(client)
+    let firstPath = URL(filePath: "/tmp/worktree-only")
+    let secondPath = URL(filePath: "/tmp/worktree-and-branch")
+
+    await model.removeWorktree(path: firstPath)
+    await model.removeWorktree(
+      path: secondPath,
+      force: true,
+      deleteBranch: "topic",
+      forceDeleteBranch: true
+    )
+
+    #expect(
+      await client.mutationCalls == [
+        "remove-worktree:\(firstPath.path):false",
+        "remove-worktree:\(secondPath.path):true",
+        "delete-local:topic:true",
+      ]
+    )
+  }
+
   @Test func historyLoadsSubsequentPages() async {
     let client = FakeRepositoryGitClient()
     let head = makeOID("33333333")
@@ -402,6 +476,7 @@ private actor FakeRepositoryGitClient: GitClient {
   private var mergeBases: [String: ObjectID] = [:]
   private var shouldFailBranches = false
   private var shouldFailRemoteBranches = false
+  private var shouldFailWorktreeMutations = false
   private(set) var stageCallCount = 0
   private(set) var logQueries: [LogQuery] = []
   private(set) var mutationCalls: [String] = []
@@ -414,7 +489,8 @@ private actor FakeRepositoryGitClient: GitClient {
     logPages: [Int: LogPage] = [:],
     mergeBases: [String: ObjectID] = [:],
     failBranches: Bool = false,
-    failRemoteBranches: Bool = false
+    failRemoteBranches: Bool = false,
+    failWorktreeMutations: Bool = false
   ) {
     currentStatus = status
     currentBranches = branches
@@ -424,6 +500,7 @@ private actor FakeRepositoryGitClient: GitClient {
     self.mergeBases = mergeBases
     shouldFailBranches = failBranches
     shouldFailRemoteBranches = failRemoteBranches
+    shouldFailWorktreeMutations = failWorktreeMutations
   }
 
   func status() async throws -> WorkingTreeStatus { currentStatus }
@@ -521,15 +598,24 @@ private actor FakeRepositoryGitClient: GitClient {
   func deleteRemoteTag(name: String, from remoteName: String) async throws {
     throw Failure.unimplemented
   }
-  func addWorktree(path: URL, branch: String) async throws { throw Failure.unimplemented }
+  func addWorktree(path: URL, branch: String) async throws {
+    if shouldFailWorktreeMutations { throw Failure.unimplemented }
+    mutationCalls.append("add-worktree:\(path.path):\(branch)")
+  }
   func addWorktree(
     path: URL,
     remoteBranch: String,
     localBranch: String
   ) async throws {
-    throw Failure.unimplemented
+    if shouldFailWorktreeMutations { throw Failure.unimplemented }
+    mutationCalls.append(
+      "add-remote-worktree:\(path.path):\(remoteBranch):\(localBranch)"
+    )
   }
-  func removeWorktree(path: URL, force: Bool) async throws { throw Failure.unimplemented }
+  func removeWorktree(path: URL, force: Bool) async throws {
+    if shouldFailWorktreeMutations { throw Failure.unimplemented }
+    mutationCalls.append("remove-worktree:\(path.path):\(force)")
+  }
   func sparseCheckoutPaths() async throws -> [String]? { nil }
   func setSparseCheckout(paths: [String]) async throws { throw Failure.unimplemented }
   func disableSparseCheckout() async throws { throw Failure.unimplemented }

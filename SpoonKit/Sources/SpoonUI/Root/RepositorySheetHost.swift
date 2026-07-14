@@ -5,6 +5,7 @@ import SwiftUI
 struct RepositorySheetHost: ViewModifier {
   let model: RepositoryModel
   @Bindable var navigation: RepositoryNavigationState
+  let switchToWorktree: (URL) -> Void
 
   func body(content: Content) -> some View {
     content.sheet(item: $navigation.activeSheet) {
@@ -22,9 +23,17 @@ struct RepositorySheetHost: ViewModifier {
       case .addRemote:
         AddRemoteSheet(model: model)
       case .addWorktree(let branch):
-        AddWorktreeSheet(model: model, branch: branch)
+        AddWorktreeSheet(
+          model: model,
+          branch: branch,
+          switchToWorktree: switchToWorktree
+        )
       case .addRemoteWorktree(let selection):
-        AddRemoteBranchWorktreeSheet(model: model, selection: selection)
+        AddRemoteBranchWorktreeSheet(
+          model: model,
+          selection: selection,
+          switchToWorktree: switchToWorktree
+        )
       case .renameBranch(let branch):
         RenameBranchSheet(model: model, branch: branch)
       case .renameRemoteBranch(let selection):
@@ -50,8 +59,15 @@ struct RepositorySheetHost: ViewModifier {
 extension View {
   func repositorySheets(
     model: RepositoryModel,
-    navigation: RepositoryNavigationState
+    navigation: RepositoryNavigationState,
+    switchToWorktree: @escaping (URL) -> Void
   ) -> some View {
-    modifier(RepositorySheetHost(model: model, navigation: navigation))
+    modifier(
+      RepositorySheetHost(
+        model: model,
+        navigation: navigation,
+        switchToWorktree: switchToWorktree
+      )
+    )
   }
 }

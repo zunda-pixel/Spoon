@@ -5,14 +5,13 @@ import SwiftUI
 struct RepoSidebarView: View {
   let model: RepositoryModel
   @Bindable var navigation: RepositoryNavigationState
-  let switchRepository: (Repository.ID) -> Void
+  let openWorktree: (Worktree) -> Void
   @State private var removingRemote: Remote?
   @State private var removingWorktree: Worktree?
   @State private var deletingBranch: Branch?
   @State private var deletingRemoteBranch: RemoteBranchSelection?
   @State private var deletingTag: Tag?
   @State private var deletingRemoteTag: RemoteTagSelection?
-  @State private var switchWorktreeErrorMessage: String?
   @State private var searchText = ""
 
   var body: some View {
@@ -52,6 +51,9 @@ struct RepoSidebarView: View {
     .sheet(item: $deletingBranch) { branch in
       DeleteBranchSheet(model: model, branch: branch)
     }
+    .sheet(item: $removingWorktree) { worktree in
+      DeleteWorktreeSheet(model: model, worktree: worktree)
+    }
     .confirmationDialog(
       "Remove remote “\(removingRemote?.name ?? "")”?",
       isPresented: binding(for: $removingRemote)
@@ -62,23 +64,6 @@ struct RepoSidebarView: View {
       }
     } message: {
       Text("Remote-tracking branches and settings for this remote will be deleted.")
-    }
-    .confirmationDialog(
-      "Remove worktree “\(removingWorktree?.name ?? "")”?",
-      isPresented: binding(for: $removingWorktree)
-    ) {
-      Button("Remove Worktree", role: .destructive) {
-        guard let worktree = removingWorktree else { return }
-        Task { await model.removeWorktree(path: worktree.path, force: false) }
-      }
-      Button("Force Remove (Discard Changes)", role: .destructive) {
-        guard let worktree = removingWorktree else { return }
-        Task { await model.removeWorktree(path: worktree.path, force: true) }
-      }
-    } message: {
-      Text(
-        "The worktree folder at \(removingWorktree?.path.path ?? "") will be deleted. Remove refuses worktrees with local changes; Force Remove deletes them anyway."
-      )
     }
     .confirmationDialog(
       "Delete tag “\(deletingTag?.name ?? "")”?",
@@ -118,18 +103,8 @@ struct RepoSidebarView: View {
         }
       }
     } message: {
-      Text("The remote branch will be permanently deleted. A matching local branch is not affected.")
-    }
-    .alert(
-      "Could Not Switch Worktree",
-      isPresented: .init(
-        get: { switchWorktreeErrorMessage != nil },
-        set: { if !$0 { switchWorktreeErrorMessage = nil } }
-      )
-    ) {
-      Button("OK", role: .cancel) {}
-    } message: {
-      Text(switchWorktreeErrorMessage ?? "")
+      Text(
+        "The remote branch will be permanently deleted. A matching local branch is not affected.")
     }
   }
 
@@ -138,18 +113,5 @@ struct RepoSidebarView: View {
       get: { value.wrappedValue != nil },
       set: { if !$0 { value.wrappedValue = nil } }
     )
-  }
-
-  private func openWorktree(_ worktree: Worktree) {
-    let gitMetadataURL = worktree.path.appending(path: ".git")
-    guard FileManager.default.fileExists(atPath: gitMetadataURL.path) else {
-      switchWorktreeErrorMessage = "The worktree no longer exists at \(worktree.path.path)."
-      return
-    }
-
-    let repositoryID = Repository(rootURL: worktree.path).id
-    guard repositoryID != model.repository.id else { return }
-    model.stopWatching()
-    switchRepository(repositoryID)
   }
 }

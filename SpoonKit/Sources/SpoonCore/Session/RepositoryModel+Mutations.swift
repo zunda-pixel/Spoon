@@ -194,15 +194,17 @@ extension RepositoryModel {
     worktrees.first { $0.branch == branch.name }
   }
 
-  public func addWorktree(path: URL, branch: String) async {
+  @discardableResult
+  public func addWorktree(path: URL, branch: String) async -> Bool {
     await perform { try await $0.addWorktree(path: path, branch: branch) }
   }
 
+  @discardableResult
   public func addWorktree(
     path: URL,
     remoteBranch: String,
     localBranch: String
-  ) async {
+  ) async -> Bool {
     await perform {
       try await $0.addWorktree(
         path: path,
@@ -212,8 +214,18 @@ extension RepositoryModel {
     }
   }
 
-  public func removeWorktree(path: URL, force: Bool = false) async {
-    await perform { try await $0.removeWorktree(path: path, force: force) }
+  public func removeWorktree(
+    path: URL,
+    force: Bool = false,
+    deleteBranch branchName: String? = nil,
+    forceDeleteBranch: Bool = false
+  ) async {
+    await perform {
+      try await $0.removeWorktree(path: path, force: force)
+      if let branchName {
+        try await $0.deleteBranch(name: branchName, force: forceDeleteBranch)
+      }
+    }
   }
 
   public func sparseCheckoutPaths() async throws -> [String]? {

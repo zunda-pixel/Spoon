@@ -180,7 +180,7 @@ private struct BranchContextMenu: View {
         NSWorkspace.shared.open(worktree.path)
       }
       if !worktree.isMain {
-        Button("Remove Worktree…", role: .destructive) { removingWorktree = worktree }
+        Button("Delete Worktree…", role: .destructive) { removingWorktree = worktree }
           .disabled(model.isBusy)
       }
     } else if !branch.isCurrent {

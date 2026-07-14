@@ -101,15 +101,16 @@ struct RepositorySplitView: View {
   let model: RepositoryModel
   let switchRepository: (Repository.ID) -> Void
   @State private var navigation = RepositoryNavigationState()
+  @State private var switchWorktreeErrorMessage: String?
 
   var body: some View {
     NavigationSplitView {
       RepoSidebarView(
         model: model,
         navigation: navigation,
-        switchRepository: switchRepository
+        openWorktree: { switchToWorktree(at: $0.path) }
       )
-        .navigationSplitViewColumnWidth(min: 220, ideal: 260)
+      .navigationSplitViewColumnWidth(min: 220, ideal: 260)
     } content: {
       RepositoryContentColumn(model: model, navigation: navigation)
         .navigationSplitViewColumnWidth(min: 300, ideal: 380)
@@ -127,7 +128,11 @@ struct RepositorySplitView: View {
     .toolbar {
       RepositoryToolbar(model: model, navigation: navigation)
     }
-    .repositorySheets(model: model, navigation: navigation)
+    .repositorySheets(
+      model: model,
+      navigation: navigation,
+      switchToWorktree: switchToWorktree
+    )
     .confirmationDialog(
       "Force push \(model.currentBranch?.name ?? "the current branch")?",
       isPresented: .init(
@@ -178,6 +183,17 @@ struct RepositorySplitView: View {
     } message: {
       Text(model.lastErrorMessage ?? "")
     }
+    .alert(
+      "Could Not Switch Worktree",
+      isPresented: .init(
+        get: { switchWorktreeErrorMessage != nil },
+        set: { if !$0 { switchWorktreeErrorMessage = nil } }
+      )
+    ) {
+      Button("OK", role: .cancel) {}
+    } message: {
+      Text(switchWorktreeErrorMessage ?? "")
+    }
     .focusedSceneValue(\.repositoryModel, model)
     .focusedSceneValue(\.repositoryNavigationState, navigation)
     .onChange(of: model.branches) {
@@ -216,10 +232,23 @@ struct RepositorySplitView: View {
     case nil: "Operation"
     }
   }
+
+  private func switchToWorktree(at path: URL) {
+    let gitMetadataURL = path.appending(path: ".git")
+    guard FileManager.default.fileExists(atPath: gitMetadataURL.path) else {
+      switchWorktreeErrorMessage = "The worktree no longer exists at \(path.path)."
+      return
+    }
+
+    let repositoryID = Repository(rootURL: path).id
+    guard repositoryID != model.repository.id else { return }
+    model.stopWatching()
+    switchRepository(repositoryID)
+  }
 }
 
-private extension RepositoryModel {
-  var commonWorktreeName: String {
+extension RepositoryModel {
+  fileprivate var commonWorktreeName: String {
     worktrees.first(where: \.isMain)?.name ?? repository.name
   }
 }

@@ -221,7 +221,7 @@ private struct RemoteBranchTreeNodeView: View {
         NSWorkspace.shared.open(worktree.path)
       }
       if !worktree.isMain {
-        Button("Remove Worktree…", role: .destructive) {
+        Button("Delete Worktree…", role: .destructive) {
           removingWorktree = worktree
         }
         .disabled(model.isBusy)

@@ -113,16 +113,91 @@ struct DeleteBranchSheet: View {
 }
 
 @MainActor
+struct DeleteWorktreeSheet: View {
+  let model: RepositoryModel
+  let worktree: Worktree
+  @Environment(\.dismiss) private var dismiss
+  @State private var forceRemove = false
+  @State private var deleteBranch = false
+  @State private var forceDeleteBranch = false
+  @State private var branchRequiresForce: Bool?
+
+  var body: some View {
+    SheetFormLayout(title: "Delete Worktree “\(worktree.name)”") {
+      Text("The worktree folder at \(worktree.path.path) will be deleted.")
+        .frame(width: 420, alignment: .leading)
+      Toggle("Force delete, discarding local changes", isOn: $forceRemove)
+
+      if let branch {
+        Toggle("Also delete branch “\(branch.name)”", isOn: $deleteBranch)
+        if deleteBranch, branchRequiresForce == true {
+          Text("This branch has commits that are merged into neither HEAD nor its upstream.")
+            .frame(width: 420, alignment: .leading)
+          Toggle(
+            "Force delete, discarding those commits",
+            isOn: $forceDeleteBranch
+          )
+        }
+        if deleteBranch {
+          Text("This runs multiple Git operations and cannot be completed atomically.")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        }
+      }
+    } actions: {
+      Button("Cancel", role: .cancel) { dismiss() }
+      Button("Delete", role: .destructive, action: remove)
+        .keyboardShortcut(.defaultAction)
+        .disabled(
+          deleteBranch
+            && (branchRequiresForce == nil
+              || (branchRequiresForce == true && !forceDeleteBranch))
+        )
+    }
+    .task {
+      guard let branch else { return }
+      branchRequiresForce = await model.requiresForceDelete(branch)
+    }
+  }
+
+  private var branch: Branch? {
+    guard let branchName = worktree.branch else { return nil }
+    return model.branches.first { $0.name == branchName }
+  }
+
+  private func remove() {
+    let branchName = deleteBranch ? branch?.name : nil
+    let shouldForceRemove = forceRemove
+    let shouldForceDeleteBranch = forceDeleteBranch
+    dismiss()
+    Task {
+      await model.removeWorktree(
+        path: worktree.path,
+        force: shouldForceRemove,
+        deleteBranch: branchName,
+        forceDeleteBranch: shouldForceDeleteBranch
+      )
+    }
+  }
+}
+
+@MainActor
 struct AddWorktreeSheet: View {
   let model: RepositoryModel
   let branch: Branch
+  let switchToWorktree: (URL) -> Void
   @Environment(\.dismiss) private var dismiss
   @State private var parentPath: String
   @State private var folderName: String
 
-  init(model: RepositoryModel, branch: Branch) {
+  init(
+    model: RepositoryModel,
+    branch: Branch,
+    switchToWorktree: @escaping (URL) -> Void
+  ) {
     self.model = model
     self.branch = branch
+    self.switchToWorktree = switchToWorktree
     let root = model.repository.rootURL
     self._parentPath = State(initialValue: root.deletingLastPathComponent().path)
     let safeBranchName = branch.name.replacingOccurrences(of: "/", with: "-")
@@ -147,7 +222,7 @@ struct AddWorktreeSheet: View {
         .truncationMode(.middle)
     } actions: {
       Button("Cancel", role: .cancel) { dismiss() }
-      Button("Add Worktree", action: create)
+      Button("Add and Switch", action: create)
         .keyboardShortcut(.defaultAction)
         .disabled(!isValid)
     }
@@ -167,6 +242,9 @@ struct AddWorktreeSheet: View {
     guard isValid else { return }
     let destination = destination
     dismiss()
-    Task { await model.addWorktree(path: destination, branch: branch.name) }
+    Task {
+      guard await model.addWorktree(path: destination, branch: branch.name) else { return }
+      switchToWorktree(destination)
+    }
   }
 }

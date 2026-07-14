@@ -5,14 +5,20 @@ import SwiftUI
 struct AddRemoteBranchWorktreeSheet: View {
   let model: RepositoryModel
   let selection: RemoteBranchSelection
+  let switchToWorktree: (URL) -> Void
   @Environment(\.dismiss) private var dismiss
   @State private var localBranchName: String
   @State private var parentPath: String
   @State private var folderName: String
 
-  init(model: RepositoryModel, selection: RemoteBranchSelection) {
+  init(
+    model: RepositoryModel,
+    selection: RemoteBranchSelection,
+    switchToWorktree: @escaping (URL) -> Void
+  ) {
     self.model = model
     self.selection = selection
+    self.switchToWorktree = switchToWorktree
     let root = model.repository.rootURL
     self._localBranchName = State(initialValue: selection.localName)
     self._parentPath = State(initialValue: root.deletingLastPathComponent().path)
@@ -39,7 +45,7 @@ struct AddRemoteBranchWorktreeSheet: View {
         .truncationMode(.middle)
     } actions: {
       Button("Cancel", role: .cancel) { dismiss() }
-      Button("Add Worktree", action: create)
+      Button("Add and Switch", action: create)
         .keyboardShortcut(.defaultAction)
         .disabled(!isValid)
     }
@@ -69,11 +75,14 @@ struct AddRemoteBranchWorktreeSheet: View {
     let localBranchName = trimmedLocalBranchName
     dismiss()
     Task {
-      await model.addWorktree(
-        path: destination,
-        remoteBranch: selection.fullName,
-        localBranch: localBranchName
-      )
+      guard
+        await model.addWorktree(
+          path: destination,
+          remoteBranch: selection.fullName,
+          localBranch: localBranchName
+        )
+      else { return }
+      switchToWorktree(destination)
     }
   }
 }
@@ -97,10 +106,12 @@ struct RenameRemoteBranchSheet: View {
         .textFieldStyle(.roundedBorder)
         .frame(width: 280)
         .onSubmit(rename)
-      Text("The new branch is pushed before the old branch is deleted. This operation is not atomic.")
-        .font(.caption)
-        .foregroundStyle(.secondary)
-        .frame(width: 360, alignment: .leading)
+      Text(
+        "The new branch is pushed before the old branch is deleted. This operation is not atomic."
+      )
+      .font(.caption)
+      .foregroundStyle(.secondary)
+      .frame(width: 360, alignment: .leading)
     } actions: {
       Button("Cancel", role: .cancel) { dismiss() }
       Button("Rename", action: rename)
