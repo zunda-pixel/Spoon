@@ -6,8 +6,6 @@ import SwiftUI
 struct BranchesSidebarSection: View {
   let model: RepositoryModel
   let navigation: RepositoryNavigationState
-  @Binding var removingWorktree: Worktree?
-  @Binding var deletingBranch: Branch?
   let searchText: String
   let openWorktree: (Worktree) -> Void
   @State private var isExpanded = true
@@ -26,8 +24,6 @@ struct BranchesSidebarSection: View {
           navigation: navigation,
           isSearching: searchText.hasSidebarSearchQuery,
           expandedFolderPaths: $expandedFolderPaths,
-          removingWorktree: $removingWorktree,
-          deletingBranch: $deletingBranch,
           openWorktree: openWorktree
         )
       }
@@ -61,8 +57,6 @@ private struct BranchTreeNodeView: View {
   let navigation: RepositoryNavigationState
   let isSearching: Bool
   @Binding var expandedFolderPaths: Set<String>
-  @Binding var removingWorktree: Worktree?
-  @Binding var deletingBranch: Branch?
   let openWorktree: (Worktree) -> Void
 
   var body: some View {
@@ -97,8 +91,6 @@ private struct BranchTreeNodeView: View {
           branch: branch,
           pullRequest: pullRequest,
           worktree: worktree,
-          removingWorktree: $removingWorktree,
-          deletingBranch: $deletingBranch,
           openWorktree: openWorktree
         )
       }
@@ -111,8 +103,6 @@ private struct BranchTreeNodeView: View {
             navigation: navigation,
             isSearching: isSearching,
             expandedFolderPaths: $expandedFolderPaths,
-            removingWorktree: $removingWorktree,
-            deletingBranch: $deletingBranch,
             openWorktree: openWorktree
           )
         }
@@ -150,14 +140,12 @@ private struct BranchTreeNodeView: View {
 }
 
 @MainActor
-private struct BranchContextMenu: View {
+struct BranchContextMenu: View {
   let model: RepositoryModel
   let navigation: RepositoryNavigationState
   let branch: Branch
   let pullRequest: PullRequest?
   let worktree: Worktree?
-  @Binding var removingWorktree: Worktree?
-  @Binding var deletingBranch: Branch?
   let openWorktree: (Worktree) -> Void
 
   var body: some View {
@@ -186,7 +174,9 @@ private struct BranchContextMenu: View {
         NSWorkspace.shared.open(worktree.path)
       }
       if !worktree.isMain {
-        Button("Delete Worktree…", role: .destructive) { removingWorktree = worktree }
+        Button("Delete Worktree…", role: .destructive) {
+          navigation.present(.deleteWorktree(worktree))
+        }
           .disabled(model.isBusy)
       }
     } else if !branch.isCurrent {
@@ -200,7 +190,9 @@ private struct BranchContextMenu: View {
     .disabled(model.isBusy)
     Button("Rename Branch…") { navigation.present(.renameBranch(branch)) }
       .disabled(model.isBusy)
-    Button("Delete Branch…", role: .destructive) { deletingBranch = branch }
+    Button("Delete Branch…", role: .destructive) {
+      navigation.present(.deleteBranch(branch))
+    }
       .disabled(branch.isCurrent || model.isBusy || worktree != nil)
   }
 

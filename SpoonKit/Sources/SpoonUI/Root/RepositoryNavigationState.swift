@@ -31,6 +31,8 @@ final class RepositoryNavigationState {
     case addWorktree(Branch)
     case addRemoteWorktree(RemoteBranchSelection)
     case renameBranch(Branch)
+    case deleteBranch(Branch)
+    case deleteWorktree(Worktree)
     case renameRemoteBranch(RemoteBranchSelection)
     case mergeBranch(Branch)
     case rebase(Commit)
@@ -54,6 +56,10 @@ final class RepositoryNavigationState {
         "add-remote-worktree:\(selection.id)"
       case .renameBranch(let branch):
         "rename-branch:\(branch.id)"
+      case .deleteBranch(let branch):
+        "delete-branch:\(branch.id)"
+      case .deleteWorktree(let worktree):
+        "delete-worktree:\(worktree.id)"
       case .renameRemoteBranch(let selection):
         "rename-remote-branch:\(selection.id)"
       case .mergeBranch(let branch):

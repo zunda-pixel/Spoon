@@ -6,6 +6,7 @@ struct HistoryListView: View {
   let model: RepositoryModel
   let focus: HistoryFocus?
   @Bindable var navigation: RepositoryNavigationState
+  let openWorktree: (Worktree) -> Void
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
   var body: some View {
@@ -25,9 +26,12 @@ struct HistoryListView: View {
           List(selection: $navigation.selectedCommitID) {
             ForEach(model.historyRows) { row in
               CommitGraphRowView(
+                model: model,
+                navigation: navigation,
                 row: row,
                 referenceLabels: referenceLabelsByOID[row.commit.oid] ?? [],
-                selectedReference: focus?.reference
+                selectedReference: focus?.reference,
+                openWorktree: openWorktree
               )
               .tag(row.id)
               .id(row.id)
@@ -110,6 +114,26 @@ struct HistoryListView: View {
 
   @ViewBuilder
   private func commitMenu(_ commit: Commit) -> some View {
+    let branches = localBranches(on: commit)
+    ForEach(branches) { branch in
+      Menu(branchMenuTitle(for: branch)) {
+        Button("Select Branch") {
+          navigation.focusHistory(on: branch)
+        }
+        Divider()
+        BranchContextMenu(
+          model: model,
+          navigation: navigation,
+          branch: branch,
+          pullRequest: model.prByBranch[branch.name],
+          worktree: model.worktree(for: branch),
+          openWorktree: openWorktree
+        )
+      }
+    }
+    if !branches.isEmpty {
+      Divider()
+    }
     RevisionContextMenu(
       model: model,
       navigation: navigation,
@@ -138,6 +162,20 @@ struct HistoryListView: View {
       }
       .disabled(model.isBusy || model.isSequencing)
     }
+  }
+
+  private func localBranches(on commit: Commit) -> [Branch] {
+    (referenceLabelsByOID[commit.oid] ?? []).compactMap { label in
+      guard case .localBranch(let name) = label.referenceIdentity else { return nil }
+      return model.branches.first { $0.name == name }
+    }
+  }
+
+  private func branchMenuTitle(for branch: Branch) -> String {
+    if model.worktree(for: branch) != nil {
+      return "Worktree Branch “\(branch.name)”"
+    }
+    return "Branch “\(branch.name)”"
   }
 }
 

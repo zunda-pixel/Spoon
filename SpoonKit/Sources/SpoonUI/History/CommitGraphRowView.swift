@@ -3,9 +3,12 @@ import SwiftUI
 
 @MainActor
 struct CommitGraphRowView: View {
+  let model: RepositoryModel
+  let navigation: RepositoryNavigationState
   let row: GraphRow
   let referenceLabels: [HistoryReferenceLabel]
   let selectedReference: HistoryReferenceIdentity?
+  let openWorktree: (Worktree) -> Void
 
   private nonisolated static let laneWidth: CGFloat = 12
   private nonisolated static let rowHeight: CGFloat = 34
@@ -77,7 +80,44 @@ struct CommitGraphRowView: View {
     return components.joined(separator: ", ")
   }
 
+  @ViewBuilder
   private func referenceBadge(_ referenceLabel: HistoryReferenceLabel) -> some View {
+    if let branch = localBranch(for: referenceLabel) {
+      referenceBadgeButton(referenceLabel, branch: branch)
+    } else {
+      referenceBadgeLabel(referenceLabel)
+    }
+  }
+
+  private func referenceBadgeButton(
+    _ referenceLabel: HistoryReferenceLabel,
+    branch: Branch
+  ) -> some View {
+    let worktree = model.worktree(for: branch)
+    return Button {
+      navigation.focusHistory(on: branch)
+    } label: {
+      referenceBadgeLabel(referenceLabel)
+    }
+    .buttonStyle(.plain)
+    .contextMenu {
+      BranchContextMenu(
+        model: model,
+        navigation: navigation,
+        branch: branch,
+        pullRequest: model.prByBranch[branch.name],
+        worktree: worktree,
+        openWorktree: openWorktree
+      )
+    }
+    .accessibilityHint(
+      worktree == nil
+        ? "Selects this branch; open the context menu for branch actions"
+        : "Selects this worktree branch; open the context menu for worktree actions"
+    )
+  }
+
+  private func referenceBadgeLabel(_ referenceLabel: HistoryReferenceLabel) -> some View {
     Label(
       referenceLabel.name,
       systemImage: symbolName(for: referenceLabel)
@@ -97,6 +137,11 @@ struct CommitGraphRowView: View {
     .help(accessibilityDescription(referenceLabel))
     .accessibilityLabel(accessibilityDescription(referenceLabel))
     .accessibilityAddTraits(isSelected(referenceLabel) ? .isSelected : [])
+  }
+
+  private func localBranch(for label: HistoryReferenceLabel) -> Branch? {
+    guard case .localBranch(let name) = label.referenceIdentity else { return nil }
+    return model.branches.first { $0.name == name }
   }
 
   private func isSelected(_ label: HistoryReferenceLabel) -> Bool {

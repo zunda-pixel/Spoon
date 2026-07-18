@@ -5,6 +5,7 @@ import SwiftUI
 struct RepositoryContentColumn: View {
   let model: RepositoryModel
   @Bindable var navigation: RepositoryNavigationState
+  let openWorktree: (Worktree) -> Void
 
   var body: some View {
     switch navigation.sidebarSelection {
@@ -14,7 +15,8 @@ struct RepositoryContentColumn: View {
       HistoryListView(
         model: model,
         focus: resolvedHistoryFocus,
-        navigation: navigation
+        navigation: navigation,
+        openWorktree: openWorktree
       )
     case .reflog:
       ReflogView(model: model, navigation: navigation)

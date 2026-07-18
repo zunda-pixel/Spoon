@@ -112,7 +112,11 @@ struct RepositorySplitView: View {
       )
       .navigationSplitViewColumnWidth(min: 220, ideal: 260)
     } content: {
-      RepositoryContentColumn(model: model, navigation: navigation)
+      RepositoryContentColumn(
+        model: model,
+        navigation: navigation,
+        openWorktree: { switchToWorktree(at: $0.path) }
+      )
         .navigationSplitViewColumnWidth(min: 300, ideal: 380)
     } detail: {
       RepositoryDetailColumn(model: model, navigation: navigation)

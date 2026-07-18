@@ -8,7 +8,6 @@ struct RepoSidebarView: View {
   let openWorktree: (Worktree) -> Void
   @State private var removingRemote: Remote?
   @State private var removingWorktree: Worktree?
-  @State private var deletingBranch: Branch?
   @State private var deletingRemoteBranch: RemoteBranchSelection?
   @State private var deletingTag: Tag?
   @State private var deletingRemoteTag: RemoteTagSelection?
@@ -20,8 +19,6 @@ struct RepoSidebarView: View {
       BranchesSidebarSection(
         model: model,
         navigation: navigation,
-        removingWorktree: $removingWorktree,
-        deletingBranch: $deletingBranch,
         searchText: searchText,
         openWorktree: openWorktree
       )
@@ -49,9 +46,6 @@ struct RepoSidebarView: View {
       placement: .sidebar,
       prompt: "Search branches, remotes, stashes, and tags"
     )
-    .sheet(item: $deletingBranch) { branch in
-      DeleteBranchSheet(model: model, branch: branch)
-    }
     .sheet(item: $removingWorktree) { worktree in
       DeleteWorktreeSheet(model: model, worktree: worktree)
     }
