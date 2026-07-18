@@ -28,6 +28,7 @@ public struct HistoryReferenceLabel: Sendable, Hashable, Identifiable {
   public let name: String
   public let kind: Kind
   public let isCurrent: Bool
+  public let isCheckedOutInWorktree: Bool
   public let referenceIdentity: HistoryReferenceIdentity?
 
   public init(
@@ -35,12 +36,14 @@ public struct HistoryReferenceLabel: Sendable, Hashable, Identifiable {
     name: String,
     kind: Kind,
     isCurrent: Bool = false,
+    isCheckedOutInWorktree: Bool = false,
     referenceIdentity: HistoryReferenceIdentity? = nil
   ) {
     self.id = id
     self.name = name
     self.kind = kind
     self.isCurrent = isCurrent
+    self.isCheckedOutInWorktree = isCheckedOutInWorktree
     self.referenceIdentity = referenceIdentity
   }
 }
@@ -58,7 +61,7 @@ public enum HistoryReferenceLabelBuilder {
     visibleReferenceIDs: Set<String>? = nil
   ) -> [ObjectID: [HistoryReferenceLabel]] {
     var labelsByOID: [ObjectID: [HistoryReferenceLabel]] = [:]
-    let activeWorktreeID = activeWorktreeRoot.map { Repository(rootURL: $0).id }
+    let worktreeBranchNames = Set(worktrees.compactMap(\.branch))
 
     for branch in branches {
       let filterID = HistoryReferenceFilterID.localBranch(branch.name).id
@@ -72,6 +75,7 @@ public enum HistoryReferenceLabelBuilder {
           name: branch.name,
           kind: .localBranch,
           isCurrent: branch.isCurrent,
+          isCheckedOutInWorktree: worktreeBranchNames.contains(branch.name),
           referenceIdentity: identity
         )
       )
@@ -99,18 +103,6 @@ public enum HistoryReferenceLabelBuilder {
           )
         )
       }
-    }
-
-    for worktree in worktrees {
-      guard let oid = worktree.headOID else { continue }
-      labelsByOID[oid, default: []].append(
-        HistoryReferenceLabel(
-          id: "worktree:\(worktree.path.path)",
-          name: worktree.name,
-          kind: .worktree,
-          isCurrent: Repository(rootURL: worktree.path).id == activeWorktreeID
-        )
-      )
     }
 
     for tag in tags {

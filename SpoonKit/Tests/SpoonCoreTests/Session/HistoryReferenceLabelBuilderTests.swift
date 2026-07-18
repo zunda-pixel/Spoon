@@ -5,7 +5,7 @@ import Testing
 
 @Suite("HistoryReferenceLabelBuilder")
 struct HistoryReferenceLabelBuilderTests {
-  @Test func groupsEveryReferenceKindAndPrioritizesFocusedBranch() throws {
+  @Test func groupsHistoryReferencesAndMarksWorktreeBranches() throws {
     let oid = try #require(ObjectID(rawValue: String(repeating: "a", count: 40)))
     let local = Branch(
       name: "main",
@@ -50,12 +50,14 @@ struct HistoryReferenceLabelBuilderTests {
     )
 
     let commitLabels = try #require(labels[oid])
-    #expect(commitLabels.count == 5)
+    #expect(commitLabels.count == 4)
     #expect(commitLabels.first?.referenceIdentity == focus)
-    #expect(commitLabels.first(where: { $0.kind == .worktree })?.isCurrent == true)
+    #expect(
+      commitLabels.first(where: { $0.kind == .localBranch })?.isCheckedOutInWorktree == true
+    )
     #expect(
       Set(commitLabels.map(\.kind))
-        == Set([.localBranch, .remoteBranch, .worktree, .tag, .stash])
+        == Set([.localBranch, .remoteBranch, .tag, .stash])
     )
   }
 
@@ -89,15 +91,16 @@ struct HistoryReferenceLabelBuilderTests {
     )
   }
 
-  @Test func omitsWorktreesWithoutAHeadCommit() throws {
+  @Test func omitsStandaloneWorktreeLabels() throws {
+    let oid = try #require(ObjectID(rawValue: String(repeating: "d", count: 40)))
     let labels = HistoryReferenceLabelBuilder.build(
       branches: [],
       remoteBranchesByRemote: [:],
       worktrees: [
         Worktree(
-          path: URL(filePath: "/tmp/bare"),
-          branch: nil,
-          headOID: nil,
+          path: URL(filePath: "/tmp/worktree"),
+          branch: "topic",
+          headOID: oid,
           isMain: false
         )
       ],

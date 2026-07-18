@@ -427,7 +427,7 @@ struct RepositoryModelTests {
     #expect(await client.logQueries.isEmpty)
   }
 
-  @Test func historyPreservesDeduplicatedDetachedWorktreeHeadsAcrossPages() async {
+  @Test func historyDoesNotLoadDetachedWorktreeHeadsAcrossPages() async {
     let client = FakeRepositoryGitClient()
     let head = makeOID("77777777")
     let detached = makeOID("88889999")
@@ -468,7 +468,7 @@ struct RepositoryModelTests {
     let queries = await client.logQueries
     #expect(queries.map(\.reference) == [nil, nil])
     #expect(queries.map(\.allReferences) == [true, true])
-    #expect(queries.map(\.additionalRevisions) == [[detached], [detached]])
+    #expect(queries.map(\.additionalRevisions) == [[], []])
   }
 
   @Test func ensureCommitLoadedPagesUntilTheRequestedOIDAppears() async {
@@ -667,7 +667,7 @@ struct RepositoryModelTests {
     let queries = await client.logQueries
     #expect(queries.map(\.reference) == [nil, nil])
     #expect(queries.map(\.allReferences) == [true, true])
-    #expect(queries.map(\.additionalRevisions) == [[detached], [detached]])
+    #expect(queries.map(\.additionalRevisions) == [[], []])
     #expect(model.lastErrorMessage == nil)
     #expect(model.historyRows.count == 1)
   }

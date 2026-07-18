@@ -80,7 +80,7 @@ struct CommitGraphRowView: View {
   private func referenceBadge(_ referenceLabel: HistoryReferenceLabel) -> some View {
     Label(
       referenceLabel.name,
-      systemImage: symbolName(for: referenceLabel.kind)
+      systemImage: symbolName(for: referenceLabel)
     )
     .font(.caption2)
     .fontWeight(referenceLabel.isCurrent ? .semibold : nil)
@@ -103,8 +103,12 @@ struct CommitGraphRowView: View {
     label.referenceIdentity != nil && label.referenceIdentity == selectedReference
   }
 
-  private func symbolName(for kind: HistoryReferenceLabel.Kind) -> String {
-    switch kind {
+  private func symbolName(for label: HistoryReferenceLabel) -> String {
+    if label.kind == .localBranch, label.isCheckedOutInWorktree {
+      return "folder"
+    }
+
+    return switch label.kind {
     case .localBranch:
       "arrow.trianglehead.branch"
     case .remoteBranch:
@@ -122,7 +126,11 @@ struct CommitGraphRowView: View {
     let prefix =
       switch label.kind {
       case .localBranch:
-        label.isCurrent ? "Current branch" : "Local branch"
+        if label.isCheckedOutInWorktree {
+          label.isCurrent ? "Current worktree branch" : "Worktree branch"
+        } else {
+          label.isCurrent ? "Current branch" : "Local branch"
+        }
       case .remoteBranch:
         "Remote branch"
       case .worktree:

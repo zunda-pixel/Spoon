@@ -48,7 +48,7 @@ extension RepositoryModel {
   /// Loads the single history graph spanning every repository reference.
   public func loadHistoryIfNeeded() async {
     await historyStore.loadIfNeeded(
-      additionalRevisions: detachedWorktreeHeads,
+      additionalRevisions: [],
       hiddenCommitOIDs: stashHelperCommitOIDs,
       references: historyReferenceURLs(for: effectiveFocusedHistoryReferenceIDs),
       excludedReferences: historyReferenceURLs(for: effectiveHiddenHistoryReferenceIDs),
@@ -59,7 +59,7 @@ extension RepositoryModel {
 
   public func reloadHistory() async {
     await historyStore.reload(
-      additionalRevisions: detachedWorktreeHeads,
+      additionalRevisions: [],
       hiddenCommitOIDs: stashHelperCommitOIDs,
       references: historyReferenceURLs(for: effectiveFocusedHistoryReferenceIDs),
       excludedReferences: historyReferenceURLs(for: effectiveHiddenHistoryReferenceIDs),
@@ -100,23 +100,12 @@ extension RepositoryModel {
     try await gitClient.reflog(maxCount: maxCount, skip: skip)
   }
 
-  private var detachedWorktreeHeads: [ObjectID] {
-    var seen: Set<ObjectID> = []
-    return worktrees.compactMap { worktree in
-      guard worktree.branch == nil, let oid = worktree.headOID, seen.insert(oid).inserted else {
-        return nil
-      }
-      return oid
-    }
-  }
-
   private var canLoadUnifiedHistory: Bool {
     status?.headOID != nil
       || !branches.isEmpty
       || remoteBranchesByRemote.values.contains(where: { !$0.isEmpty })
       || !tags.isEmpty
       || !stashes.isEmpty
-      || !detachedWorktreeHeads.isEmpty
   }
 
   private var stashHelperCommitOIDs: Set<ObjectID> {
