@@ -92,6 +92,8 @@ final class RepositoryNavigationState {
   var historyFocus: HistoryFocus?
   var activeSheet: ActiveSheet?
   var confirmation: Confirmation?
+  var deletingTag: Tag?
+  var deletingRemoteTag: RemoteTagSelection?
 
   func present(_ sheet: ActiveSheet) {
     activeSheet = sheet

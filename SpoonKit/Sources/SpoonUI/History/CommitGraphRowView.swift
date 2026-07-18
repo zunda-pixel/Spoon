@@ -84,6 +84,8 @@ struct CommitGraphRowView: View {
   private func referenceBadge(_ referenceLabel: HistoryReferenceLabel) -> some View {
     if let branch = localBranch(for: referenceLabel) {
       referenceBadgeButton(referenceLabel, branch: branch)
+    } else if let tag = tag(for: referenceLabel) {
+      referenceBadgeButton(referenceLabel, tag: tag)
     } else {
       referenceBadgeLabel(referenceLabel)
     }
@@ -117,6 +119,26 @@ struct CommitGraphRowView: View {
     )
   }
 
+  private func referenceBadgeButton(
+    _ referenceLabel: HistoryReferenceLabel,
+    tag: Tag
+  ) -> some View {
+    Button {
+      navigation.focusHistory(on: tag)
+    } label: {
+      referenceBadgeLabel(referenceLabel)
+    }
+    .buttonStyle(.plain)
+    .contextMenu {
+      TagContextMenu(
+        model: model,
+        tag: tag,
+        navigation: navigation
+      )
+    }
+    .accessibilityHint("Selects this tag; open the context menu for tag actions")
+  }
+
   private func referenceBadgeLabel(_ referenceLabel: HistoryReferenceLabel) -> some View {
     Label(
       referenceLabel.name,
@@ -142,6 +164,11 @@ struct CommitGraphRowView: View {
   private func localBranch(for label: HistoryReferenceLabel) -> Branch? {
     guard case .localBranch(let name) = label.referenceIdentity else { return nil }
     return model.branches.first { $0.name == name }
+  }
+
+  private func tag(for label: HistoryReferenceLabel) -> Tag? {
+    guard case .tag(let name) = label.referenceIdentity else { return nil }
+    return model.tags.first { $0.name == name }
   }
 
   private func isSelected(_ label: HistoryReferenceLabel) -> Bool {

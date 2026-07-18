@@ -9,8 +9,6 @@ struct RepoSidebarView: View {
   @State private var removingRemote: Remote?
   @State private var removingWorktree: Worktree?
   @State private var deletingRemoteBranch: RemoteBranchSelection?
-  @State private var deletingTag: Tag?
-  @State private var deletingRemoteTag: RemoteTagSelection?
   @State private var searchText = ""
 
   var body: some View {
@@ -35,8 +33,6 @@ struct RepoSidebarView: View {
       TagsSidebarSection(
         model: model,
         navigation: navigation,
-        deletingTag: $deletingTag,
-        deletingRemoteTag: $deletingRemoteTag,
         searchText: searchText
       )
     }
@@ -59,30 +55,6 @@ struct RepoSidebarView: View {
       }
     } message: {
       Text("Remote-tracking branches and settings for this remote will be deleted.")
-    }
-    .confirmationDialog(
-      "Delete tag “\(deletingTag?.name ?? "")”?",
-      isPresented: binding(for: $deletingTag)
-    ) {
-      Button("Delete Tag", role: .destructive) {
-        guard let tag = deletingTag else { return }
-        Task { await model.deleteTag(name: tag.name) }
-      }
-    } message: {
-      Text("The tag will be removed locally. Remote copies are not affected.")
-    }
-    .confirmationDialog(
-      "Delete tag “\(deletingRemoteTag?.tag.name ?? "")” from \(deletingRemoteTag?.remote.name ?? "remote")?",
-      isPresented: binding(for: $deletingRemoteTag)
-    ) {
-      Button("Delete from Remote", role: .destructive) {
-        guard let selection = deletingRemoteTag else { return }
-        Task {
-          await model.deleteRemoteTag(name: selection.tag.name, from: selection.remote.name)
-        }
-      }
-    } message: {
-      Text("The local tag will be kept.")
     }
     .confirmationDialog(
       "Delete remote branch “\(deletingRemoteBranch?.fullName ?? "")”?",

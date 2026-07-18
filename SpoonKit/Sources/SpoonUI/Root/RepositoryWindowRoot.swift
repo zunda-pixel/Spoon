@@ -165,6 +165,36 @@ struct RepositorySplitView: View {
     } message: {
       Text("All progress from this operation will be discarded and the branch restored.")
     }
+    .confirmationDialog(
+      "Delete tag “\(navigation.deletingTag?.name ?? "")”?",
+      isPresented: .init(
+        get: { navigation.deletingTag != nil },
+        set: { if !$0 { navigation.deletingTag = nil } }
+      )
+    ) {
+      Button("Delete Tag", role: .destructive) {
+        guard let tag = navigation.deletingTag else { return }
+        Task { await model.deleteTag(name: tag.name) }
+      }
+    } message: {
+      Text("The tag will be removed locally. Remote copies are not affected.")
+    }
+    .confirmationDialog(
+      "Delete tag “\(navigation.deletingRemoteTag?.tag.name ?? "")” from \(navigation.deletingRemoteTag?.remote.name ?? "remote")?",
+      isPresented: .init(
+        get: { navigation.deletingRemoteTag != nil },
+        set: { if !$0 { navigation.deletingRemoteTag = nil } }
+      )
+    ) {
+      Button("Delete from Remote", role: .destructive) {
+        guard let selection = navigation.deletingRemoteTag else { return }
+        Task {
+          await model.deleteRemoteTag(name: selection.tag.name, from: selection.remote.name)
+        }
+      }
+    } message: {
+      Text("The local tag will be kept.")
+    }
     .alert(
       "AI Task Failed",
       isPresented: .init(

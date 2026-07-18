@@ -78,5 +78,13 @@ let package = Package(
       ],
       swiftSettings: swiftSettings
     ),
+    .testTarget(
+      name: "SpoonUITests",
+      dependencies: [
+        .target(name: "SpoonUI"),
+        .target(name: "SpoonCore"),
+      ],
+      swiftSettings: swiftSettings
+    ),
   ]
 )

@@ -84,8 +84,6 @@ struct StashesSidebarSection: View {
 struct TagsSidebarSection: View {
   let model: RepositoryModel
   let navigation: RepositoryNavigationState
-  @Binding var deletingTag: Tag?
-  @Binding var deletingRemoteTag: RemoteTagSelection?
   let searchText: String
   @State private var isExpanded = false
 
@@ -102,8 +100,7 @@ struct TagsSidebarSection: View {
               TagContextMenu(
                 model: model,
                 tag: tag,
-                deletingTag: $deletingTag,
-                deletingRemoteTag: $deletingRemoteTag
+                navigation: navigation
               )
             }
         }
@@ -182,11 +179,10 @@ private struct TagSidebarRow: View {
 }
 
 @MainActor
-private struct TagContextMenu: View {
+struct TagContextMenu: View {
   let model: RepositoryModel
   let tag: Tag
-  @Binding var deletingTag: Tag?
-  @Binding var deletingRemoteTag: RemoteTagSelection?
+  let navigation: RepositoryNavigationState
 
   var body: some View {
     Menu("Push to Remote") {
@@ -198,13 +194,13 @@ private struct TagContextMenu: View {
     Menu("Delete from Remote") {
       ForEach(model.remotes) { remote in
         Button(remote.name, role: .destructive) {
-          deletingRemoteTag = RemoteTagSelection(tag: tag, remote: remote)
+          navigation.deletingRemoteTag = RemoteTagSelection(tag: tag, remote: remote)
         }
       }
     }
     .disabled(model.remotes.isEmpty || model.isBusy)
     Divider()
-    Button("Delete Tag…", role: .destructive) { deletingTag = tag }
+    Button("Delete Tag…", role: .destructive) { navigation.deletingTag = tag }
       .disabled(model.isBusy)
   }
 }

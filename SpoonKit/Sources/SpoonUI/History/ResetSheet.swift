@@ -6,9 +6,17 @@ struct ResetSheet: View {
   let model: RepositoryModel
   let target: ObjectID
   let targetDescription: String
+  let targetSummary: String
   @Environment(\.dismiss) private var dismiss
   @State private var mode = ResetMode.mixed
   @State private var isConfirmingHardReset = false
+
+  init(model: RepositoryModel, target: ObjectID, targetDescription: String, targetSummary: String? = nil) {
+    self.model = model
+    self.target = target
+    self.targetDescription = targetDescription
+    self.targetSummary = targetSummary ?? "\(targetDescription) (\(target.shortened))"
+  }
 
   var body: some View {
     SheetFormLayout(title: "Reset to \(targetDescription)") {
@@ -47,7 +55,7 @@ struct ResetSheet: View {
       Button("Cancel", role: .cancel) {}
     } message: {
       Text(
-        "Target: \(targetDescription)\n\nThis moves \(model.currentBranch?.name ?? "HEAD") to the target and permanently discards all tracked index and working-tree changes. Untracked files are not removed."
+        "Target: \(targetSummary)\n\nThis moves \(model.currentBranch?.name ?? "HEAD") to the target and permanently discards all tracked index and working-tree changes. Untracked files are not removed."
       )
     }
   }
@@ -67,5 +75,26 @@ struct ResetSheet: View {
     let mode = mode
     dismiss()
     Task { await model.reset(to: target, mode: mode) }
+  }
+}
+
+@MainActor
+struct ResetBranchTarget: Hashable, Identifiable {
+  let name: String
+  let tip: ObjectID
+
+  var id: String { name }
+  var targetDescription: String { "branch \"\(name)\"" }
+  var resetSheet: RepositoryNavigationState.ActiveSheet {
+    .reset(target: tip, description: targetDescription)
+  }
+
+  init(branch: Branch) {
+    self.name = branch.name
+    self.tip = branch.tip
+  }
+
+  static func isAvailable(for branch: Branch) -> Bool {
+    !branch.isCurrent
   }
 }

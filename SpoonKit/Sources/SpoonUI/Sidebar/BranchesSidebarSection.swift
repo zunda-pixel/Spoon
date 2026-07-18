@@ -167,6 +167,10 @@ struct BranchContextMenu: View {
       navigation.present(.mergeBranch(branch))
     }
     .disabled(branch.isCurrent || model.isBusy || model.isSequencing)
+    Button("Reset Current Branch to \(branch.name)…", role: .destructive) {
+      navigation.present(ResetBranchTarget(branch: branch).resetSheet)
+    }
+    .disabled(!ResetBranchTarget.isAvailable(for: branch) || model.isBusy || model.isSequencing)
     Divider()
     if let worktree {
       Button("Switch to Worktree") { openWorktree(worktree) }

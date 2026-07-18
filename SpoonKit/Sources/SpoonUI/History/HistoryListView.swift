@@ -115,6 +115,7 @@ struct HistoryListView: View {
   @ViewBuilder
   private func commitMenu(_ commit: Commit) -> some View {
     let branches = localBranches(on: commit)
+    let tags = tags(on: commit)
     ForEach(branches) { branch in
       Menu(branchMenuTitle(for: branch)) {
         Button("Select Branch") {
@@ -131,7 +132,20 @@ struct HistoryListView: View {
         )
       }
     }
-    if !branches.isEmpty {
+    ForEach(tags) { tag in
+      Menu("Tag “\(tag.name)”") {
+        Button("Select Tag") {
+          navigation.focusHistory(on: tag)
+        }
+        Divider()
+        TagContextMenu(
+          model: model,
+          tag: tag,
+          navigation: navigation
+        )
+      }
+    }
+    if !branches.isEmpty || !tags.isEmpty {
       Divider()
     }
     RevisionContextMenu(
@@ -176,6 +190,13 @@ struct HistoryListView: View {
       return "Worktree Branch “\(branch.name)”"
     }
     return "Branch “\(branch.name)”"
+  }
+
+  private func tags(on commit: Commit) -> [Tag] {
+    (referenceLabelsByOID[commit.oid] ?? []).compactMap { label in
+      guard case .tag(let name) = label.referenceIdentity else { return nil }
+      return model.tags.first { $0.name == name }
+    }
   }
 }
 
