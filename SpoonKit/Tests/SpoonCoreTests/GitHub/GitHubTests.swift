@@ -30,6 +30,57 @@ struct RemoteURLParserTests {
   }
 }
 
+@Suite("PullRequestURLBuilder")
+struct PullRequestURLBuilderTests {
+  private let oid = ObjectID(rawValue: String(repeating: "a", count: 40))!
+
+  @Test func createsCompareURLForFallbackGitHubRepo() throws {
+    let url = PullRequestURLBuilder.createURL(
+      for: branch("feature/new-ui"),
+      remotes: [],
+      fallbackRepoRef: RepoRef(owner: "owner", name: "repo")
+    )
+
+    #expect(url?.absoluteString == "https://github.com/owner/repo/compare/feature/new-ui?expand=1")
+  }
+
+  @Test func usesUpstreamGitHubRemoteBeforeFallback() throws {
+    let url = PullRequestURLBuilder.createURL(
+      for: branch("topic", upstream: "fork/topic"),
+      remotes: [
+        Remote(name: "origin", fetchURL: "https://github.com/base/repo.git"),
+        Remote(name: "fork", fetchURL: "git@github.com:me/repo.git"),
+      ],
+      fallbackRepoRef: RepoRef(owner: "base", name: "repo")
+    )
+
+    #expect(url?.absoluteString == "https://github.com/me/repo/compare/topic?expand=1")
+  }
+
+  @Test func returnsNilWithoutGitHubRepo() throws {
+    let url = PullRequestURLBuilder.createURL(
+      for: branch("topic"),
+      remotes: [Remote(name: "origin", fetchURL: "https://gitlab.com/owner/repo.git")],
+      fallbackRepoRef: nil
+    )
+
+    #expect(url == nil)
+  }
+
+  private func branch(_ name: String, upstream: String? = nil) -> Branch {
+    Branch(
+      name: name,
+      isCurrent: false,
+      tip: oid,
+      subject: "",
+      upstream: upstream,
+      ahead: nil,
+      behind: nil,
+      committedAt: nil
+    )
+  }
+}
+
 @Suite("PullRequestSync")
 struct PullRequestSyncTests {
   /// Recorded GraphQL response fixture — the decode contract with GitHub.

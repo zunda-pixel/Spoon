@@ -169,6 +169,10 @@ private struct BranchContextMenu: View {
       Button("Open Pull Request #\(pullRequest.number)", systemImage: "arrow.up.right.square") {
         NSWorkspace.shared.open(url)
       }
+    } else if let createPullRequestURL {
+      Button("Create Pull Request…", systemImage: "arrow.triangle.pull") {
+        NSWorkspace.shared.open(createPullRequestURL)
+      }
     }
     Divider()
     Button("Merge into \(model.currentBranch?.name ?? "HEAD")…") {
@@ -198,5 +202,13 @@ private struct BranchContextMenu: View {
       .disabled(model.isBusy)
     Button("Delete Branch…", role: .destructive) { deletingBranch = branch }
       .disabled(branch.isCurrent || model.isBusy || worktree != nil)
+  }
+
+  private var createPullRequestURL: URL? {
+    PullRequestURLBuilder.createURL(
+      for: branch,
+      remotes: model.remotes,
+      fallbackRepoRef: model.gitHubRepoRef
+    )
   }
 }
