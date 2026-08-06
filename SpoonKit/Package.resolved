@@ -1,5 +1,5 @@
 {
-  "originHash" : "55079e850adb643714ed32e31f04140b4dd564742bd3838f326c17591c614103",
+  "originHash" : "04a16641f48c2815d3e76cb60366635eb68d81240a0ce88d7a6fc2b6e62e500e",
   "pins" : [
     {
       "identity" : "defaults",
@@ -15,8 +15,17 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/vapor/multipart-kit.git",
       "state" : {
-        "revision" : "481a44661dae96a609fc30f6ddad8d6f35c51947",
-        "version" : "5.0.0-alpha.5"
+        "revision" : "fb04cffa1d56dcd90a9a30bb300c2608e4b38000",
+        "version" : "5.0.0-beta.1"
+      }
+    },
+    {
+      "identity" : "swift-algorithms",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-algorithms.git",
+      "state" : {
+        "revision" : "87e50f483c54e6efd60e885f7f5aa946cee68023",
+        "version" : "1.2.1"
       }
     },
     {
@@ -56,12 +65,21 @@
       }
     },
     {
+      "identity" : "swift-numerics",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-numerics.git",
+      "state" : {
+        "revision" : "0c0290ff6b24942dadb83a929ffaaa1481df04a2",
+        "version" : "1.1.1"
+      }
+    },
+    {
       "identity" : "swift-subprocess",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/swiftlang/swift-subprocess.git",
       "state" : {
-        "revision" : "40243d063b41485e17501ccb9d434006bdf837a5",
-        "version" : "1.0.0-beta.1"
+        "revision" : "b3937ab85dd32f6e9435914599c1519074769c1a",
+        "version" : "1.0.0"
       }
     },
     {
