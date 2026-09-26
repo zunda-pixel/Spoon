@@ -1,4 +1,4 @@
-# Spoon
+# Spoon1
 
 An AI-first git client for macOS, built with SwiftUI for macOS 26 or later.
 
