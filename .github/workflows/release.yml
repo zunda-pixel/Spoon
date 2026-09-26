@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   release:
-    runs-on: macos-27
+    runs-on: xcode-27
     env:
       TAG: ${{ github.ref_name }}
     steps:

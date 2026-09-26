@@ -9,7 +9,7 @@ permissions:
 
 jobs:
   spoon-kit:
-    runs-on: macos-27
+    runs-on: xcode-27
     steps:
       - uses: actions/checkout@v7.0.0
 
