@@ -192,6 +192,36 @@ struct RepositoryModelTests {
     )
   }
 
+  @Test func pullRequestPublishesBranchesWithoutLiveUpstream() async {
+    let client = FakeRepositoryGitClient()
+    let oid = makeOID("26262627")
+    var gone = makeBranch("gone", oid: oid, isCurrent: false, upstream: "fork/gone")
+    gone.upstreamGone = true
+    let local = makeBranch("local", oid: oid, isCurrent: true)
+    let tracked = makeBranch("tracked", oid: oid, isCurrent: false, upstream: "origin/tracked")
+    await client.configure(
+      status: makeStatus(oid: oid, branch: "local"),
+      branches: [gone, local, tracked],
+      remotes: [
+        Remote(name: "fork", fetchURL: "git@github.com:me/repo.git"),
+        Remote(name: "origin", fetchURL: "git@github.com:org/repo.git"),
+      ]
+    )
+    let model = makeModel(client)
+    await model.refresh()
+
+    #expect(await model.publishBranchForPullRequest(local) == local)
+    #expect(await model.publishBranchForPullRequest(gone) == gone)
+    #expect(await model.publishBranchForPullRequest(tracked) == tracked)
+
+    #expect(
+      await client.mutationCalls == [
+        "publish:origin:local",
+        "publish:fork:gone",
+      ]
+    )
+  }
+
   @Test func worktreeCreationReportsSuccessAndFailure() async {
     let client = FakeRepositoryGitClient()
     let oid = makeOID("27272727")
@@ -912,6 +942,9 @@ private actor FakeRepositoryGitClient: GitClient {
   }
   func deleteRemoteBranch(name: String, from remoteName: String) async throws {
     mutationCalls.append("delete-remote:\(remoteName):\(name)")
+  }
+  func publishBranch(_ branch: String, to remoteName: String) async throws {
+    mutationCalls.append("publish:\(remoteName):\(branch)")
   }
   func fetch() async throws { throw Failure.unimplemented }
   func backfill() async throws { throw Failure.unimplemented }

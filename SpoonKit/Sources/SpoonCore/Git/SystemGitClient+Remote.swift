@@ -54,6 +54,13 @@ extension SystemGitClient {
     )
   }
 
+  public func publishBranch(_ branch: String, to remoteName: String) async throws {
+    try await runVoid(
+      ["push", "--set-upstream", remoteName, "refs/heads/\(branch):refs/heads/\(branch)"],
+      timeout: .seconds(300)
+    )
+  }
+
   public func fetch() async throws {
     try await runVoid(["fetch", "--all", "--prune"], timeout: .seconds(300))
   }

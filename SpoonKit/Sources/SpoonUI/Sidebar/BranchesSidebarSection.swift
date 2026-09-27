@@ -157,10 +157,11 @@ struct BranchContextMenu: View {
       Button("Open Pull Request #\(pullRequest.number)", systemImage: "arrow.up.right.square") {
         NSWorkspace.shared.open(url)
       }
-    } else if let createPullRequestURL {
+    } else if createPullRequestURL(for: branch) != nil {
       Button("Create Pull Request…", systemImage: "arrow.triangle.pull") {
-        NSWorkspace.shared.open(createPullRequestURL)
+        Task { await createPullRequest() }
       }
+      .disabled(model.isBusy)
     }
     Divider()
     Button("Merge into \(model.currentBranch?.name ?? "HEAD")…") {
@@ -200,7 +201,14 @@ struct BranchContextMenu: View {
       .disabled(branch.isCurrent || model.isBusy || worktree != nil)
   }
 
-  private var createPullRequestURL: URL? {
+  private func createPullRequest() async {
+    guard let publishedBranch = await model.publishBranchForPullRequest(branch),
+      let url = createPullRequestURL(for: publishedBranch)
+    else { return }
+    NSWorkspace.shared.open(url)
+  }
+
+  private func createPullRequestURL(for branch: Branch) -> URL? {
     PullRequestURLBuilder.createURL(
       for: branch,
       remotes: model.remotes,

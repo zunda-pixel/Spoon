@@ -66,6 +66,8 @@ public protocol GitRemoteClient: Sendable {
     to newName: String
   ) async throws
   func deleteRemoteBranch(name: String, from remoteName: String) async throws
+  /// Pushes local `branch` to the same name on `remoteName` and sets it as upstream.
+  func publishBranch(_ branch: String, to remoteName: String) async throws
   func fetch() async throws
   /// Whether the installed git provides `git backfill` (2.49+).
   func supportsBackfill() async -> Bool

@@ -510,6 +510,20 @@ struct SystemGitClientTests {
     #expect(runner.invocations.count == 3)
   }
 
+  @Test func publishBranchPushesNamedBranchAndSetsUpstream() async throws {
+    let runner = FakeCommandRunner()
+    runner.stub(
+      arguments: baseFlags + [
+        "push", "--set-upstream", "origin",
+        "refs/heads/feature/new:refs/heads/feature/new",
+      ]
+    )
+
+    try await makeClient(runner).publishBranch("feature/new", to: "origin")
+
+    #expect(runner.invocations.count == 1)
+  }
+
   @Test func worktreeOperationsSendExactArgv() async throws {
     let runner = FakeCommandRunner()
     runner.stub(

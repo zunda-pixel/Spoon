@@ -197,6 +197,30 @@ extension RepositoryModel {
     }
   }
 
+  /// Pushes `branch` to a remote first when it has no live upstream, so that
+  /// GitHub's compare page has a head branch to open a pull request from.
+  /// Returns the refreshed branch, or `nil` when the push failed.
+  public func publishBranchForPullRequest(_ branch: Branch) async -> Branch? {
+    guard branch.upstream == nil || branch.upstreamGone,
+      let remoteName = pullRequestRemoteName(for: branch)
+    else { return branch }
+    let succeeded = await perform {
+      try await $0.publishBranch(branch.name, to: remoteName)
+    }
+    guard succeeded else { return nil }
+    return branches.first { $0.name == branch.name } ?? branch
+  }
+
+  /// The branch's own upstream remote when still configured, else `origin`,
+  /// else the first remote.
+  private func pullRequestRemoteName(for branch: Branch) -> String? {
+    let names = remotes.map(\.name)
+    if let upstreamRemoteName = branch.upstreamRemoteName, names.contains(upstreamRemoteName) {
+      return upstreamRemoteName
+    }
+    return names.contains("origin") ? "origin" : names.first
+  }
+
   public func deleteRemoteBranch(name: String, from remoteName: String) async {
     await perform { try await $0.deleteRemoteBranch(name: name, from: remoteName) }
   }
