@@ -28,20 +28,20 @@
     "swift-concurrency": {
       "source": "avdlee/swift-concurrency-agent-skill",
       "sourceType": "github",
-      "skillPath": "swift-concurrency/SKILL.md",
-      "computedHash": "5e1f6433159038c49135028eeeea3a7b9a0a6001c8a4cc8227e391caf35cd985"
+      "skillPath": "skills/swift-concurrency/SKILL.md",
+      "computedHash": "49e4df69412710a0ca320c21a9d26cf4abb6d2c553960cffaceea5a09e3be792"
     },
     "swiftui-expert-skill": {
       "source": "AvdLee/SwiftUI-Agent-Skill",
       "sourceType": "github",
-      "skillPath": "swiftui-expert-skill/SKILL.md",
-      "computedHash": "12a318304d7cdc6ec40e981f02865d098caf6eab1b992051e3322ebeecf287b1"
+      "skillPath": "skills/swiftui-expert-skill/SKILL.md",
+      "computedHash": "26ee28fcfa0434b1ad66ae742e8a82a16cc2a0e40b9a9a02ea550e597366c7eb"
     },
     "update-swiftui-apis": {
       "source": "AvdLee/SwiftUI-Agent-Skill",
       "sourceType": "github",
       "skillPath": ".agents/skills/update-swiftui-apis/SKILL.md",
-      "computedHash": "cd1d2af833b4f98836bbd98684880c73d3a17556d216fe6f4d6eb7149c6dfa3f"
+      "computedHash": "1aebd4401fcaf0bd28f64e6e1332c40d90058e2a89a415536deed3556a2b8f78"
     }
   }
 }
