@@ -31,9 +31,14 @@ jobs:
             -configuration Release \
             -destination 'generic/platform=macOS' \
             -derivedDataPath "$DERIVED_DATA_PATH" \
-            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGN_IDENTITY="-" \
+            CODE_SIGN_STYLE=Manual \
+            DEVELOPMENT_TEAM="" \
             -skipMacroValidation \
             build
+
+      - name: Verify signature
+        run: codesign --verify --deep --strict --verbose=2 "$DERIVED_DATA_PATH/Build/Products/Release/Spoon.app"
 
       - name: Package
         run: |
