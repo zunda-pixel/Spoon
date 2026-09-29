@@ -46,6 +46,8 @@ struct RepositorySheetHost: ViewModifier {
         RenameBranchSheet(model: model, branch: branch)
       case .deleteBranch(let branch):
         DeleteBranchSheet(model: model, branch: branch)
+      case .deleteBranches(let branches):
+        DeleteBranchesSheet(model: model, branches: branches)
       case .deleteMergedBranches:
         DeleteMergedBranchesSheet(model: model)
       case .deleteWorktree(let worktree):

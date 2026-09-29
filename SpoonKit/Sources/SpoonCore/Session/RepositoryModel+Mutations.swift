@@ -224,6 +224,36 @@ extension RepositoryModel {
     await perform { try await $0.deleteMergedBranches(branches: names, dryRun: false) }
   }
 
+  /// One branch of a bulk delete.
+  public struct BranchDeletion: Sendable, Hashable {
+    public var name: String
+    public var force: Bool
+    /// `remote/branch` to delete from its remote as well, if any.
+    public var remoteUpstream: String?
+
+    public init(name: String, force: Bool, remoteUpstream: String? = nil) {
+      self.name = name
+      self.force = force
+      self.remoteUpstream = remoteUpstream
+    }
+  }
+
+  /// Deletes several local branches, and optionally their remote branches,
+  /// in order. Stops at the first failure; earlier deletions stay done.
+  public func deleteBranches(_ deletions: [BranchDeletion]) async {
+    guard !deletions.isEmpty else { return }
+    await perform {
+      for deletion in deletions {
+        try await $0.deleteBranch(name: deletion.name, force: deletion.force)
+        if let upstream = deletion.remoteUpstream,
+          let (remoteName, remoteBranch) = Self.remoteBranchComponents(of: upstream)
+        {
+          try await $0.deleteRemoteBranch(name: remoteBranch, from: remoteName)
+        }
+      }
+    }
+  }
+
   public func renameBranch(
     from oldName: String,
     to newName: String,

@@ -217,6 +217,29 @@ struct RepositoryModelTests {
     #expect(model.existingRemoteUpstream(of: untracked) == nil)
   }
 
+  @Test func bulkDeleteRemovesEachBranchAndItsRemoteInOrder() async {
+    let client = FakeRepositoryGitClient()
+    let oid = makeOID("28282828")
+    await client.configure(
+      status: makeStatus(oid: oid, branch: "main"),
+      branches: [makeBranch("main", oid: oid, isCurrent: true)]
+    )
+    let model = makeModel(client)
+
+    await model.deleteBranches([
+      .init(name: "merged", force: false),
+      .init(name: "unmerged", force: true, remoteUpstream: "origin/unmerged"),
+    ])
+
+    #expect(
+      await client.mutationCalls == [
+        "delete-local:merged:false",
+        "delete-local:unmerged:true",
+        "delete-remote:origin:unmerged",
+      ]
+    )
+  }
+
   @Test func pullRequestPublishesBranchesWithoutLiveUpstream() async {
     let client = FakeRepositoryGitClient()
     let oid = makeOID("26262627")

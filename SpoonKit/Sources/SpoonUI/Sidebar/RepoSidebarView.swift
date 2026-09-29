@@ -12,7 +12,7 @@ struct RepoSidebarView: View {
   @State private var searchText = ""
 
   var body: some View {
-    List(selection: $navigation.sidebarSelection) {
+    List(selection: $navigation.sidebarSelections) {
       WorkspaceSidebarSection(model: model)
       BranchesSidebarSection(
         model: model,
@@ -37,6 +37,13 @@ struct RepoSidebarView: View {
       )
     }
     .listStyle(.sidebar)
+    .onDeleteCommand {
+      let branches = model.branches.filter { navigation.selectedBranchNames.contains($0.name) }
+      guard !branches.isEmpty, !model.isBusy else { return }
+      navigation.present(
+        branches.count == 1 ? .deleteBranch(branches[0]) : .deleteBranches(branches)
+      )
+    }
     .searchable(
       text: $searchText,
       placement: .sidebar,

@@ -76,6 +76,10 @@ private struct BranchTreeNodeView: View {
       .tag(SidebarItem.branch(branch.name))
       .simultaneousGesture(
         TapGesture().onEnded {
+          // ⌘/⇧-clicks extend the multi-selection instead of focusing.
+          guard !NSEvent.modifierFlags.contains(.command),
+            !NSEvent.modifierFlags.contains(.shift)
+          else { return }
           navigation.focusHistory(on: branch)
         }
       )
@@ -85,14 +89,23 @@ private struct BranchTreeNodeView: View {
         }
       )
       .contextMenu {
-        BranchContextMenu(
-          model: model,
-          navigation: navigation,
-          branch: branch,
-          pullRequest: pullRequest,
-          worktree: worktree,
-          openWorktree: openWorktree
-        )
+        let selected = navigation.selectedBranchNames
+        if selected.count > 1, selected.contains(branch.name) {
+          MultipleBranchesContextMenu(
+            model: model,
+            navigation: navigation,
+            branches: model.branches.filter { selected.contains($0.name) }
+          )
+        } else {
+          BranchContextMenu(
+            model: model,
+            navigation: navigation,
+            branch: branch,
+            pullRequest: pullRequest,
+            worktree: worktree,
+            openWorktree: openWorktree
+          )
+        }
       }
     } else {
       DisclosureGroup(isExpanded: isFolderExpanded) {
@@ -136,6 +149,28 @@ private struct BranchTreeNodeView: View {
         }
       }
     )
+  }
+}
+
+/// Actions for several selected local branches.
+@MainActor
+struct MultipleBranchesContextMenu: View {
+  let model: RepositoryModel
+  let navigation: RepositoryNavigationState
+  let branches: [Branch]
+
+  var body: some View {
+    Button("Show Only These Branches in History") {
+      navigation.select(.history)
+      Task {
+        await model.focusHistory(onReferences: branches.map { .localBranch($0.name) })
+      }
+    }
+    Divider()
+    Button("Delete \(branches.count) Branches…", role: .destructive) {
+      navigation.present(.deleteBranches(branches))
+    }
+    .disabled(model.isBusy)
   }
 }
 

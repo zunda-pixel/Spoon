@@ -53,6 +53,15 @@ extension RepositoryModel {
     await reloadHistory()
   }
 
+  /// Shows exactly these references in the history.
+  public func focusHistory(onReferences references: [HistoryReferenceFilterID]) async {
+    let ids = Set(references.map(\.id))
+    focusedHistoryReferenceIDs = ids
+    hiddenHistoryReferenceIDs.subtract(ids)
+    persistHistoryReferenceFilters()
+    await reloadHistory()
+  }
+
   public func toggleHistoryHidden(_ id: String) async {
     if hiddenHistoryReferenceIDs.contains(id) {
       hiddenHistoryReferenceIDs.remove(id)
