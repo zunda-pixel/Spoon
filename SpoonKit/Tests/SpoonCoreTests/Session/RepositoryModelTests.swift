@@ -895,6 +895,36 @@ struct RepositoryModelTests {
     #expect(await client.mutationCalls == ["drop-blobs:10"])
   }
 
+  @Test func backfillEstimateFallsBackToACountWhenSizesAreUnavailable() async throws {
+    let client = FakeRepositoryGitClient()
+    let head = makeOID("aaaa1111")
+    let missing = [makeOID("bbbb2222"), makeOID("cccc3333")]
+    func configure(remoteObjectSize: Int?) async {
+      await client.configure(
+        status: makeStatus(oid: head, branch: "main"),
+        branches: [makeBranch("main", oid: head, isCurrent: true)],
+        gitVersion: GitVersion(2, 56, 0),
+        partialCloneRemote: "origin",
+        missingObjects: missing,
+        remoteObjectSize: remoteObjectSize
+      )
+    }
+    let model = makeModel(client)
+
+    await configure(remoteObjectSize: 100)
+    await model.refresh()
+    #expect(model.canEstimateBackfill)
+    let sized = try await model.backfillEstimate()
+    #expect(sized.missingObjectCount == 2)
+    #expect(sized.downloadByteCount == 200)
+
+    await configure(remoteObjectSize: nil)
+    let unsized = try await model.backfillEstimate()
+    #expect(unsized.missingObjectCount == 2)
+    #expect(unsized.downloadByteCount == nil)
+    #expect(unsized.sizeUnavailableReason != nil)
+  }
+
   @Test func refreshErrorClearsOnceRefreshRecovers() async {
     let client = FakeRepositoryGitClient()
     let oid = makeOID("99999999")
@@ -982,6 +1012,8 @@ private actor FakeRepositoryGitClient: GitClient {
   private var currentStatus = WorkingTreeStatus()
   private var currentCapabilities = GitCapabilities()
   private var currentPartialCloneRemote: String?
+  private var currentMissingObjects: [ObjectID] = []
+  private var currentRemoteObjectSize: Int?
   private var currentBranches: [Branch] = []
   private var currentRemotes: [Remote] = []
   private var currentRemoteBranchesByRemote: [String: [Branch]] = [:]
@@ -1011,9 +1043,13 @@ private actor FakeRepositoryGitClient: GitClient {
     failRemoteBranches: Bool = false,
     failWorktreeMutations: Bool = false,
     gitVersion: GitVersion? = nil,
-    partialCloneRemote: String? = nil
+    partialCloneRemote: String? = nil,
+    missingObjects: [ObjectID] = [],
+    remoteObjectSize: Int? = nil
   ) {
     currentStatus = status
+    currentMissingObjects = missingObjects
+    currentRemoteObjectSize = remoteObjectSize
     currentPartialCloneRemote = partialCloneRemote
     currentCapabilities = GitCapabilities(version: gitVersion)
     currentBranches = branches
@@ -1134,6 +1170,13 @@ private actor FakeRepositoryGitClient: GitClient {
   func fetch() async throws { throw Failure.unimplemented }
   func backfill() async throws { throw Failure.unimplemented }
   func partialCloneRemote() async throws -> String? { currentPartialCloneRemote }
+  func missingObjectIDs() async throws -> [ObjectID] { currentMissingObjects }
+  func remoteObjectSizes(of objects: [ObjectID], from remoteName: String) async throws
+    -> [ObjectID: Int]
+  {
+    guard let currentRemoteObjectSize else { throw Failure.unimplemented }
+    return Dictionary(uniqueKeysWithValues: objects.map { ($0, currentRemoteObjectSize) })
+  }
   func dropLargeBlobs(largerThan byteLimit: Int) async throws {
     mutationCalls.append("drop-blobs:\(byteLimit)")
   }

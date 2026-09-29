@@ -69,6 +69,45 @@ extension SystemGitClient {
     try await runVoid(["backfill"], timeout: .seconds(3600))
   }
 
+  public func missingObjectIDs() async throws -> [ObjectID] {
+    let result = try await run(
+      ["rev-list", "--objects", "--missing=print", "--missing-only", "HEAD"],
+      timeout: .seconds(300)
+    )
+    return result.standardOutputText.split(whereSeparator: \.isNewline).compactMap {
+      ObjectID(rawValue: String($0))
+    }
+  }
+
+  public func remoteObjectSizes(
+    of objects: [ObjectID],
+    from remoteName: String
+  ) async throws -> [ObjectID: Int] {
+    guard !objects.isEmpty else { return [:] }
+    // Chunk so each protocol request and stdin line stays modest.
+    let commands = stride(from: 0, to: objects.count, by: 500).map { start in
+      let chunk = objects[start..<min(start + 500, objects.count)]
+      return "remote-object-info \(remoteName) "
+        + chunk.map(\.rawValue).joined(separator: " ") + "\n"
+    }
+    let result = try await run(
+      ["cat-file", "--batch-command=%(objectname) %(objectsize)"],
+      standardInput: Data(commands.joined().utf8),
+      timeout: .seconds(300)
+    )
+    var sizes: [ObjectID: Int] = [:]
+    for line in result.standardOutputText.split(whereSeparator: \.isNewline) {
+      let fields = line.split(separator: " ")
+      guard
+        fields.count == 2,
+        let oid = ObjectID(rawValue: String(fields[0])),
+        let size = Int(fields[1])
+      else { continue }
+      sizes[oid] = size
+    }
+    return sizes
+  }
+
   public func partialCloneRemote() async throws -> String? {
     let command = GitCommand.make(
       git: git,

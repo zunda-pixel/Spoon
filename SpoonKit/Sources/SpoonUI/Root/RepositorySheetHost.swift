@@ -20,6 +20,8 @@ struct RepositorySheetHost: ViewModifier {
         SparseCheckoutSheet(model: model)
       case .dropLargeBlobs:
         DropLargeBlobsSheet(model: model)
+      case .backfill:
+        BackfillSheet(model: model)
       case .fileHistory(let path):
         FileHistorySheet(model: model, path: path)
       case .addRemote:

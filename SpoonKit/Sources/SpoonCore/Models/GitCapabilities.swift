@@ -38,6 +38,10 @@ public struct GitCapabilities: Sendable, Hashable {
   /// `git branch --forked` (2.56+).
   public var supportsForkedBranchFilter: Bool { supports(GitVersion(2, 56)) }
 
+  /// `git cat-file --batch-command` `remote-object-info` and
+  /// `git rev-list --missing-only` (2.56+).
+  public var supportsRemoteObjectInfo: Bool { supports(GitVersion(2, 56)) }
+
   /// `git repack --drop-filtered` for partial clones (2.56+).
   public var supportsRepackDropFiltered: Bool { supports(GitVersion(2, 56)) }
 

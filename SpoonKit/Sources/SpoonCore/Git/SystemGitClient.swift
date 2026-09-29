@@ -36,13 +36,18 @@ public actor SystemGitClient: GitClient {
   // Shared command execution remains actor-isolated.
   // MARK: - Helpers
 
-  func run(_ arguments: [String], timeout: Duration? = .seconds(30)) async throws -> CommandResult {
-    let command = GitCommand.make(
+  func run(
+    _ arguments: [String],
+    standardInput: Data? = nil,
+    timeout: Duration? = .seconds(30)
+  ) async throws -> CommandResult {
+    var command = GitCommand.make(
       git: git,
       repository: repositoryRoot,
       arguments: arguments,
       timeout: timeout
     )
+    command.standardInput = standardInput
     return try await runner.run(command).checkSuccess(of: command)
   }
 

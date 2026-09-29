@@ -320,6 +320,39 @@ extension RepositoryModel {
     await syncPullRequests(force: true)
   }
 
+  /// Whether `backfillEstimate` can measure this repository.
+  public var canEstimateBackfill: Bool {
+    gitCapabilities.supportsRemoteObjectInfo && partialCloneRemote != nil
+  }
+
+  /// Counts the objects `backfill` would download and asks the promisor
+  /// remote for their total size, downloading nothing.
+  public func backfillEstimate() async throws -> BackfillEstimate {
+    let missing = try await gitClient.missingObjectIDs()
+    guard !missing.isEmpty, let remote = partialCloneRemote else {
+      return BackfillEstimate(
+        missingObjectCount: missing.count,
+        downloadByteCount: missing.isEmpty ? 0 : nil,
+        sizeUnavailableReason: nil
+      )
+    }
+    do {
+      let sizes = try await gitClient.remoteObjectSizes(of: missing, from: remote)
+      return BackfillEstimate(
+        missingObjectCount: missing.count,
+        downloadByteCount: sizes.values.reduce(0, +),
+        sizeUnavailableReason: nil
+      )
+    } catch {
+      // Servers without the object-info capability still allow a backfill.
+      return BackfillEstimate(
+        missingObjectCount: missing.count,
+        downloadByteCount: nil,
+        sizeUnavailableReason: "“\(remote)” did not report object sizes."
+      )
+    }
+  }
+
   public func backfill() async {
     await perform { try await $0.backfill() }
   }

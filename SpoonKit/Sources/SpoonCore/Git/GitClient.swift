@@ -98,6 +98,16 @@ public protocol GitRemoteClient: Sendable {
   /// Downloads blobs omitted by a partial clone (requires
   /// `GitCapabilities.supportsBackfill`).
   func backfill() async throws
+  /// Objects reachable from HEAD that a partial clone has not downloaded
+  /// (`rev-list --missing=print --missing-only`, requires
+  /// `GitCapabilities.supportsRemoteObjectInfo`). Never fetches.
+  func missingObjectIDs() async throws -> [ObjectID]
+  /// Sizes in bytes the remote reports for `objects`, without downloading
+  /// them (`cat-file --batch-command` `remote-object-info`, requires
+  /// `GitCapabilities.supportsRemoteObjectInfo` and a server that
+  /// advertises the `object-info` capability).
+  func remoteObjectSizes(of objects: [ObjectID], from remoteName: String) async throws
+    -> [ObjectID: Int]
   /// The promisor remote of a partial clone (`extensions.partialClone`), or
   /// `nil` for a full clone.
   func partialCloneRemote() async throws -> String?
