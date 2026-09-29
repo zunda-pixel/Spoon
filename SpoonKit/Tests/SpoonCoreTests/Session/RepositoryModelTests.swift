@@ -925,6 +925,36 @@ struct RepositoryModelTests {
     #expect(unsized.sizeUnavailableReason != nil)
   }
 
+  @Test func stagingConflictedPathsMarksThemResolved() async {
+    let client = FakeRepositoryGitClient()
+    let head = makeOID("aaaa1111")
+    var status = makeStatus(oid: head, branch: "main")
+    status.entries = [
+      FileStatusEntry(path: "conflicted.txt", conflict: .bothModified),
+      FileStatusEntry(path: "deleted-by-them.txt", conflict: .deletedByThem),
+      FileStatusEntry(path: "edited.txt", unstaged: .modified),
+    ]
+    await client.configure(
+      status: status,
+      branches: [makeBranch("main", oid: head, isCurrent: true)]
+    )
+    let model = makeModel(client)
+    await model.refresh()
+
+    await model.stage(paths: ["edited.txt", "conflicted.txt"])
+    await model.resolveConflict(status.entries[0], using: .theirs)
+    await model.resolveConflict(status.entries[1], using: .theirs)
+
+    #expect(await client.stageCallCount == 1)
+    #expect(
+      await client.mutationCalls == [
+        "resolved:conflicted.txt",
+        "take:conflicted.txt:theirs:true",
+        "take:deleted-by-them.txt:theirs:false",
+      ]
+    )
+  }
+
   @Test func refreshErrorClearsOnceRefreshRecovers() async {
     let client = FakeRepositoryGitClient()
     let oid = makeOID("99999999")
@@ -1083,6 +1113,16 @@ private actor FakeRepositoryGitClient: GitClient {
     return GitRepositoryPaths(gitDirectory: dotGit, commonDirectory: dotGit)
   }
 
+  func markResolved(paths: [String]) async throws {
+    mutationCalls.append("resolved:\(paths.joined(separator: ","))")
+  }
+  func resolveConflict(
+    path: String,
+    using side: FileStatusEntry.ConflictSide,
+    sideHasFile: Bool
+  ) async throws {
+    mutationCalls.append("take:\(path):\(side.rawValue):\(sideHasFile)")
+  }
   func stage(paths: [String]) async throws {
     stageCallCount += 1
     currentStatus.entries = currentStatus.entries.map { entry in

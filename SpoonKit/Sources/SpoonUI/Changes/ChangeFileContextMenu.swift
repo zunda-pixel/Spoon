@@ -10,6 +10,7 @@ struct ChangeFileContextMenu: View {
   let area: RepositoryModel.ChangeArea
   let targets: Set<RepositoryModel.FileSelection>
   @Binding var confirmingDiscard: RepositoryModel.FileSelection?
+  @Binding var confirmingConflictResolution: ConflictResolutionRequest?
   let moveFiles: (_ stagePaths: [String], _ unstagePaths: [String]) -> Void
 
   var body: some View {
@@ -53,6 +54,13 @@ struct ChangeFileContextMenu: View {
       }
     case .conflicted:
       Button("Mark Resolved (Stage)") { moveFiles([entry.path], []) }
+      Divider()
+      ForEach([FileStatusEntry.ConflictSide.ours, .theirs], id: \.self) { side in
+        Button("Use \(side.displayName(during: model.sequencerState?.kind))…") {
+          confirmingConflictResolution = ConflictResolutionRequest(entry: entry, side: side)
+        }
+        .disabled(model.isBusy)
+      }
     }
     if area != .untracked {
       Divider()

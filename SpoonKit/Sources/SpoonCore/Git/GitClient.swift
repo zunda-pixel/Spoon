@@ -17,6 +17,14 @@ public protocol GitWorkingTreeClient: Sendable {
   /// Metadata, full message, and first-parent patch for one commit.
   /// Stages whole paths (also marks conflicted paths resolved).
   func stage(paths: [String]) async throws
+  /// Stages conflicted paths as resolved. With
+  /// `GitCapabilities.supportsAddResolved`, git refuses (staging nothing)
+  /// while any path still contains conflict markers.
+  func markResolved(paths: [String]) async throws
+  /// Resolves one conflicted path by taking `side`'s version, or deleting
+  /// the path when `side` has no version (`sideHasFile == false`).
+  func resolveConflict(path: String, using side: FileStatusEntry.ConflictSide, sideHasFile: Bool)
+    async throws
   /// Removes paths from the index, keeping working-tree contents.
   func unstage(paths: [String]) async throws
   /// Applies a patch (from `DiffPatchBuilder`). `toIndex` targets the index

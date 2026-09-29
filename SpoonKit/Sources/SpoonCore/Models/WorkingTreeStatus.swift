@@ -22,6 +22,13 @@ public struct FileStatusEntry: Sendable, Hashable, Identifiable {
     case deletedByThem
   }
 
+  /// One side of a conflicted path: `ours` is the checked-out side (the
+  /// branch being rebased onto, during a rebase), `theirs` the incoming one.
+  public enum ConflictSide: String, Sendable, Hashable {
+    case ours
+    case theirs
+  }
+
   public var path: String
   /// Original path for renames/copies.
   public var originalPath: String? = nil
@@ -34,6 +41,18 @@ public struct FileStatusEntry: Sendable, Hashable, Identifiable {
   public var conflict: Conflict? = nil
 
   public var id: String { path }
+
+  /// Whether `side` still has this file; resolving to a side without it
+  /// deletes the path.
+  public func conflictSideHasFile(_ side: ConflictSide) -> Bool {
+    switch (conflict, side) {
+    case (.bothDeleted, _), (.deletedByUs, .ours), (.addedByThem, .ours),
+      (.deletedByThem, .theirs), (.addedByUs, .theirs):
+      false
+    default:
+      true
+    }
+  }
 }
 
 /// Snapshot of `git status --porcelain=v2 --branch`.

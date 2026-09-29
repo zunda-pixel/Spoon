@@ -1,8 +1,34 @@
 public import Foundation
 
 extension RepositoryModel {
+  /// Stages paths; conflicted ones are marked resolved, so on git 2.56+
+  /// a file that still has conflict markers is refused instead of staged.
   public func stage(paths: [String]) async {
-    await perform { try await $0.stage(paths: paths) }
+    let conflicted = Set(status?.conflictedEntries.map(\.path) ?? [])
+    let resolved = paths.filter(conflicted.contains)
+    let others = paths.filter { !conflicted.contains($0) }
+    await perform {
+      if !others.isEmpty {
+        try await $0.stage(paths: others)
+      }
+      if !resolved.isEmpty {
+        try await $0.markResolved(paths: resolved)
+      }
+    }
+  }
+
+  /// Resolves a conflicted path by taking one side's version of the file.
+  public func resolveConflict(_ entry: FileStatusEntry, using side: FileStatusEntry.ConflictSide)
+    async
+  {
+    guard entry.conflict != nil else { return }
+    await perform {
+      try await $0.resolveConflict(
+        path: entry.path,
+        using: side,
+        sideHasFile: entry.conflictSideHasFile(side)
+      )
+    }
   }
 
   public func unstage(paths: [String]) async {

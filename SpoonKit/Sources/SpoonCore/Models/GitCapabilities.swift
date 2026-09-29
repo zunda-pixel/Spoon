@@ -32,6 +32,10 @@ public struct GitCapabilities: Sendable, Hashable {
   /// `git backfill` (2.49+).
   public var supportsBackfill: Bool { supports(GitVersion(2, 49)) }
 
+  /// `git add --resolved`, which refuses paths with leftover conflict
+  /// markers (2.56+).
+  public var supportsAddResolved: Bool { supports(GitVersion(2, 56)) }
+
   /// `git branch --delete-merged` (2.56+).
   public var supportsDeleteMergedBranches: Bool { supports(GitVersion(2, 56)) }
 

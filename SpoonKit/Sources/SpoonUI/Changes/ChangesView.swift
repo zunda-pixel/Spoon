@@ -32,6 +32,7 @@ struct ChangesView: View {
   }
 
   @State private var confirmingDiscard: RepositoryModel.FileSelection?
+  @State private var confirmingConflictResolution: ConflictResolutionRequest?
   /// The first click of a double-click collapses a multi-selection to the
   /// clicked row (List behavior), so remember the just-collapsed selection
   /// long enough for the double-click handler to act on all of it.
@@ -100,6 +101,28 @@ struct ChangesView: View {
     } message: {
       Text("This cannot be undone.")
     }
+    .confirmationDialog(
+      "Resolve \(confirmingConflictResolution?.entry.path ?? "") using the \(resolutionSideName)?",
+      isPresented: .init(
+        get: { confirmingConflictResolution != nil },
+        set: { if !$0 { confirmingConflictResolution = nil } }
+      ),
+      presenting: confirmingConflictResolution
+    ) { request in
+      Button("Use \(resolutionSideName)", role: .destructive) {
+        Task { await model.resolveConflict(request.entry, using: request.side) }
+      }
+    } message: { request in
+      Text(
+        request.entry.conflictSideHasFile(request.side)
+          ? "The file is replaced with that version and staged. Other edits to it, including manual conflict fixes, are discarded."
+          : "That side deleted the file, so it is removed and the deletion is staged."
+      )
+    }
+  }
+
+  private var resolutionSideName: String {
+    confirmingConflictResolution?.side.displayName(during: model.sequencerState?.kind) ?? ""
   }
 
   private func changeList(_ status: WorkingTreeStatus) -> some View {
@@ -210,6 +233,7 @@ struct ChangesView: View {
           area: area,
           targets: actionTargets(for: entry, area: area),
           confirmingDiscard: $confirmingDiscard,
+          confirmingConflictResolution: $confirmingConflictResolution,
           moveFiles: moveFiles
         )
       }
