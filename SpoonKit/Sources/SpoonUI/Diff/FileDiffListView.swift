@@ -69,6 +69,21 @@ struct FileDiffListView: View {
     .background(.background)
   }
 
+  /// What makes a hunk row current: its file and its exact content.
+  private struct HunkIdentity: Hashable {
+    let path: String
+    let hunkID: Hunk.ID
+    let header: String
+    let lineCount: Int
+
+    init(diff: FileDiff, hunk: Hunk) {
+      path = diff.path
+      hunkID = hunk.id
+      header = hunk.header
+      lineCount = hunk.lines.count
+    }
+  }
+
   @ViewBuilder
   private func fileBody(_ diff: FileDiff) -> some View {
     if diff.isBinary {
@@ -97,6 +112,9 @@ struct FileDiffListView: View {
             ? onDiscardHunk.map { handler in { handler(diff, hunk) } }
             : nil
         )
+        // Hunk IDs are only line numbers, so two files (or two versions of
+        // one) share them; LazyVStack then kept showing the previous hunk.
+        .id(HunkIdentity(diff: diff, hunk: hunk))
       }
     }
   }

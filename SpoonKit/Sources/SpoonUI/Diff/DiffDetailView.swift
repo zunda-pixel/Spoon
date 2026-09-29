@@ -8,6 +8,9 @@ struct DiffDetailView: View {
   let selection: RepositoryModel.FileSelection
 
   @State private var diffs: [FileDiff]?
+  /// Which file `diffs` (or `errorMessage`) belongs to. Until the selected
+  /// file loads, the previous file's diff must not stand in for it.
+  @State private var loadedSelection: RepositoryModel.FileSelection?
   @State private var errorMessage: String?
   @State private var lineSelection: DiffLineSelection?
   @State private var pendingDiscard: PendingDiscard?
@@ -36,7 +39,9 @@ struct DiffDetailView: View {
 
   var body: some View {
     Group {
-      if let conflictDocument, !conflictDocument.blocks.isEmpty {
+      if loadedSelection != selection {
+        ProgressView()
+      } else if let conflictDocument, !conflictDocument.blocks.isEmpty {
         ConflictBlocksView(
           model: model,
           path: selection.path,
@@ -88,17 +93,27 @@ struct DiffDetailView: View {
       }
     }
     .task(id: taskKey) {
+      let selection = selection
       do {
-        errorMessage = nil
-        conflictDocument =
+        let document =
           selection.area == .conflicted
           ? try? await model.conflictDocument(path: selection.path) : nil
-        diffs = try await model.diff(for: selection)
+        let loaded = try await model.diff(for: selection)
+        // git calls run concurrently, so a superseded load (another file, or
+        // an older status) can finish after the current one; it must not
+        // overwrite it.
+        guard !Task.isCancelled else { return }
+        errorMessage = nil
+        conflictDocument = document
+        diffs = loaded
         lineSelection = nil  // stale offsets after any reload
       } catch {
+        guard !Task.isCancelled else { return }
+        conflictDocument = nil
         diffs = nil
         errorMessage = error.localizedDescription
       }
+      loadedSelection = selection
     }
     .confirmationDialog(
       "Discard \(pendingDiscard?.lineCount ?? 0) changed line(s)?",
