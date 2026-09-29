@@ -50,6 +50,33 @@ extension RepositoryModel {
     await perform { try await $0.dropCommit(oid, dryRun: false) }
   }
 
+  /// Whether `git history reword` can edit this commit's message.
+  public func canRewordCommit(_ commit: Commit) -> Bool {
+    gitCapabilities.supportsHistoryReword && !commit.isMerge
+  }
+
+  @discardableResult
+  public func rewordCommit(_ oid: ObjectID, message: String) async -> Bool {
+    await perform { try await $0.rewordCommit(oid, message: message) }
+  }
+
+  /// Whether the staged changes can be folded into this commit with
+  /// `git history fixup`.
+  public func canFixupCommit(_ commit: Commit) -> Bool {
+    gitCapabilities.supportsHistoryFixup && !commit.isMerge
+      && status?.stagedEntries.isEmpty == false
+  }
+
+  /// The branches `fixupCommit` would rewrite, or git's reason for refusing.
+  public func previewFixupCommit(_ oid: ObjectID) async throws -> [RefUpdate] {
+    try await gitClient.fixupCommit(oid, dryRun: true)
+  }
+
+  @discardableResult
+  public func fixupCommit(_ oid: ObjectID) async -> Bool {
+    await perform { try await $0.fixupCommit(oid, dryRun: false) }
+  }
+
   /// Whether `branch` can be rebased onto the checked-out commit with
   /// `git replay`: it must not be checked out anywhere, since replay never
   /// updates a worktree.

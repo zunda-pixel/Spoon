@@ -55,6 +55,12 @@ public struct GitCapabilities: Sendable, Hashable {
   /// `git refs create/update/delete/rename` (2.56+).
   public var supportsRefsWriteCommands: Bool { supports(GitVersion(2, 56)) }
 
+  /// `git history reword` (2.54+).
+  public var supportsHistoryReword: Bool { supports(GitVersion(2, 54)) }
+
+  /// `git history fixup` (2.55+).
+  public var supportsHistoryFixup: Bool { supports(GitVersion(2, 55)) }
+
   /// `git history drop` (2.56+).
   public var supportsHistoryDrop: Bool { supports(GitVersion(2, 56)) }
 

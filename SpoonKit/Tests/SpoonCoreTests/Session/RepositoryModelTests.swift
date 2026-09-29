@@ -955,6 +955,43 @@ struct RepositoryModelTests {
     )
   }
 
+  @Test func rewordAndFixupAreGatedOnGitVersionAndStagedChanges() async {
+    let client = FakeRepositoryGitClient()
+    let head = makeOID("aaaa1111")
+    var commit = makeCommit("aaaa1111", subject: "change")
+    commit.parents = [makeOID("bbbb2222")]
+    var staged = makeStatus(oid: head, branch: "main")
+    staged.entries = [FileStatusEntry(path: "a.txt", staged: .modified)]
+    let branches = [makeBranch("main", oid: head, isCurrent: true)]
+    let model = makeModel(client)
+
+    await client.configure(status: staged, branches: branches, gitVersion: GitVersion(2, 53, 0))
+    await model.refresh()
+    #expect(!model.canRewordCommit(commit))
+    #expect(!model.canFixupCommit(commit))
+
+    await client.configure(status: staged, branches: branches, gitVersion: GitVersion(2, 54, 0))
+    await model.refresh()
+    #expect(model.canRewordCommit(commit))
+    #expect(!model.canFixupCommit(commit))
+
+    await client.configure(
+      status: makeStatus(oid: head, branch: "main"),
+      branches: branches,
+      gitVersion: GitVersion(2, 55, 0)
+    )
+    await model.refresh()
+    #expect(!model.canFixupCommit(commit))
+
+    await client.configure(status: staged, branches: branches, gitVersion: GitVersion(2, 55, 0))
+    await model.refresh()
+    #expect(model.canFixupCommit(commit))
+
+    await model.rewordCommit(head, message: "Better\n")
+    await model.fixupCommit(head)
+    #expect(await client.mutationCalls == ["reword:aaaa1111:Better\n", "fixup:aaaa1111:false"])
+  }
+
   @Test func refreshErrorClearsOnceRefreshRecovers() async {
     let client = FakeRepositoryGitClient()
     let oid = makeOID("99999999")
@@ -1260,6 +1297,13 @@ private actor FakeRepositoryGitClient: GitClient {
   func revert(_ oid: ObjectID) async throws { throw Failure.unimplemented }
   func replayBranch(_ branch: String, onto newBase: ObjectID, linearize: Bool) async throws {
     mutationCalls.append("replay:\(branch):\(newBase.rawValue):\(linearize)")
+  }
+  func rewordCommit(_ oid: ObjectID, message: String) async throws {
+    mutationCalls.append("reword:\(oid.rawValue):\(message)")
+  }
+  func fixupCommit(_ oid: ObjectID, dryRun: Bool) async throws -> [RefUpdate] {
+    mutationCalls.append("fixup:\(oid.rawValue):\(dryRun)")
+    return []
   }
   func dropCommit(_ oid: ObjectID, dryRun: Bool) async throws -> [RefUpdate] {
     mutationCalls.append("drop:\(oid.rawValue):\(dryRun)")

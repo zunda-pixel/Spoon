@@ -178,6 +178,16 @@ public protocol GitSequencerClient: Sendable {
   /// overwrite. `dryRun` reports the ref updates without applying them.
   @discardableResult
   func dropCommit(_ oid: ObjectID, dryRun: Bool) async throws -> [RefUpdate]
+  /// Replaces one commit's message and rewrites its descendants, without
+  /// touching the index or worktree (`git history reword`, requires
+  /// `GitCapabilities.supportsHistoryReword`).
+  func rewordCommit(_ oid: ObjectID, message: String) async throws
+  /// Folds the staged changes into an earlier commit, keeping its message,
+  /// and replays its descendants (`git history fixup`, requires
+  /// `GitCapabilities.supportsHistoryFixup`). Aborts without changing
+  /// anything on conflicts. `dryRun` reports the ref updates only.
+  @discardableResult
+  func fixupCommit(_ oid: ObjectID, dryRun: Bool) async throws -> [RefUpdate]
   /// Rebases local `branch` onto `newBase` without touching the index or any
   /// worktree (`git replay`, requires `GitCapabilities.supportsReplayLinearize`).
   /// The branch is updated atomically, or not at all on conflicts.

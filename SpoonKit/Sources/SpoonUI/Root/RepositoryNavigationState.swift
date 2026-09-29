@@ -41,6 +41,8 @@ final class RepositoryNavigationState {
     case replayBranch(Branch)
     case rebase(Commit)
     case dropCommit(Commit)
+    case fixupCommit(Commit)
+    case rewordCommit(Commit)
     case moveBranch(Branch, to: Commit)
     case tag(Commit)
     case reset(target: ObjectID, description: String)
@@ -84,6 +86,10 @@ final class RepositoryNavigationState {
         "move-branch:\(branch.id):\(commit.id)"
       case .dropCommit(let commit):
         "drop-commit:\(commit.id)"
+      case .fixupCommit(let commit):
+        "fixup-commit:\(commit.id)"
+      case .rewordCommit(let commit):
+        "reword-commit:\(commit.id)"
       case .tag(let commit):
         "tag:\(commit.id)"
       case .reset(let target, _):
