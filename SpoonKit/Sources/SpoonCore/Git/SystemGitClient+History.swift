@@ -70,6 +70,23 @@ extension SystemGitClient {
     return GitBlameParser.parse(result.standardOutput)
   }
 
+  public func searchCode(_ query: CodeSearchQuery, limit: Int) async throws -> CodeSearchResult {
+    let command = GitCommand.make(
+      git: git,
+      repository: repositoryRoot,
+      arguments: query.arguments,
+      timeout: .seconds(60)
+    )
+    let result = try await runner.run(command)
+    // `git grep` exits 1 when nothing matches.
+    if result.exitCode == 1 { return CodeSearchResult(matches: [], isTruncated: false) }
+    return CodeSearchResult.parse(
+      try result.checkSuccess(of: command).standardOutput,
+      revision: query.revision,
+      limit: limit
+    )
+  }
+
   public func commitDetail(_ oid: ObjectID, options: DiffOptions) async throws -> CommitDetail {
     let metadata = try await run([
       "log", "-1", "-z", "--format=\(GitLogParser.logFormat)", oid.rawValue, "--",

@@ -2,6 +2,13 @@ import Defaults
 import Foundation
 
 extension RepositoryModel {
+  /// Lines matching `query` in the working tree or a revision.
+  public func searchCode(_ query: CodeSearchQuery, limit: Int = 2_000) async throws
+    -> CodeSearchResult
+  {
+    try await gitClient.searchCode(query, limit: limit)
+  }
+
   public var historyRows: [GraphRow] { historyStore.historyRows }
   public var isLoadingHistory: Bool { historyStore.isLoadingHistory }
   public var hasMoreHistory: Bool { historyStore.hasMoreHistory }

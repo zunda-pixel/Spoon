@@ -51,6 +51,40 @@ struct LiveGitTests {
     #expect(raw.contains("Signed-off-by: Spoon Tests <test@example.com>"))
   }
 
+  @Test func codeSearchFindsLinesInTheWorkingTreeAndAtARevision() async throws {
+    let root = try await makeTemporaryRepo()
+    defer { try? FileManager.default.removeItem(at: root) }
+    try await LiveRepoFixture.commitFile(
+      "Sources/Greeting.swift", content: "func greet() {}\nlet name = \"a\"\n",
+      message: "greet", in: root, runner: runner)
+    try await runGit(["tag", "v1"], in: root)
+    try Data("func greet() {}\n// greet again\n".utf8).write(
+      to: root.appending(path: "Sources/Greeting.swift"))
+    try Data("greet untracked\n".utf8).write(to: root.appending(path: "notes.txt"))
+    let client = SystemGitClient(repositoryRoot: root, git: git, runner: runner)
+
+    let working = try await client.searchCode(CodeSearchQuery(pattern: "GREET"), limit: 100)
+    #expect(working.matches.map(\.lineNumber) == [1, 2])
+    #expect(working.matches.first?.path == "Sources/Greeting.swift")
+    #expect(working.matches.first?.column == 6)
+
+    let untracked = try await client.searchCode(
+      CodeSearchQuery(pattern: "greet", includesUntracked: true, paths: ["*.txt"]), limit: 100)
+    #expect(untracked.matches.map(\.path) == ["notes.txt"])
+
+    let tagged = try await client.searchCode(
+      CodeSearchQuery(pattern: "name", revision: "v1"), limit: 100)
+    #expect(tagged.matches.map(\.path) == ["Sources/Greeting.swift"])
+    #expect(tagged.matches.map(\.text) == ["let name = \"a\""])
+
+    let none = try await client.searchCode(CodeSearchQuery(pattern: "absent"), limit: 100)
+    #expect(none.matches.isEmpty)
+    await #expect(throws: CommandError.self) {
+      try await client.searchCode(
+        CodeSearchQuery(pattern: "(", syntax: .regularExpression), limit: 100)
+    }
+  }
+
   @Test func statusAndBranchesOnRealRepo() async throws {
     let root = try await makeTemporaryRepo()
     defer { try? FileManager.default.removeItem(at: root) }
