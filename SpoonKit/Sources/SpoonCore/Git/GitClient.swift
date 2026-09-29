@@ -68,7 +68,10 @@ public protocol GitHistoryClient: Sendable {
   /// Line-by-line authorship of `path`: the working-tree file when
   /// `revision` is `nil` (uncommitted lines use the zero OID), else the
   /// file at that revision.
-  func blame(path: String, at revision: ObjectID?) async throws -> [BlameLine]
+  func blame(path: String, at revision: ObjectID?, options: BlameOptions) async throws
+    -> [BlameLine]
+  /// Files `blame.ignoreRevsFile` lists, which git reads on every blame.
+  func blameIgnoreRevsFiles() async throws -> [String]
   /// The commits, newest first, that changed `lines` (1-based, inclusive)
   /// of `path` as it is at HEAD, each with the diff of just those lines,
   /// following them as they move (`git log -L`). At most `limit` commits.
@@ -371,6 +374,10 @@ extension GitSequencerClient {
 }
 
 extension GitHistoryClient {
+  public func blame(path: String, at revision: ObjectID?) async throws -> [BlameLine] {
+    try await blame(path: path, at: revision, options: BlameOptions())
+  }
+
   public func commitDetail(_ oid: ObjectID) async throws -> CommitDetail {
     try await commitDetail(oid, options: .standard)
   }
