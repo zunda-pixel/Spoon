@@ -65,4 +65,22 @@ struct FileTreeBuilderTests {
       leaves == ["docs/readme.md", "src/app/main.swift", "src/lib/util.swift", "zebra.txt"]
     )
   }
+
+  @Test func areaTreesGiveTheSamePathDistinctIDs() {
+    var status = WorkingTreeStatus()
+    status.entries = [
+      FileStatusEntry(path: "Sources/App/a.swift", staged: .modified, unstaged: .modified),
+      FileStatusEntry(path: "Sources/App/b.swift", isUntracked: true),
+    ]
+
+    let trees = ChangeTrees(status: status)
+    let ids = [trees.staged, trees.unstaged, trees.untracked].flatMap { allIDs($0) }
+
+    #expect(Set(ids).count == ids.count)
+    #expect(trees.staged.first?.path == trees.unstaged.first?.path)
+  }
+
+  private func allIDs(_ nodes: [FileTreeNode]) -> [String] {
+    nodes.flatMap { [$0.id] + allIDs($0.children ?? []) }
+  }
 }

@@ -463,6 +463,32 @@ struct LiveRepositoryTests {
     #expect(entries[1].patchDiff.contains { $0.contains("+line twenty") })
   }
 
+  @Test func filesInANewFolderAreListedAndDiffedOneByOne() async throws {
+    let root = try await LiveRepoFixture.makeTemporaryRepo(
+      commits: [.init(file: "README.md", content: "readme\n", message: "base")],
+      runner: runner
+    )
+    defer { try? FileManager.default.removeItem(at: root) }
+    let folder = root.appending(path: "Sources/Update")
+    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+    try Data("one\n".utf8).write(to: folder.appending(path: "One.swift"))
+    try Data("two\n".utf8).write(to: folder.appending(path: "Two.swift"))
+    let nested = root.appending(path: "Vendor/Lib")
+    try FileManager.default.createDirectory(at: nested, withIntermediateDirectories: true)
+    try await LiveRepoFixture.run(["init", "-q"], in: nested, runner: runner)
+    try Data("lib\n".utf8).write(to: nested.appending(path: "lib.txt"))
+    let client = makeClient(root)
+
+    let untracked = try await client.status().untrackedEntries.map(\.path)
+
+    #expect(untracked == ["Sources/Update/One.swift", "Sources/Update/Two.swift", "Vendor/Lib/"])
+    let diff = try await client.untrackedFileDiff(path: "Sources/Update/One.swift")
+    #expect(diff.additionCount == 1)
+    await #expect(throws: UntrackedDiffError.nestedRepository(path: "Vendor/Lib/")) {
+      try await client.untrackedFileDiff(path: "Vendor/Lib/")
+    }
+  }
+
   @Test func cloneCreatesAWorkingLocalCopy() async throws {
     let source = try await LiveRepoFixture.makeTemporaryRepo(
       commits: [.init(file: "base.txt", content: "base\n", message: "base")],

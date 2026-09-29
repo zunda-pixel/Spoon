@@ -18,7 +18,7 @@ struct SystemGitClientTests {
       arguments: [
         "-c", "color.ui=false",
         "-c", "core.quotePath=false",
-        "status", "--porcelain=v2", "--branch", "--show-stash", "-z",
+        "status", "--porcelain=v2", "--branch", "--show-stash", "--untracked-files=all", "-z",
       ],
       stdout: "# branch.oid 4ae2b1babc8e42f9dc9e34b7de1836a10ed4c331\u{0}# branch.head main\u{0}"
     )
@@ -59,7 +59,7 @@ struct SystemGitClientTests {
       arguments: [
         "-c", "color.ui=false",
         "-c", "core.quotePath=false",
-        "status", "--porcelain=v2", "--branch", "--show-stash", "-z",
+        "status", "--porcelain=v2", "--branch", "--show-stash", "--untracked-files=all", "-z",
       ],
       stderr: "fatal: not a git repository\n",
       exitCode: 128
