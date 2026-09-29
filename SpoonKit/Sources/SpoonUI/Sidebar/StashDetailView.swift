@@ -5,13 +5,15 @@ import SwiftUI
 @MainActor
 struct StashDetailView: View {
   let model: RepositoryModel
+  let navigation: RepositoryNavigationState
   let stashIndex: Int
   @State private var diffs: [FileDiff]?
   @State private var loadErrorMessage: String?
   @State private var confirmingDrop = false
 
-  init(model: RepositoryModel, stashIndex: Int) {
+  init(model: RepositoryModel, navigation: RepositoryNavigationState, stashIndex: Int) {
     self.model = model
+    self.navigation = navigation
     self.stashIndex = stashIndex
   }
 
@@ -51,6 +53,23 @@ struct StashDetailView: View {
   }
 
   private func header(_ stash: Stash) -> some View {
+    // The buttons move under the message when the column is too narrow.
+    ViewThatFits(in: .horizontal) {
+      HStack(spacing: 10) {
+        title(stash)
+        Spacer()
+        actions(stash)
+      }
+      VStack(alignment: .leading, spacing: 8) {
+        title(stash)
+        HStack { actions(stash) }
+      }
+    }
+    .disabled(model.isBusy)
+    .padding(12)
+  }
+
+  private func title(_ stash: Stash) -> some View {
     HStack(spacing: 10) {
       Image(systemName: "tray")
         .foregroundStyle(.secondary)
@@ -61,19 +80,27 @@ struct StashDetailView: View {
           .font(.caption.monospaced())
           .foregroundStyle(.secondary)
       }
-      Spacer()
+    }
+  }
+
+  @ViewBuilder
+  private func actions(_ stash: Stash) -> some View {
+    Group {
       Button("Apply") {
         Task { await model.applyStash(stash, pop: false) }
       }
       Button("Pop") {
         Task { await model.applyStash(stash, pop: true) }
       }
+      Button("New Branch…") {
+        navigation.present(.stashBranch(stash))
+      }
+      .help("Apply the stash on a new branch made where it was stashed")
       Button("Drop…", role: .destructive) {
         confirmingDrop = true
       }
     }
-    .disabled(model.isBusy)
-    .padding(12)
+    .fixedSize()
   }
 
   @ViewBuilder

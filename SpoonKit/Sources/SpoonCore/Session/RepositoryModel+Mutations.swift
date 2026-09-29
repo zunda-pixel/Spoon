@@ -546,6 +546,12 @@ extension RepositoryModel {
     await perform { try await $0.dropStash(stash) }
   }
 
+  /// Moves the stash onto a new branch made where it was stashed.
+  @discardableResult
+  public func branchFromStash(_ stash: Stash, name: String) async -> Bool {
+    await perform { try await $0.branchFromStash(stash, name: name) }
+  }
+
   public func stashDiffs(_ stash: Stash) async throws -> [FileDiff] {
     try await gitClient.stashDiffs(stash)
   }
