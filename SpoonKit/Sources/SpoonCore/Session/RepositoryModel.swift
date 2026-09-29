@@ -30,6 +30,10 @@ public final class RepositoryModel {
   /// A long-running mutation (fetch/pull/push/commit/…) is in flight.
   public internal(set) var isBusy = false
   public internal(set) var lastErrorMessage: String?
+  /// Stash local changes around every pull (`--autostash`), app-wide.
+  public var pullAutostash = Defaults[.pullAutostash] {
+    didSet { Defaults[.pullAutostash] = pullAutostash }
+  }
   public internal(set) var focusedHistoryReferenceIDs: Set<String> = []
   public internal(set) var hiddenHistoryReferenceIDs: Set<String> = []
   /// Whether `lastErrorMessage` came from a background read (git refresh or

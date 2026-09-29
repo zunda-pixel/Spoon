@@ -364,6 +364,45 @@ struct LiveRepositoryTests {
     #expect(try await subjects("answer = 42", .code) == ["Add the answer"])
   }
 
+  @Test func pullRebaseReplaysLocalCommitsAndAutostashesChanges() async throws {
+    let bare = try await LiveRepoFixture.makeBareRepo(runner: runner)
+    let root = try await LiveRepoFixture.makeTemporaryRepo(
+      commits: [.init(file: "base.txt", content: "base\n", message: "base")],
+      runner: runner
+    )
+    let other = URL.temporaryDirectory.appending(path: "spoon-other-\(UUID().uuidString)")
+    defer {
+      for url in [bare, root, other] { try? FileManager.default.removeItem(at: url) }
+    }
+    try await LiveRepoFixture.run(["remote", "add", "origin", bare.path], in: root, runner: runner)
+    try await LiveRepoFixture.run(["push", "-u", "origin", "main"], in: root, runner: runner)
+    try await LiveRepoFixture.run(
+      ["clone", bare.path, other.path], in: URL.temporaryDirectory, runner: runner
+    )
+    for arguments in [
+      ["config", "user.email", "test@example.com"], ["config", "user.name", "Other"],
+      ["config", "commit.gpgsign", "false"],
+    ] {
+      try await LiveRepoFixture.run(arguments, in: other, runner: runner)
+    }
+    try await LiveRepoFixture.commitFile(
+      "remote.txt", content: "r\n", message: "remote change", in: other, runner: runner
+    )
+    try await LiveRepoFixture.run(["push"], in: other, runner: runner)
+    try await LiveRepoFixture.commitFile(
+      "local.txt", content: "l\n", message: "local change", in: root, runner: runner
+    )
+    try Data("edited\n".utf8).write(to: root.appending(path: "base.txt"))
+    let client = makeClient(root)
+
+    try await client.pull(PullOptions(strategy: .rebase, autostash: true))
+
+    let commits = try await client.log(LogQuery(maxCount: 5)).commits
+    #expect(commits.map(\.subject) == ["local change", "remote change", "base"])
+    #expect(commits.allSatisfy { !$0.isMerge })
+    #expect(try await client.status().unstagedEntries.map(\.path) == ["base.txt"])
+  }
+
   @Test func cloneCreatesAWorkingLocalCopy() async throws {
     let source = try await LiveRepoFixture.makeTemporaryRepo(
       commits: [.init(file: "base.txt", content: "base\n", message: "base")],

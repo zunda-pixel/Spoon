@@ -18,14 +18,18 @@ struct RepositoryToolbar: ToolbarContent {
       .accessibilityHint("Downloads updated references from all remotes")
       .disabled(model.isBusy)
 
-      Button {
-        Task { await model.pull() }
+      Menu {
+        PullMenuItems(model: model)
       } label: {
         remoteCountLabel(
           "Pull", systemImage: "arrow.down.to.line", count: model.currentBranch?.behind)
+      } primaryAction: {
+        Task { await model.pull() }
       }
-      .help("Pull (⇧⌘L)")
-      .accessibilityHint("Fetches and integrates the current upstream branch")
+      .help("Pull (⇧⌘L); open the menu to rebase, merge, or fast-forward only")
+      .accessibilityHint(
+        "Fetches and integrates the current upstream branch; open the menu for other pull modes"
+      )
       .disabled(model.isBusy || model.isSequencing)
 
       Menu {

@@ -149,8 +149,8 @@ extension SystemGitClient {
     )
   }
 
-  public func pull() async throws {
-    try await runVoid(["pull"], timeout: .seconds(300))
+  public func pull(_ options: PullOptions) async throws {
+    try await runVoid(["pull"] + options.arguments, timeout: .seconds(300))
   }
 
   public func push(force: Bool) async throws {

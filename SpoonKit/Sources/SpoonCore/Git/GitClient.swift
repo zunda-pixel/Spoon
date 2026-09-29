@@ -131,7 +131,7 @@ public protocol GitRemoteClient: Sendable {
   /// `GitCapabilities.supportsRepackDropFiltered`). git keeps blobs the index
   /// uses and refuses while a merge, rebase, or similar operation runs.
   func dropLargeBlobs(largerThan byteLimit: Int) async throws
-  func pull() async throws
+  func pull(_ options: PullOptions) async throws
   /// Pushes the current branch; sets upstream on first push.
   func push(force: Bool) async throws
 }
