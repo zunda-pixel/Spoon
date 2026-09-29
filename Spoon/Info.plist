@@ -19,6 +19,8 @@
 	</array>
 	<key>CFBundleIconFile</key>
 	<string>AppIcon</string>
+	<key>SpoonReleaseTag</key>
+	<string>$(SPOON_RELEASE_TAG)</string>
 	<key>UTExportedTypeDeclarations</key>
 	<array>
 		<dict>

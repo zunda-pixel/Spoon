@@ -27,11 +27,14 @@ public final class AppModel {
   }
 
   public let toolLocator: ToolLocator
+  /// Checks for and installs new Spoon releases.
+  public let updater: AppUpdater
   private let runner: any CommandRunning
   private static let maxRecents = 20
 
   public init(runner: any CommandRunning = SubprocessCommandRunner()) {
     self.runner = runner
+    self.updater = AppUpdater(installer: AppUpdateInstaller(runner: runner))
     defer { Self.shared = self }
     self.toolLocator = ToolLocator(
       runner: runner,

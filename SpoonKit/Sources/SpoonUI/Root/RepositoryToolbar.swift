@@ -6,8 +6,21 @@ import SwiftUI
 struct RepositoryToolbar: ToolbarContent {
   let model: RepositoryModel
   let navigation: RepositoryNavigationState
+  @Environment(AppModel.self) private var appModel
+  @Environment(\.openWindow) private var openWindow
 
   var body: some ToolbarContent {
+    if let release = appModel.updater.availableRelease {
+      ToolbarItem {
+        Button {
+          openWindow(id: softwareUpdateWindowID)
+        } label: {
+          Label("Update to \(release.version.description)", systemImage: "arrow.down.app.fill")
+        }
+        .help("Spoon \(release.version.description) is available")
+        .accessibilityHint("Opens Software Update to install the new version")
+      }
+    }
     ToolbarItemGroup {
       Button {
         Task { await model.fetch() }

@@ -29,6 +29,13 @@ public struct RootView: View {
     .task {
       uiLogger.info("RootView appeared, repositoryID=\(repositoryID ?? "nil", privacy: .public)")
       consumeExternalOpenRequest()
+      await appModel.updater.checkAtLaunchIfNeeded()
+    }
+    .onChange(of: appModel.updater.availableRelease) { _, release in
+      // One shared window, however many repository windows are open.
+      if release != nil {
+        openWindow(id: softwareUpdateWindowID)
+      }
     }
     .onChange(of: appModel.externalOpenRequest) {
       consumeExternalOpenRequest()

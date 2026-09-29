@@ -30,11 +30,20 @@ struct SpoonApp: App {
     // argument-carrying launches.
     .defaultLaunchBehavior(.presented)
     .commands {
-      SpoonCommands()
+      SpoonCommands(appModel: appModel)
     }
+
+    Window("Software Update", id: softwareUpdateWindowID) {
+      SoftwareUpdateView()
+        .environment(appModel)
+    }
+    .windowResizability(.contentSize)
+    .defaultLaunchBehavior(.suppressed)
+    .restorationBehavior(.disabled)
 
     Settings {
       SettingsView()
+        .environment(appModel)
     }
   }
 }
