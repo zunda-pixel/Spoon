@@ -10,6 +10,7 @@ struct FileHistorySheet: View {
   @State private var selectedCommitID: String?
   @State private var nextQuery: LogQuery?
   @State private var isLoadingMore = false
+  @State private var followRenames = true
 
   var body: some View {
     VStack(spacing: 0) {
@@ -43,7 +44,7 @@ struct FileHistorySheet: View {
       }
     }
     .frame(minWidth: 760, minHeight: 480)
-    .task(id: path) {
+    .task(id: followRenames) {
       await loadFirstPage()
     }
   }
@@ -55,6 +56,9 @@ struct FileHistorySheet: View {
         .lineLimit(1)
         .truncationMode(.middle)
       Spacer()
+      Toggle("Follow Renames", isOn: $followRenames)
+        .toggleStyle(.checkbox)
+        .help("Include commits from before the file was renamed or moved")
       Button("Done") {
         dismiss()
       }
@@ -84,7 +88,9 @@ struct FileHistorySheet: View {
   }
 
   private func loadFirstPage() async {
-    let query = LogQuery(path: path, maxCount: 200)
+    let query = LogQuery(path: path, followRenames: followRenames, maxCount: 200)
+    loadState = .loading
+    nextQuery = nil
     do {
       let page = try await model.fileHistory(query)
       loadState = .loaded(page.commits)

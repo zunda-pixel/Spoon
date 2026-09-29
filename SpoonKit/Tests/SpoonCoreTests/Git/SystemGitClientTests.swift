@@ -541,6 +541,21 @@ struct SystemGitClientTests {
     #expect(runner.invocations.count == 1)
   }
 
+  @Test func fileLogFollowsRenamesOnlyWithAPath() async throws {
+    let runner = FakeCommandRunner()
+    let prefix = [
+      "log", "--topo-order", "-z", "--format=\(GitLogParser.logFormat)", "--max-count=11",
+    ]
+    runner.stub(arguments: baseFlags + prefix + ["--follow", "HEAD", "--", "Sources/App.swift"])
+    runner.stub(arguments: baseFlags + prefix + ["HEAD", "--"])
+    let client = makeClient(runner)
+
+    _ = try await client.log(LogQuery(path: "Sources/App.swift", followRenames: true, maxCount: 10))
+    _ = try await client.log(LogQuery(followRenames: true, maxCount: 10))
+
+    #expect(runner.invocations.count == 2)
+  }
+
   @Test func filteredAllReferenceLogSendsIncludedAndExcludedReferences() async throws {
     let runner = FakeCommandRunner()
     runner.stub(

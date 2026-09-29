@@ -12,6 +12,9 @@ extension SystemGitClient {
     if query.skip > 0 {
       arguments.append("--skip=\(query.skip)")
     }
+    if query.followRenames, query.path != nil {
+      arguments.append("--follow")
+    }
     if query.allReferences {
       arguments.append("--all")
     }
