@@ -31,11 +31,19 @@ jobs:
             -configuration Release \
             -destination 'generic/platform=macOS' \
             -derivedDataPath "$DERIVED_DATA_PATH" \
+            MARKETING_VERSION="$TAG" \
+            SPOON_RELEASE_TAG="$TAG" \
             CODE_SIGN_IDENTITY="-" \
             CODE_SIGN_STYLE=Manual \
             DEVELOPMENT_TEAM="" \
             -skipMacroValidation \
             build
+
+      - name: Verify version
+        # The in-app updater compares release tags with SpoonReleaseTag.
+        run: |
+          plist="$DERIVED_DATA_PATH/Build/Products/Release/Spoon.app/Contents/Info.plist"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :SpoonReleaseTag' "$plist")" = "$TAG"
 
       - name: Verify signature
         run: codesign --verify --deep --strict --verbose=2 "$DERIVED_DATA_PATH/Build/Products/Release/Spoon.app"

@@ -10,6 +10,9 @@ public struct SettingsView: View {
       Tab("GitHub", systemImage: "arrow.triangle.pull") {
         GitHubSettingsView()
       }
+      Tab("Updates", systemImage: "arrow.down.app") {
+        UpdateSettingsView()
+      }
     }
     .frame(width: 480)
     .scenePadding()
@@ -57,5 +60,32 @@ private struct GitHubSettingsView: View {
       }
     }
     .formStyle(.grouped)
+  }
+}
+
+@MainActor
+private struct UpdateSettingsView: View {
+  @Environment(AppModel.self) private var appModel
+  @Environment(\.openWindow) private var openWindow
+  @State private var automaticallyChecks = true
+
+  var body: some View {
+    Form {
+      LabeledContent("Current version") {
+        Text(appModel.updater.currentVersion?.description ?? "Development build")
+      }
+      Toggle("Check for updates when Spoon opens", isOn: $automaticallyChecks)
+        .onChange(of: automaticallyChecks) {
+          appModel.updater.automaticallyChecks = automaticallyChecks
+        }
+      Button("Check Now") {
+        openWindow(id: softwareUpdateWindowID)
+        Task { await appModel.updater.checkForUpdates() }
+      }
+      Text("Updates are downloaded from the project’s GitHub releases.")
+        .font(.caption)
+        .foregroundStyle(.secondary)
+    }
+    .onAppear { automaticallyChecks = appModel.updater.automaticallyChecks }
   }
 }

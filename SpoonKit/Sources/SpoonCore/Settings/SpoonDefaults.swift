@@ -21,4 +21,13 @@ extension Defaults.Keys {
 
   /// Stash local changes around every pull (`git pull --autostash`).
   public static let pullAutostash = Key<Bool>("pullAutostash", default: false)
+
+  /// Check GitHub for a newer release when the app launches.
+  public static let automaticallyCheckForUpdates = Key<Bool>(
+    "automaticallyCheckForUpdates",
+    default: true
+  )
+
+  /// Release tag the user chose to skip; not offered again at launch.
+  public static let skippedUpdateVersion = Key<String?>("skippedUpdateVersion", default: nil)
 }

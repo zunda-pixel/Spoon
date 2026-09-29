@@ -1,5 +1,5 @@
 import AppKit
-import SpoonCore
+public import SpoonCore
 public import SwiftUI
 
 struct RepositoryModelFocusedKey: FocusedValueKey {
@@ -28,10 +28,22 @@ extension FocusedValues {
 public struct SpoonCommands: Commands {
   @FocusedValue(\.repositoryModel) private var model
   @FocusedValue(\.repositoryNavigationState) private var navigation
+  @Environment(\.openWindow) private var openWindow
+  private let appModel: AppModel
 
-  public init() {}
+  public init(appModel: AppModel) {
+    self.appModel = appModel
+  }
 
   public var body: some Commands {
+    CommandGroup(after: .appInfo) {
+      Button("Check for Updates…") {
+        openWindow(id: softwareUpdateWindowID)
+        Task { await appModel.updater.checkForUpdates() }
+      }
+      .disabled(isUpdaterBusy)
+    }
+
     CommandMenu("Repository") {
       Button("Fetch") {
         run { await $0.fetch() }
@@ -175,6 +187,13 @@ public struct SpoonCommands: Commands {
         .keyboardShortcut("4", modifiers: .command)
         .disabled(navigation == nil)
       }
+    }
+  }
+
+  private var isUpdaterBusy: Bool {
+    switch appModel.updater.state {
+    case .checking, .installing, .readyToRelaunch: true
+    default: false
     }
   }
 
