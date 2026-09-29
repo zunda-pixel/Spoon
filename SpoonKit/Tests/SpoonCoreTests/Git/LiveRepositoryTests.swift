@@ -763,6 +763,21 @@ struct LiveRepositoryTests {
     try await client.updateSubmodules(paths: ["Vendor/Lib"])
     #expect(try await client.submodules().first?.state == .upToDate)
     #expect(FileManager.default.fileExists(atPath: root.appending(path: "Vendor/Lib/lib.txt").path))
+
+    // A local change blocks deinit and removal until it may be discarded.
+    let libFile = root.appending(path: "Vendor/Lib/lib.txt")
+    try Data("edited\n".utf8).write(to: libFile)
+    await #expect(throws: CommandError.self) {
+      try await client.deinitializeSubmodule(path: "Vendor/Lib", force: false)
+    }
+    try await client.deinitializeSubmodule(path: "Vendor/Lib", force: true)
+    #expect(try await client.submodules().first?.state == .notInitialized)
+    #expect(!FileManager.default.fileExists(atPath: libFile.path))
+
+    try await client.removeSubmodule(path: "Vendor/Lib", force: false)
+    #expect(try await client.submodules().isEmpty)
+    let staged = try await client.status().stagedEntries.map(\.path).sorted()
+    #expect(staged == [".gitmodules", "Vendor/Lib"])
   }
 
   @Test func recursiveCloneChecksOutSubmoduleContent() async throws {
