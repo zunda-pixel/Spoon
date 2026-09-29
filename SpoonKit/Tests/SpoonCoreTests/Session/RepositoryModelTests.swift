@@ -1218,6 +1218,32 @@ struct RepositoryModelTests {
     )
   }
 
+  @Test func selectionsWithAMergeUseTheFirstParentAsMainline() async {
+    let client = FakeRepositoryGitClient()
+    let head = makeOID("aaaa1111")
+    var merge = makeCommit("bbbb2222", subject: "Merge topic")
+    merge.parents = [makeOID("cccc3333"), makeOID("dddd4444")]
+    let plain = makeCommit("eeee5555", subject: "plain")
+    await client.configure(
+      status: makeStatus(oid: head, branch: "main"),
+      branches: [makeBranch("main", oid: head, isCurrent: true)],
+      logPages: [0: LogPage(commits: [plain, merge], hasMore: false)]
+    )
+    let model = makeModel(client)
+    await model.refresh()
+    await model.loadHistoryIfNeeded()
+
+    await model.cherryPick([merge])
+    await model.revert([plain, merge])
+    await model.revert([plain])
+
+    #expect(
+      await client.mutationCalls == [
+        "cherry-pick:-m1:bbbb2222", "revert:-m1:eeee5555,bbbb2222", "revert:eeee5555",
+      ]
+    )
+  }
+
   @Test func refreshErrorClearsOnceRefreshRecovers() async {
     let client = FakeRepositoryGitClient()
     let oid = makeOID("99999999")
@@ -1582,11 +1608,13 @@ private actor FakeRepositoryGitClient: GitClient {
   func interactiveRebase(_ plan: RebasePlan) async throws { throw Failure.unimplemented }
   func cherryPick(_ oid: ObjectID) async throws { throw Failure.unimplemented }
   func revert(_ oid: ObjectID) async throws { throw Failure.unimplemented }
-  func cherryPick(_ oids: [ObjectID]) async throws {
-    mutationCalls.append("cherry-pick:" + oids.map(\.rawValue).joined(separator: ","))
+  func cherryPick(_ oids: [ObjectID], options: CherryPickOptions) async throws {
+    let mainline = options.mainline.map { "-m\($0):" } ?? ""
+    mutationCalls.append("cherry-pick:\(mainline)" + oids.map(\.rawValue).joined(separator: ","))
   }
-  func revert(_ oids: [ObjectID]) async throws {
-    mutationCalls.append("revert:" + oids.map(\.rawValue).joined(separator: ","))
+  func revert(_ oids: [ObjectID], options: RevertOptions) async throws {
+    let mainline = options.mainline.map { "-m\($0):" } ?? ""
+    mutationCalls.append("revert:\(mainline)" + oids.map(\.rawValue).joined(separator: ","))
   }
   func replayBranch(_ branch: String, onto newBase: ObjectID, linearize: Bool) async throws {
     mutationCalls.append("replay:\(branch):\(newBase.rawValue):\(linearize)")

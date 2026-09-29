@@ -144,16 +144,25 @@ extension RepositoryModel {
 
   /// Cherry-picks `commits` onto HEAD oldest first, whatever order they
   /// were selected in, so each applies on top of the one it followed.
+  /// A merge commit brings the changes it made to its first parent.
   public func cherryPick(_ commits: [Commit]) async {
     let oids = historyOrder(commits).reversed().map(\.oid)
-    await perform { try await $0.cherryPick(Array(oids)) }
+    let options = CherryPickOptions(mainline: Self.mainline(for: commits))
+    await perform { try await $0.cherryPick(Array(oids), options: options) }
   }
 
   /// Reverts `commits` newest first, so later changes are undone before the
-  /// ones they build on.
+  /// ones they build on. A merge commit is undone back to its first parent.
   public func revert(_ commits: [Commit]) async {
     let oids = historyOrder(commits).map(\.oid)
-    await perform { try await $0.revert(oids) }
+    let options = RevertOptions(mainline: Self.mainline(for: commits))
+    await perform { try await $0.revert(oids, options: options) }
+  }
+
+  /// git refuses a merge commit without `--mainline`; the first parent is
+  /// the branch it was merged into, which is what users almost always mean.
+  private static func mainline(for commits: [Commit]) -> Int? {
+    commits.contains(where: \.isMerge) ? 1 : nil
   }
 
   /// `commits` in the history list's newest-first order.

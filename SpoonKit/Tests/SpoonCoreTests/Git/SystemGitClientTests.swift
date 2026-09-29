@@ -949,6 +949,19 @@ struct SystemGitClientTests {
     #expect(runner.invocations.allSatisfy { $0.environment["GIT_EDITOR"] == nil })
   }
 
+  @Test func mainlineOptionsPrecedeTheCommits() async throws {
+    let runner = FakeCommandRunner()
+    runner.stub(arguments: baseFlags + ["cherry-pick", "--mainline", "1", "aaaa1111", "cccc3333"])
+    runner.stub(arguments: baseFlags + ["revert", "--no-edit", "--mainline", "2", "bbbb2222"])
+    let client = makeClient(runner)
+    try await client.cherryPick(
+      [ObjectID(rawValue: "aaaa1111")!, ObjectID(rawValue: "cccc3333")!],
+      options: CherryPickOptions(mainline: 1))
+    try await client.revert(
+      [ObjectID(rawValue: "bbbb2222")!], options: RevertOptions(mainline: 2))
+    #expect(runner.invocations.count == 2)
+  }
+
   @Test func interactiveRebaseSendsArgvAndEnvironment() async throws {
     let runner = FakeCommandRunner()
     runner.stub(arguments: baseFlags + ["rebase", "--interactive", "beef0000"])

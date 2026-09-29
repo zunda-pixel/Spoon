@@ -132,6 +132,42 @@ struct LiveSequencerTests {
     #expect(after.map(\.subject) == ["third", "second", "base"])
   }
 
+  @Test func mergeCommitsRevertAndCherryPickRelativeToTheirFirstParent() async throws {
+    let root = try await LiveRepoFixture.makeTemporaryRepo(
+      commits: [.init(file: "base.txt", content: "base\n", message: "base")],
+      runner: runner
+    )
+    defer { try? FileManager.default.removeItem(at: root) }
+    func git(_ arguments: [String]) async throws {
+      try await LiveRepoFixture.run(arguments, in: root, runner: runner)
+    }
+    try await git(["branch", "release"])
+    try await git(["switch", "-c", "topic"])
+    try await LiveRepoFixture.commitFile(
+      "feature.txt", content: "feature\n", message: "feature", in: root, runner: runner)
+    try await git(["switch", "main"])
+    try await LiveRepoFixture.commitFile(
+      "main.txt", content: "main\n", message: "main work", in: root, runner: runner)
+    try await git(["merge", "--no-ff", "--no-edit", "topic"])
+    let client = LiveRepoFixture.makeClient(for: root, runner: runner)
+    let head = try await client.run(["rev-parse", "HEAD"]).standardOutputText
+    let merge = try #require(ObjectID(rawValue: head.trimmingCharacters(in: .whitespacesAndNewlines)))
+
+    // A plain commit alongside the merge: git accepts --mainline for both.
+    try await git(["switch", "release"])
+    try await LiveRepoFixture.commitFile(
+      "release.txt", content: "release\n", message: "release", in: root, runner: runner)
+    try await client.cherryPick([merge], options: CherryPickOptions(mainline: 1))
+    #expect(FileManager.default.fileExists(atPath: root.appending(path: "feature.txt").path))
+    #expect(!FileManager.default.fileExists(atPath: root.appending(path: "main.txt").path))
+
+    try await git(["switch", "main"])
+    try await client.revert([merge], options: RevertOptions(mainline: 1))
+    #expect(!FileManager.default.fileExists(atPath: root.appending(path: "feature.txt").path))
+    #expect(FileManager.default.fileExists(atPath: root.appending(path: "main.txt").path))
+    #expect(try await client.sequencerState() == nil)
+  }
+
   @Test func conflictIsDetectedAndAbortRestoresEverything() async throws {
     let root = try await LiveRepoFixture.makeTemporaryRepo(runner: runner)
     defer { try? FileManager.default.removeItem(at: root) }
