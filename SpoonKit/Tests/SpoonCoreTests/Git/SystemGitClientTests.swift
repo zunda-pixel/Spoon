@@ -395,6 +395,26 @@ struct SystemGitClientTests {
     #expect(runner.invocations.count == 3)
   }
 
+  @Test func rewordAndFixupSendExactArgv() async throws {
+    let runner = FakeCommandRunner()
+    let oid = try #require(ObjectID(rawValue: String(repeating: "a", count: 40)))
+    runner.stub(arguments: baseFlags + ["history", "reword", oid.rawValue])
+    runner.stub(
+      arguments: baseFlags + ["history", "fixup", "--dry-run", oid.rawValue],
+      stdout: "update refs/heads/main \(String(repeating: "b", count: 40)) "
+        + "\(String(repeating: "c", count: 40))\n"
+    )
+    let client = makeClient(runner)
+
+    try await client.rewordCommit(oid, message: "New subject\n")
+    let preview = try await client.fixupCommit(oid, dryRun: true)
+
+    let reword = try #require(runner.invocations.first)
+    #expect(reword.environment["GIT_EDITOR"] == #"cp -f "$SPOON_COMMIT_MESSAGE""#)
+    #expect(reword.environment["SPOON_COMMIT_MESSAGE"] != nil)
+    #expect(preview.map(\.branchName) == ["main"])
+  }
+
   @Test func failedVersionProbeIsRetried() async {
     let runner = FakeCommandRunner()
     runner.stub(arguments: baseFlags + ["version"], stdout: "not a version\n")

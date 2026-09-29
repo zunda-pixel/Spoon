@@ -176,6 +176,18 @@ struct HistoryListView: View {
       navigation.present(.rebase(commit))
     }
     .disabled(commit.isMerge || model.isBusy || model.isSequencing)
+    if model.canRewordCommit(commit) {
+      Button("Edit Commit Message…") {
+        navigation.present(.rewordCommit(commit))
+      }
+      .disabled(model.isBusy || model.isSequencing)
+    }
+    if model.canFixupCommit(commit) {
+      Button("Fixup Staged Changes into This Commit…") {
+        navigation.present(.fixupCommit(commit))
+      }
+      .disabled(model.isBusy || model.isSequencing)
+    }
     if model.canDropCommit(commit) {
       Button("Drop Commit…", role: .destructive) {
         navigation.present(.dropCommit(commit))

@@ -188,6 +188,28 @@ struct LiveRepositoryTests {
     #expect(!FileManager.default.fileExists(atPath: root.appending(path: "doomed.txt").path))
   }
 
+  @Test func rewordReplacesAnOlderMessageWithoutTouchingTheWorktree() async throws {
+    let root = try await LiveRepoFixture.makeTemporaryRepo(
+      commits: [
+        .init(file: "a.txt", content: "a\n", message: "frist"),
+        .init(file: "b.txt", content: "b\n", message: "second"),
+      ],
+      runner: runner
+    )
+    defer { try? FileManager.default.removeItem(at: root) }
+    try Data("dirty\n".utf8).write(to: root.appending(path: "b.txt"))
+    let client = makeClient(root)
+    let first = try await client.log(LogQuery(maxCount: 2)).commits[1]
+
+    try await client.rewordCommit(first.oid, message: "first\n\nFix the typo.\n")
+
+    let commits = try await client.log(LogQuery(maxCount: 2)).commits
+    #expect(commits.map(\.subject) == ["second", "first"])
+    let detail = try await client.commitDetail(commits[1].oid)
+    #expect(detail.fullMessage.contains("Fix the typo."))
+    #expect(try await client.status().unstagedEntries.map(\.path) == ["b.txt"])
+  }
+
   @Test func cloneCreatesAWorkingLocalCopy() async throws {
     let source = try await LiveRepoFixture.makeTemporaryRepo(
       commits: [.init(file: "base.txt", content: "base\n", message: "base")],

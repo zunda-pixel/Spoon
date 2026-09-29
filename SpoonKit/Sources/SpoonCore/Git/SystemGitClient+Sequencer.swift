@@ -60,6 +60,34 @@ extension SystemGitClient {
     return RefUpdateParser.parse(result.standardOutputText)
   }
 
+  public func rewordCommit(_ oid: ObjectID, message: String) async throws {
+    let messageURL = FileManager.default.temporaryDirectory
+      .appending(path: "spoon-reword-\(UUID().uuidString)")
+    try Data(message.utf8).write(to: messageURL)
+    defer { try? FileManager.default.removeItem(at: messageURL) }
+    // git runs the editor as `sh -c '<editor> "$@"'`; the message path is a
+    // shell expansion of its own variable, so spaces in it are safe.
+    try await runVoid(
+      ["history", "reword", oid.rawValue],
+      extraEnvironment: [
+        "SPOON_COMMIT_MESSAGE": messageURL.path,
+        "GIT_EDITOR": #"cp -f "$SPOON_COMMIT_MESSAGE""#,
+      ],
+      timeout: .seconds(120)
+    )
+  }
+
+  @discardableResult
+  public func fixupCommit(_ oid: ObjectID, dryRun: Bool) async throws -> [RefUpdate] {
+    var arguments = ["history", "fixup"]
+    if dryRun {
+      arguments.append("--dry-run")
+    }
+    arguments.append(oid.rawValue)
+    let result = try await run(arguments, timeout: .seconds(120))
+    return RefUpdateParser.parse(result.standardOutputText)
+  }
+
   public func replayBranch(_ branch: String, onto newBase: ObjectID, linearize: Bool) async throws {
     // Explicit update mode: a user's replay.refAction=print would otherwise
     // make this print commands and leave the branch where it was.

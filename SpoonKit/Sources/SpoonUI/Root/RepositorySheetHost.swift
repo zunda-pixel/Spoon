@@ -57,7 +57,11 @@ struct RepositorySheetHost: ViewModifier {
       case .moveBranch(let branch, let commit):
         MoveBranchSheet(model: model, branch: branch, commit: commit)
       case .dropCommit(let commit):
-        DropCommitSheet(model: model, commit: commit)
+        HistoryRewriteSheet(model: model, commit: commit, operation: .drop)
+      case .fixupCommit(let commit):
+        HistoryRewriteSheet(model: model, commit: commit, operation: .fixup)
+      case .rewordCommit(let commit):
+        RewordCommitSheet(model: model, commit: commit)
       case .tag(let commit):
         TagCommitSheet(model: model, commit: commit)
       case .reset(let target, let description):
