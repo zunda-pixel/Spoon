@@ -11,6 +11,36 @@ struct LiveRepositoryTests {
     LiveRepoFixture.makeClient(for: root, runner: runner)
   }
 
+  @Test func repositoryPathsLocateLinkedWorktreeMetadata() async throws {
+    let root = try await LiveRepoFixture.makeTemporaryRepo(
+      commits: [.init(file: "base.txt", content: "base\n", message: "base")],
+      runner: runner
+    )
+    let linked = URL.temporaryDirectory.appending(path: "spoon-linked-\(UUID().uuidString)")
+    defer {
+      try? FileManager.default.removeItem(at: root)
+      try? FileManager.default.removeItem(at: linked)
+    }
+    try await LiveRepoFixture.run(
+      ["worktree", "add", "-b", "linked", linked.path], in: root, runner: runner
+    )
+
+    let main = try await makeClient(root).repositoryPaths()
+    let worktree = try await makeClient(linked).repositoryPaths()
+
+    func canonical(_ url: URL) -> String {
+      url.resolvingSymlinksInPath().standardizedFileURL.path(percentEncoded: false)
+        .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+    }
+    let commonDirectory = canonical(main.commonDirectory)
+    #expect(canonical(main.gitDirectory) == commonDirectory)
+    #expect(canonical(worktree.commonDirectory) == commonDirectory)
+    #expect(
+      canonical(worktree.gitDirectory)
+        == "\(commonDirectory)/worktrees/\(linked.lastPathComponent)"
+    )
+  }
+
   @Test func cloneCreatesAWorkingLocalCopy() async throws {
     let source = try await LiveRepoFixture.makeTemporaryRepo(
       commits: [.init(file: "base.txt", content: "base\n", message: "base")],

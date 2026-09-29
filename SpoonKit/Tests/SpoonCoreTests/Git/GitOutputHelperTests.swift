@@ -65,6 +65,13 @@ struct GitOutputHelperTests {
     #expect(GitCapabilities(version: version).supportsBackfill == expected)
   }
 
+  @Test func repositoryPathsParserRejectsIncompleteOrRelativeOutput() {
+    let gitDirectoryOnly = Data("path.gitdir.absolute\n/r/.git\u{0}".utf8)
+    #expect(GitRepositoryPathsParser.parseRepoInfo(gitDirectoryOnly) == nil)
+    #expect(GitRepositoryPathsParser.parseRevParse(".git\n.git\n") == nil)
+    #expect(GitRepositoryPathsParser.parseRevParse("/r/.git\n") == nil)
+  }
+
   @Test func untrackedDiffBuilderCreatesTextPatch() {
     let diff = UntrackedDiffBuilder.make(path: "notes.txt", data: Data("first\nsecond".utf8))
 

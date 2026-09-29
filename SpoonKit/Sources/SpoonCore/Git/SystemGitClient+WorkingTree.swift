@@ -2,6 +2,29 @@ import Foundation
 
 extension SystemGitClient {
 
+  public func repositoryPaths() async throws -> GitRepositoryPaths {
+    let parsed: GitRepositoryPaths?
+    if await capabilities().supportsRepoInfoPaths {
+      let result = try await run(
+        [
+          "repo", "info", "-z",
+          GitRepositoryPathsParser.gitDirectoryKey,
+          GitRepositoryPathsParser.commonDirectoryKey,
+        ],
+        timeout: .seconds(10)
+      )
+      parsed = GitRepositoryPathsParser.parseRepoInfo(result.standardOutput)
+    } else {
+      let result = try await run(
+        ["rev-parse", "--path-format=absolute", "--git-dir", "--git-common-dir"],
+        timeout: .seconds(10)
+      )
+      parsed = GitRepositoryPathsParser.parseRevParse(result.standardOutputText)
+    }
+    guard let parsed else { throw GitRepositoryPathsError.unrecognizedOutput }
+    return parsed
+  }
+
   public func status() async throws -> WorkingTreeStatus {
     let result = try await run(["status", "--porcelain=v2", "--branch", "--show-stash", "-z"])
     return try GitStatusParser.parse(result.standardOutput)

@@ -4,6 +4,9 @@ public import Foundation
 public protocol GitWorkingTreeClient: Sendable {
   var repositoryRoot: URL { get }
 
+  /// Absolute git and common directories of this checkout.
+  func repositoryPaths() async throws -> GitRepositoryPaths
+
   func status() async throws -> WorkingTreeStatus
 
   /// Working-tree patch: index vs HEAD when `staged`, else worktree vs index.

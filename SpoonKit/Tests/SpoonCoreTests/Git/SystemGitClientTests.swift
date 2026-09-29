@@ -153,6 +153,39 @@ struct SystemGitClientTests {
     #expect(runner.invocations.count == 1)
   }
 
+  @Test func repositoryPathsUseRepoInfoOnGit256() async throws {
+    let runner = FakeCommandRunner()
+    runner.stub(arguments: baseFlags + ["version"], stdout: "git version 2.56.0\n")
+    runner.stub(
+      arguments: baseFlags + [
+        "repo", "info", "-z", "path.gitdir.absolute", "path.commondir.absolute",
+      ],
+      stdout: "path.gitdir.absolute\n/repo/.git/worktrees/wt\u{0}"
+        + "path.commondir.absolute\n/repo/.git\u{0}"
+    )
+
+    let paths = try await makeClient(runner).repositoryPaths()
+
+    #expect(paths.gitDirectory.path == "/repo/.git/worktrees/wt")
+    #expect(paths.commonDirectory.path == "/repo/.git")
+  }
+
+  @Test func repositoryPathsFallBackToRevParse() async throws {
+    let runner = FakeCommandRunner()
+    runner.stub(arguments: baseFlags + ["version"], stdout: "git version 2.55.0\n")
+    runner.stub(
+      arguments: baseFlags + [
+        "rev-parse", "--path-format=absolute", "--git-dir", "--git-common-dir",
+      ],
+      stdout: "/repo/.git\n/repo/.git\n"
+    )
+
+    let paths = try await makeClient(runner).repositoryPaths()
+
+    #expect(paths.gitDirectory.path == "/repo/.git")
+    #expect(paths.commonDirectory.path == "/repo/.git")
+  }
+
   @Test func failedVersionProbeIsRetried() async {
     let runner = FakeCommandRunner()
     runner.stub(arguments: baseFlags + ["version"], stdout: "not a version\n")
