@@ -141,6 +141,44 @@ struct LiveRepositoryTests {
     #expect(try await client.status().entries.isEmpty)
   }
 
+  @MainActor
+  @Test func conflictBlocksResolveOneAtATimeAndMarkersCanBeRestored() async throws {
+    // Far enough apart that git reports two conflicts, not one.
+    let keep = (1...8).map { "keep \($0)\n" }.joined()
+    let root = try await LiveRepoFixture.makeTemporaryRepo(
+      commits: [.init(file: "file.txt", content: "a\n\(keep)b\n", message: "base")],
+      runner: runner
+    )
+    defer { try? FileManager.default.removeItem(at: root) }
+    try await LiveRepoFixture.run(["switch", "-c", "topic"], in: root, runner: runner)
+    try await LiveRepoFixture.commitFile(
+      "file.txt", content: "a topic\n\(keep)b topic\n", message: "topic", in: root,
+      runner: runner)
+    try await LiveRepoFixture.run(["switch", "main"], in: root, runner: runner)
+    try await LiveRepoFixture.commitFile(
+      "file.txt", content: "a main\n\(keep)b main\n", message: "main", in: root,
+      runner: runner)
+    let client = makeClient(root)
+    await #expect(throws: CommandError.self) {
+      try await client.merge(branch: "topic", options: .standard)
+    }
+    let model = RepositoryModel(repository: Repository(rootURL: root), gitClient: client)
+    let fileURL = root.appending(path: "file.txt")
+
+    let document = try #require(try await model.conflictDocument(path: "file.txt"))
+    #expect(document.blocks.count == 2)
+    #expect(await model.resolveConflictBlock(document.blocks[0], in: "file.txt", using: .theirs))
+
+    let remaining = try #require(try await model.conflictDocument(path: "file.txt"))
+    #expect(remaining.blocks.map(\.ours) == [["b main\n"]])
+    #expect(try String(contentsOf: fileURL, encoding: .utf8).hasPrefix("a topic\n\(keep)<<<<<<<"))
+    // A block from the old document no longer matches the file.
+    #expect(!(await model.resolveConflictBlock(document.blocks[1], in: "file.txt", using: .ours)))
+
+    await model.restoreConflictMarkers(path: "file.txt")
+    #expect(try await model.conflictDocument(path: "file.txt")?.blocks.count == 2)
+  }
+
   @Test func conflictsResolveToEitherSideOrADeletion() async throws {
     let root = try await LiveRepoFixture.makeTemporaryRepo(
       commits: [

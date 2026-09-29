@@ -20,4 +20,14 @@ extension FileStatusEntry.ConflictSide {
     case (.theirs, _): "Incoming Version (Theirs)"
     }
   }
+
+  /// A short name for buttons that pick this side.
+  func shortName(during kind: SequencerState.Kind?) -> String {
+    switch (self, kind) {
+    case (.ours, .rebase): "Upstream"
+    case (.theirs, .rebase): "Your Commit"
+    case (.ours, _): "Current"
+    case (.theirs, _): "Incoming"
+    }
+  }
 }

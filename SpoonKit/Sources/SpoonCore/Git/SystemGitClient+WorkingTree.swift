@@ -92,6 +92,10 @@ extension SystemGitClient {
     }
   }
 
+  public func restoreConflictMarkers(path: String) async throws {
+    try await runVoid(["checkout", "--merge", "--", path])
+  }
+
   public func restoreFile(path: String, from revision: ObjectID) async throws {
     try await runVoid(["restore", "--source=\(revision.rawValue)", "--worktree", "--", path])
   }

@@ -11,6 +11,11 @@ struct DiffDetailView: View {
   @State private var errorMessage: String?
   @State private var lineSelection: DiffLineSelection?
   @State private var pendingDiscard: PendingDiscard?
+  /// The conflicted file split at its markers; `nil` outside Conflicts.
+  @State private var conflictDocument: ConflictDocument?
+  /// Bumped after this view rewrites a conflicted file, whose status (and
+  /// so `taskKey`) may not change.
+  @State private var conflictReload = 0
 
   private enum PendingDiscard {
     case lines(FileDiff, Hunk.ID, Set<Int>)
@@ -31,7 +36,14 @@ struct DiffDetailView: View {
 
   var body: some View {
     Group {
-      if let diffs {
+      if let conflictDocument, !conflictDocument.blocks.isEmpty {
+        ConflictBlocksView(
+          model: model,
+          path: selection.path,
+          document: conflictDocument,
+          onChange: { conflictReload += 1 }
+        )
+      } else if let diffs {
         if diffs.isEmpty {
           ContentUnavailableView(
             "No Changes",
@@ -40,6 +52,14 @@ struct DiffDetailView: View {
           )
         } else {
           VStack(spacing: 0) {
+            if conflictDocument != nil {
+              ConflictsResolvedBar(
+                model: model,
+                path: selection.path,
+                onChange: { conflictReload += 1 }
+              )
+              Divider()
+            }
             DiffOptionsBar(model: model)
             Divider()
             if let lineSelection, supportsLineSelection {
@@ -70,6 +90,9 @@ struct DiffDetailView: View {
     .task(id: taskKey) {
       do {
         errorMessage = nil
+        conflictDocument =
+          selection.area == .conflicted
+          ? try? await model.conflictDocument(path: selection.path) : nil
         diffs = try await model.diff(for: selection)
         lineSelection = nil  // stale offsets after any reload
       } catch {
@@ -142,7 +165,7 @@ struct DiffDetailView: View {
   /// Reload when the selected file, its area, or the underlying status
   /// snapshot changes (e.g. after staging from another view).
   private var taskKey: String {
-    "\(selection.area)|\(selection.path)|\(model.status.hashValue)|\(model.diffIgnoresWhitespace)"
+    "\(selection.area)|\(selection.path)|\(model.status.hashValue)|\(model.diffIgnoresWhitespace)|\(conflictReload)"
   }
 
   /// Hunk-level staging is only well-defined for content edits to
