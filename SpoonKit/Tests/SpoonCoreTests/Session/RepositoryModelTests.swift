@@ -1477,6 +1477,9 @@ private actor FakeRepositoryGitClient: GitClient {
   }
   func reflog(maxCount: Int, skip: Int) async throws -> [ReflogEntry] { [] }
   func blame(path: String, at revision: ObjectID?) async throws -> [BlameLine] { [] }
+  func lineHistory(path: String, lines: ClosedRange<Int>, limit: Int) async throws
+    -> [LineHistoryEntry]
+  { [] }
   func searchCode(_ query: CodeSearchQuery, limit: Int) async throws -> CodeSearchResult {
     CodeSearchResult(matches: [], isTruncated: false)
   }

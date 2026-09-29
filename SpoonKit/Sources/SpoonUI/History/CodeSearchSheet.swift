@@ -170,6 +170,11 @@ struct CodeSearchSheet: View {
       }
       Divider()
       Button("Blame…") { navigation.present(.blame(path: match.path)) }
+      Button("Show History of This Line…") {
+        navigation.present(.lineHistory(path: match.path, lines: match.lineNumber...match.lineNumber))
+      }
+      .disabled(model.hasUncommittedChanges(at: match.path))
+      .help(LineHistorySheet.uncommittedHelp)
     }
     Button("Show File History…") { navigation.present(.fileHistory(path: match.path)) }
     Divider()

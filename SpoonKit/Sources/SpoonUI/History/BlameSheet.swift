@@ -1,3 +1,4 @@
+import AppKit
 import SpoonCore
 import SwiftUI
 
@@ -10,6 +11,9 @@ struct BlameSheet: View {
   @Bindable var navigation: RepositoryNavigationState
   @Environment(\.dismiss) private var dismiss
   @State private var loadState: AsyncLoadState<[BlameLine]> = .loading
+  /// Lines picked by clicking their numbers; Shift-click extends from `anchor`.
+  @State private var selectedLines: ClosedRange<Int>?
+  @State private var anchor: Int?
 
   var body: some View {
     VStack(spacing: 0) {
@@ -19,6 +23,17 @@ struct BlameSheet: View {
           .lineLimit(1)
           .truncationMode(.middle)
         Spacer()
+        if let selectedLines {
+          Button("Show History of \(LineHistorySheet.describe(selectedLines))") {
+            navigation.present(.lineHistory(path: path, lines: selectedLines))
+          }
+          .disabled(model.hasUncommittedChanges(at: path))
+          .help(LineHistorySheet.uncommittedHelp)
+        } else {
+          Text("Click line numbers to pick lines")
+            .font(.callout)
+            .foregroundStyle(.secondary)
+        }
         Button("Done") { dismiss() }
           .keyboardShortcut(.cancelAction)
       }
@@ -55,12 +70,28 @@ struct BlameSheet: View {
       LazyVStack(alignment: .leading, spacing: 0) {
         ForEach(Array(lines.enumerated()), id: \.element.id) { index, line in
           let startsRun = index == 0 || lines[index - 1].commit.oid != line.commit.oid
-          BlameRow(line: line, showsCommit: startsRun) {
-            showInHistory(line.commit)
-          }
+          BlameRow(
+            line: line,
+            showsCommit: startsRun,
+            isSelected: selectedLines?.contains(line.lineNumber) == true,
+            showCommit: { showInHistory(line.commit) },
+            selectLine: { select(line.lineNumber) }
+          )
         }
       }
       .padding(.vertical, 4)
+    }
+  }
+
+  private func select(_ line: Int) {
+    if NSEvent.modifierFlags.contains(.shift), let anchor {
+      selectedLines = min(anchor, line)...max(anchor, line)
+    } else if selectedLines == line...line {
+      selectedLines = nil
+      anchor = nil
+    } else {
+      selectedLines = line...line
+      anchor = line
     }
   }
 
@@ -76,16 +107,23 @@ struct BlameSheet: View {
 private struct BlameRow: View {
   let line: BlameLine
   let showsCommit: Bool
+  let isSelected: Bool
   let showCommit: () -> Void
+  let selectLine: () -> Void
 
   var body: some View {
     HStack(alignment: .firstTextBaseline, spacing: 12) {
       commitLabel
         .frame(width: 280, alignment: .leading)
-      Text("\(line.lineNumber)")
-        .foregroundStyle(.tertiary)
-        .frame(minWidth: 36, alignment: .trailing)
-        .accessibilityLabel("Line \(line.lineNumber)")
+      Button(action: selectLine) {
+        Text("\(line.lineNumber)")
+          .foregroundStyle(isSelected ? .primary : .tertiary)
+          .frame(minWidth: 36, alignment: .trailing)
+      }
+      .buttonStyle(.plain)
+      .accessibilityLabel("Line \(line.lineNumber)")
+      .accessibilityHint("Selects this line; Shift-click selects a range")
+      .accessibilityAddTraits(isSelected ? .isSelected : [])
       Text(line.text.isEmpty ? " " : line.text)
         .fixedSize(horizontal: false, vertical: true)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -94,6 +132,7 @@ private struct BlameRow: View {
     .font(.callout.monospaced())
     .padding(.horizontal, 12)
     .padding(.top, showsCommit ? 6 : 0)
+    .background(isSelected ? Color.accentColor.opacity(0.15) : .clear)
     .overlay(alignment: .top) {
       if showsCommit {
         Divider()
