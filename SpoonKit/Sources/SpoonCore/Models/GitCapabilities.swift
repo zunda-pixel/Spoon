@@ -36,6 +36,9 @@ public struct GitCapabilities: Sendable, Hashable {
   /// markers (2.56+).
   public var supportsAddResolved: Bool { supports(GitVersion(2, 56)) }
 
+  /// `git bisect start --reset-when-found` (2.56+).
+  public var supportsBisectResetWhenFound: Bool { supports(GitVersion(2, 56)) }
+
   /// `git branch --delete-merged` (2.56+).
   public var supportsDeleteMergedBranches: Bool { supports(GitVersion(2, 56)) }
 

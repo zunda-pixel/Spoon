@@ -992,6 +992,31 @@ struct RepositoryModelTests {
     #expect(await client.mutationCalls == ["reword:aaaa1111:Better\n", "fixup:aaaa1111:false"])
   }
 
+  @Test func bisectRecordsTheCulpritAndStartsFromHead() async {
+    let client = FakeRepositoryGitClient()
+    let head = makeOID("aaaa1111")
+    let good = makeOID("bbbb2222")
+    let culprit = makeOID("cccc3333")
+    await client.configure(
+      status: makeStatus(oid: head, branch: "main"),
+      branches: [makeBranch("main", oid: head, isCurrent: true)]
+    )
+    let model = makeModel(client)
+    await model.refresh()
+
+    await model.startBisect(good: good)
+    #expect(model.bisectResult == nil)
+    await client.setNextBisectProgress(.found(culprit))
+    await model.markBisect(.bad)
+
+    #expect(model.bisectResult == culprit)
+    #expect(
+      await client.mutationCalls == ["bisect-start:aaaa1111:bbbb2222", "bisect-bad:HEAD"]
+    )
+    model.dismissBisectResult()
+    #expect(model.bisectResult == nil)
+  }
+
   @Test func refreshErrorClearsOnceRefreshRecovers() async {
     let client = FakeRepositoryGitClient()
     let oid = makeOID("99999999")
@@ -1078,6 +1103,8 @@ private actor FakeRepositoryGitClient: GitClient {
 
   private var currentStatus = WorkingTreeStatus()
   private var currentCapabilities = GitCapabilities()
+  private var currentBisectState: BisectState?
+  private var nextBisectProgress = BisectProgress.testing(nil)
   private var currentPartialCloneRemote: String?
   private var currentMissingObjects: [ObjectID] = []
   private var currentRemoteObjectSize: Int?
@@ -1313,6 +1340,17 @@ private actor FakeRepositoryGitClient: GitClient {
   func continueSequencer(_ kind: SequencerState.Kind) async throws { throw Failure.unimplemented }
   func skipSequencer(_ kind: SequencerState.Kind) async throws { throw Failure.unimplemented }
   func abortSequencer(_ kind: SequencerState.Kind) async throws { throw Failure.unimplemented }
+  func bisectState() async throws -> BisectState? { currentBisectState }
+  func startBisect(bad: ObjectID, good: ObjectID) async throws -> BisectProgress {
+    mutationCalls.append("bisect-start:\(bad.rawValue):\(good.rawValue)")
+    return nextBisectProgress
+  }
+  func markBisect(_ mark: BisectMark, revision: ObjectID?) async throws -> BisectProgress {
+    mutationCalls.append("bisect-\(mark.rawValue):\(revision?.rawValue ?? "HEAD")")
+    return nextBisectProgress
+  }
+  func resetBisect() async throws { mutationCalls.append("bisect-reset") }
+  func setNextBisectProgress(_ progress: BisectProgress) { nextBisectProgress = progress }
   func mergeBase(_ a: String, _ b: String) async throws -> ObjectID {
     guard let oid = mergeBases["\(a)...\(b)"] else { throw Failure.unimplemented }
     return oid

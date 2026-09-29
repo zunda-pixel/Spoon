@@ -121,13 +121,36 @@ struct RepositorySplitView: View {
       // toolbar and the floating sidebar, so a window-level inset overlapped
       // the sidebar and the toolbar area.
       .safeAreaInset(edge: .top, spacing: 0) {
-        if let state = model.sequencerState {
-          SequencerBannerView(model: model, state: state)
+        VStack(spacing: 0) {
+          if let state = model.sequencerState {
+            SequencerBannerView(model: model, state: state)
+          }
+          if let state = model.bisectState {
+            BisectBannerView(model: model, state: state)
+          }
         }
       }
       .navigationSplitViewColumnWidth(min: 300, ideal: 380)
     } detail: {
       RepositoryDetailColumn(model: model, navigation: navigation)
+    }
+    .alert(
+      "First Bad Commit Found",
+      isPresented: .init(
+        get: { model.bisectResult != nil && !model.isBisecting },
+        set: { if !$0 { model.dismissBisectResult() } }
+      )
+    ) {
+      Button("Show in History") {
+        if let culprit = model.bisectResult {
+          navigation.select(.history)
+          navigation.selectedCommitID = culprit.rawValue
+        }
+        model.dismissBisectResult()
+      }
+      Button("OK", role: .cancel) { model.dismissBisectResult() }
+    } message: {
+      Text(bisectResultMessage)
     }
     .navigationTitle(model.commonWorktreeName)
     .navigationSubtitle(model.repository.rootURL.path(percentEncoded: false))
@@ -268,6 +291,13 @@ struct RepositorySplitView: View {
     case .merge: "Merge"
     case nil: "Operation"
     }
+  }
+
+  private var bisectResultMessage: String {
+    guard let culprit = model.bisectResult else { return "" }
+    let subject = model.historyRows.first { $0.commit.oid == culprit }?.commit.subject
+    return [culprit.shortened, subject].compactMap(\.self).joined(separator: " — ")
+      + "\n\nThe bisect has ended and your original checkout is restored."
   }
 
   private func switchToWorktree(at path: URL) {

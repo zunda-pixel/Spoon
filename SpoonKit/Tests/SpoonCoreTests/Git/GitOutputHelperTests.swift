@@ -148,6 +148,30 @@ struct GitOutputHelperTests {
     #expect(lines[2].commit.isUncommitted)
   }
 
+  @Test func bisectParserReadsRefsAndProgress() {
+    let bad = String(repeating: "b", count: 40)
+    let good = String(repeating: "a", count: 40)
+    let skip = String(repeating: "c", count: 40)
+    let state = GitBisectParser.parseRefs(
+      "refs/bisect/bad\t\(bad)\nrefs/bisect/good-\(good)\t\(good)\nrefs/bisect/skip-\(skip)\t\(skip)\n"
+    )
+    #expect(state.badOID?.rawValue == bad)
+    #expect(state.goodOIDs.map(\.rawValue) == [good])
+    #expect(state.skippedOIDs.map(\.rawValue) == [skip])
+
+    #expect(
+      GitBisectParser.parseProgress(
+        "Bisecting: 3 revisions left to test after this (roughly 2 steps)\n[\(skip)] Some subject\n"
+      ) == .testing(ObjectID(rawValue: skip))
+    )
+    #expect(
+      GitBisectParser.parseProgress("\(bad) is the first bad commit\ncommit \(bad)\n")
+        == .found(ObjectID(rawValue: bad)!)
+    )
+    #expect(BisectState(remainingCount: 7).estimatedStepsLeft == 3)
+    #expect(BisectState(remainingCount: 1).estimatedStepsLeft == 0)
+  }
+
   @Test func untrackedDiffBuilderCreatesTextPatch() {
     let diff = UntrackedDiffBuilder.make(path: "notes.txt", data: Data("first\nsecond".utf8))
 

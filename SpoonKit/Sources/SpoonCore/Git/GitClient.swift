@@ -204,6 +204,20 @@ public protocol GitSequencerClient: Sendable {
   func abortSequencer(_ kind: SequencerState.Kind) async throws
 }
 
+/// `git bisect` to find the commit that introduced a problem.
+public protocol GitBisectClient: Sendable {
+  /// `nil` when no bisect is in progress.
+  func bisectState() async throws -> BisectState?
+  /// Starts bisecting between a bad and a good commit and checks out the
+  /// first commit to test. With `GitCapabilities.supportsBisectResetWhenFound`,
+  /// git ends the bisect by itself once the culprit is found.
+  func startBisect(bad: ObjectID, good: ObjectID) async throws -> BisectProgress
+  /// Marks `revision` (HEAD when `nil`) and moves to the next commit to test.
+  func markBisect(_ mark: BisectMark, revision: ObjectID?) async throws -> BisectProgress
+  /// Ends the bisect and returns to the commit checked out before it began.
+  func resetBisect() async throws
+}
+
 /// Cross-reference diff operations used by review features.
 public protocol GitReviewClient: Sendable {
   /// Merge base between two refs.
@@ -237,6 +251,7 @@ public protocol GitClient:
   GitWorktreeClient,
   GitSparseCheckoutClient,
   GitSequencerClient,
+  GitBisectClient,
   GitReviewClient,
   GitStashClient
 {}

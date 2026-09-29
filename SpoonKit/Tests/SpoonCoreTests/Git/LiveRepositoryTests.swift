@@ -304,6 +304,39 @@ struct LiveRepositoryTests {
     #expect(lines[0].commit.authorName == "Spoon Tests")
   }
 
+  @Test func bisectFindsTheFirstBadCommit() async throws {
+    let root = try await LiveRepoFixture.makeTemporaryRepo(
+      commits: (1...6).map { .init(file: "v.txt", content: "\($0)\n", message: "v\($0)") },
+      runner: runner
+    )
+    defer { try? FileManager.default.removeItem(at: root) }
+    let client = makeClient(root)
+    // v4 introduces the "bug": any version >= 4 is bad.
+    let commits = try await client.log(LogQuery(maxCount: 10)).commits
+    let bySubject = Dictionary(uniqueKeysWithValues: commits.map { ($0.subject, $0.oid) })
+    func isBad() throws -> Bool {
+      let text = try String(contentsOf: root.appending(path: "v.txt"), encoding: .utf8)
+      return Int(text.trimmingCharacters(in: .whitespacesAndNewlines))! >= 4
+    }
+
+    var progress = try await client.startBisect(bad: bySubject["v6"]!, good: bySubject["v1"]!)
+    #expect(try await client.bisectState()?.remainingCount == 4)
+    var marks = 0
+    while case .testing = progress, marks < 10 {
+      progress = try await client.markBisect(try isBad() ? .bad : .good, revision: nil)
+      marks += 1
+    }
+
+    #expect(progress == .found(bySubject["v4"]!))
+    let capabilities = await client.capabilities()
+    if !capabilities.supportsBisectResetWhenFound {
+      #expect(try await client.bisectState() != nil)
+      try await client.resetBisect()
+    }
+    #expect(try await client.bisectState() == nil)
+    #expect(try await client.status().headBranch == "main")
+  }
+
   @Test func cloneCreatesAWorkingLocalCopy() async throws {
     let source = try await LiveRepoFixture.makeTemporaryRepo(
       commits: [.init(file: "base.txt", content: "base\n", message: "base")],
