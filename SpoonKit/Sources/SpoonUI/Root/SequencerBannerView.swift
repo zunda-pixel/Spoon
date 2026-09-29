@@ -14,45 +14,26 @@ struct SequencerBannerView: View {
   }
 
   var body: some View {
-    HStack(spacing: 12) {
-      Image(systemName: "exclamationmark.triangle.fill")
-        .foregroundStyle(.orange)
-        .accessibilityHidden(true)
-      VStack(alignment: .leading, spacing: 2) {
-        Text(title)
-          .font(.headline)
-          .accessibilitySortPriority(2)
-        Text(subtitle)
-          .font(.caption)
-          .foregroundStyle(.secondary)
-          .accessibilitySortPriority(1)
+    // The banner lives in the content column, which can be narrow: fall back
+    // to stacking the actions under the message instead of squeezing it.
+    ViewThatFits(in: .horizontal) {
+      HStack(spacing: 12) {
+        message
+        Spacer(minLength: 0)
+        actions
       }
-      .accessibilityElement(children: .combine)
-      Spacer()
-      Button("Continue") {
-        Task { await model.continueSequencer() }
-      }
-      .disabled(hasConflicts || model.isBusy)
-      .help(hasConflicts ? "Resolve and stage all conflicts first" : "Resume the operation")
-      .accessibilityHint(
-        hasConflicts ? "Resolve and stage all conflicts first" : "Resumes the paused operation"
-      )
-      if state.kind != .merge {
-        // `git merge` has no --skip.
-        Button("Skip") {
-          Task { await model.skipSequencer() }
+      VStack(alignment: .leading, spacing: 8) {
+        message
+        HStack(spacing: 8) {
+          Spacer(minLength: 0)
+          actions
         }
-        .disabled(model.isBusy)
-        .help("Skip the current commit and resume")
       }
-      Button("Abort…", role: .destructive) {
-        confirmingAbort = true
-      }
-      .disabled(model.isBusy)
     }
     .padding(.horizontal, 14)
     .padding(.vertical, 8)
-    .background(.yellow.opacity(0.12))
+    // Keep the tint out of the toolbar area above the column.
+    .background(.yellow.opacity(0.12), ignoresSafeAreaEdges: [])
     .overlay(alignment: .bottom) {
       Divider()
     }
@@ -66,6 +47,49 @@ struct SequencerBannerView: View {
     } message: {
       Text("All progress from this operation will be discarded and the branch restored.")
     }
+  }
+
+  private var message: some View {
+    HStack(alignment: .firstTextBaseline, spacing: 10) {
+      Image(systemName: "exclamationmark.triangle.fill")
+        .foregroundStyle(.orange)
+        .accessibilityHidden(true)
+      VStack(alignment: .leading, spacing: 2) {
+        Text(title)
+          .font(.headline)
+          .accessibilitySortPriority(2)
+        Text(subtitle)
+          .font(.caption)
+          .foregroundStyle(.secondary)
+          .fixedSize(horizontal: false, vertical: true)
+          .accessibilitySortPriority(1)
+      }
+      .accessibilityElement(children: .combine)
+    }
+  }
+
+  @ViewBuilder
+  private var actions: some View {
+    Button("Continue") {
+      Task { await model.continueSequencer() }
+    }
+    .disabled(hasConflicts || model.isBusy)
+    .help(hasConflicts ? "Resolve and stage all conflicts first" : "Resume the operation")
+    .accessibilityHint(
+      hasConflicts ? "Resolve and stage all conflicts first" : "Resumes the paused operation"
+    )
+    if state.kind != .merge {
+      // `git merge` has no --skip.
+      Button("Skip") {
+        Task { await model.skipSequencer() }
+      }
+      .disabled(model.isBusy)
+      .help("Skip the current commit and resume")
+    }
+    Button("Abort…", role: .destructive) {
+      confirmingAbort = true
+    }
+    .disabled(model.isBusy)
   }
 
   private var kindName: String {
