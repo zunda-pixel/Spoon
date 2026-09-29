@@ -11,6 +11,7 @@ struct CommitDetailView: View {
   @State private var detail: CommitDetail?
   @State private var errorMessage: String?
   @State private var lineSelection: DiffLineSelection?
+  @State private var pendingRestore: FileRestoreRequest?
 
   init(model: RepositoryModel, oid: ObjectID) {
     self.model = model
@@ -27,7 +28,11 @@ struct CommitDetailView: View {
             copyBar(lineSelection, diffs: detail.diffs)
             Divider()
           }
-          FileDiffListView(diffs: detail.diffs, lineSelection: $lineSelection)
+          FileDiffListView(
+            diffs: detail.diffs,
+            lineSelection: $lineSelection,
+            fileActions: { restoreActions(for: $0, in: detail.commit) }
+          )
         }
       } else if let errorMessage {
         ContentUnavailableView(
@@ -39,6 +44,22 @@ struct CommitDetailView: View {
         ProgressView()
       }
     }
+    .confirmationDialog(
+      pendingRestore?.title ?? "",
+      isPresented: .init(
+        get: { pendingRestore != nil },
+        set: { if !$0 { pendingRestore = nil } }
+      ),
+      presenting: pendingRestore
+    ) { request in
+      Button(request.confirmTitle, role: .destructive) {
+        Task { await model.restoreFile(path: request.path, from: request.revision) }
+      }
+    } message: { request in
+      Text(
+        "Uncommitted changes to \(request.path) are replaced. The index is not changed, so the result appears as an unstaged change."
+      )
+    }
     .task(id: oid) {
       do {
         errorMessage = nil
@@ -49,6 +70,35 @@ struct CommitDetailView: View {
         errorMessage = error.localizedDescription
       }
     }
+  }
+
+  private func restoreActions(for diff: FileDiff, in commit: Commit) -> [FileDiffAction] {
+    let busy = model.isBusy || model.isSequencing
+    var actions = [
+      FileDiffAction(
+        title: diff.kind == .deleted
+          ? "Delete from Working Tree, as in This Commit…"
+          : "Restore Version from This Commit…",
+        isEnabled: !busy
+      ) {
+        pendingRestore = FileRestoreRequest(
+          path: diff.path, revision: commit.oid, isDeletion: diff.kind == .deleted)
+      }
+    ]
+    if let parent = commit.parents.first {
+      actions.append(
+        FileDiffAction(
+          title: diff.kind == .added
+            ? "Delete from Working Tree, as Before This Commit…"
+            : "Restore Version from Before This Commit…",
+          isEnabled: !busy
+        ) {
+          pendingRestore = FileRestoreRequest(
+            path: diff.oldPath ?? diff.path, revision: parent, isDeletion: diff.kind == .added)
+        }
+      )
+    }
+    return actions
   }
 
   private func copyBar(_ lineSelection: DiffLineSelection, diffs: [FileDiff]) -> some View {
@@ -120,4 +170,20 @@ struct CommitDetailView: View {
       .dropFirst(detail.commit.subject.count)
       .trimmingCharacters(in: .whitespacesAndNewlines)
   }
+}
+
+/// A confirmed-before-running `git restore --source` of one file.
+private struct FileRestoreRequest: Hashable {
+  let path: String
+  let revision: ObjectID
+  /// The file does not exist at `revision`, so restoring deletes it.
+  let isDeletion: Bool
+
+  var title: String {
+    isDeletion
+      ? "Delete \(path) from the working tree?"
+      : "Restore \(path) from \(revision.shortened)?"
+  }
+
+  var confirmTitle: String { isDeletion ? "Delete File" : "Restore File" }
 }

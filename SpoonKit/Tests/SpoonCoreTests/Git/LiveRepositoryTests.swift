@@ -403,6 +403,31 @@ struct LiveRepositoryTests {
     #expect(try await client.status().unstagedEntries.map(\.path) == ["base.txt"])
   }
 
+  @Test func restoreFileBringsBackAnOlderVersionWithoutStaging() async throws {
+    let root = try await LiveRepoFixture.makeTemporaryRepo(
+      commits: [
+        .init(file: "f.txt", content: "one\n", message: "one"),
+        .init(file: "f.txt", content: "two\n", message: "two"),
+        .init(file: "g.txt", content: "new\n", message: "add g"),
+      ],
+      runner: runner
+    )
+    defer { try? FileManager.default.removeItem(at: root) }
+    let client = makeClient(root)
+    let commits = try await client.log(LogQuery(maxCount: 3)).commits
+    let (addG, one) = (commits[0], commits[2])
+
+    try await client.restoreFile(path: "f.txt", from: one.oid)
+    try await client.restoreFile(path: "g.txt", from: try #require(addG.parents.first))
+
+    let f = try String(contentsOf: root.appending(path: "f.txt"), encoding: .utf8)
+    #expect(f == "one\n")
+    #expect(!FileManager.default.fileExists(atPath: root.appending(path: "g.txt").path))
+    let status = try await client.status()
+    #expect(status.stagedEntries.isEmpty)
+    #expect(Set(status.unstagedEntries.map(\.path)) == ["f.txt", "g.txt"])
+  }
+
   @Test func cloneCreatesAWorkingLocalCopy() async throws {
     let source = try await LiveRepoFixture.makeTemporaryRepo(
       commits: [.init(file: "base.txt", content: "base\n", message: "base")],

@@ -31,6 +31,10 @@ public protocol GitWorkingTreeClient: Sendable {
   /// (`--cached`, hunk stage/unstage); false targets the working tree
   /// (line/hunk discard via reverse apply).
   func applyPatch(_ patch: String, reverse: Bool, toIndex: Bool) async throws
+  /// Replaces the working-tree copy of `path` with its content at
+  /// `revision`, leaving the index alone (`git restore --source`). A path
+  /// tracked now but absent at `revision` is deleted.
+  func restoreFile(path: String, from revision: ObjectID) async throws
   /// Restores paths from the index, discarding working-tree edits.
   func discardWorkingTree(paths: [String]) async throws
   /// Deletes untracked files.

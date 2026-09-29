@@ -1238,6 +1238,9 @@ private actor FakeRepositoryGitClient: GitClient {
     throw Failure.unimplemented
   }
   func discardWorkingTree(paths: [String]) async throws { throw Failure.unimplemented }
+  func restoreFile(path: String, from revision: ObjectID) async throws {
+    mutationCalls.append("restore:\(path):\(revision.rawValue)")
+  }
   func deleteUntracked(paths: [String]) async throws { throw Failure.unimplemented }
   func commit(message: String, amend: Bool) async throws { throw Failure.unimplemented }
   func reset(to target: ObjectID, mode: ResetMode) async throws { throw Failure.unimplemented }
