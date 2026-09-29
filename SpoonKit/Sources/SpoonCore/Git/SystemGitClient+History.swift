@@ -68,6 +68,12 @@ extension SystemGitClient {
     }
 
     let message = try await run(["log", "-1", "--format=%B", oid.rawValue, "--"])
+    // Verification shells out to gpg/ssh-keygen, so it only runs for the one
+    // commit being inspected. A missing or broken signing tool must not hide
+    // the rest of the detail.
+    let signature = try? await run(
+      ["log", "-1", "--format=\(GitSignatureParser.signatureFormat)", oid.rawValue, "--"]
+    )
 
     // First-parent patch; `diff-tree` prints nothing for merges, so diff
     // against parent 1 explicitly. Root commits use --root.
@@ -85,7 +91,8 @@ extension SystemGitClient {
     return CommitDetail(
       commit: commit,
       fullMessage: message.standardOutputText.trimmingCharacters(in: .whitespacesAndNewlines),
-      diffs: try GitDiffParser.parse(patch.standardOutput)
+      diffs: try GitDiffParser.parse(patch.standardOutput),
+      signature: signature.flatMap { GitSignatureParser.parse($0.standardOutputText) }
     )
   }
 }

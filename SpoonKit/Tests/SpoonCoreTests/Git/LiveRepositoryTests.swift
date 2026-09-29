@@ -210,6 +210,48 @@ struct LiveRepositoryTests {
     #expect(try await client.status().unstagedEntries.map(\.path) == ["b.txt"])
   }
 
+  @Test func commitDetailReportsSshSignatureVerification() async throws {
+    let root = try await LiveRepoFixture.makeTemporaryRepo(runner: runner)
+    let keyDirectory = URL.temporaryDirectory.appending(path: "spoon-key-\(UUID().uuidString)")
+    defer {
+      try? FileManager.default.removeItem(at: root)
+      try? FileManager.default.removeItem(at: keyDirectory)
+    }
+    try FileManager.default.createDirectory(at: keyDirectory, withIntermediateDirectories: true)
+    let key = keyDirectory.appending(path: "id_ed25519")
+    let keygen = Command(
+      executable: URL(filePath: "/usr/bin/ssh-keygen"),
+      arguments: ["-q", "-t", "ed25519", "-N", "", "-C", "spoon", "-f", key.path],
+      workingDirectory: keyDirectory
+    )
+    _ = try await runner.run(keygen).checkSuccess(of: keygen)
+    let publicKey = try String(contentsOf: key.appendingPathExtension("pub"), encoding: .utf8)
+    let allowedSigners = keyDirectory.appending(path: "allowed_signers")
+    try Data("test@example.com \(publicKey)".utf8).write(to: allowedSigners)
+    for arguments in [
+      ["config", "gpg.format", "ssh"],
+      ["config", "user.signingkey", key.path],
+      ["config", "gpg.ssh.allowedSignersFile", allowedSigners.path],
+    ] {
+      try await LiveRepoFixture.run(arguments, in: root, runner: runner)
+    }
+    try await LiveRepoFixture.commitFile(
+      "unsigned.txt", content: "a\n", message: "unsigned", in: root, runner: runner
+    )
+    try Data("b\n".utf8).write(to: root.appending(path: "signed.txt"))
+    try await LiveRepoFixture.run(["add", "signed.txt"], in: root, runner: runner)
+    try await LiveRepoFixture.run(["commit", "-S", "-m", "signed"], in: root, runner: runner)
+    let client = makeClient(root)
+    let commits = try await client.log(LogQuery(maxCount: 2)).commits
+
+    let signed = try await client.commitDetail(commits[0].oid)
+    let unsigned = try await client.commitDetail(commits[1].oid)
+
+    #expect(signed.signature?.status == .good)
+    #expect(signed.signature?.signer == "test@example.com")
+    #expect(unsigned.signature == nil)
+  }
+
   @Test func cloneCreatesAWorkingLocalCopy() async throws {
     let source = try await LiveRepoFixture.makeTemporaryRepo(
       commits: [.init(file: "base.txt", content: "base\n", message: "base")],

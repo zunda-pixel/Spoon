@@ -81,4 +81,6 @@ public struct CommitDetail: Sendable, Hashable {
   public var commit: Commit
   public var fullMessage: String
   public var diffs: [FileDiff]
+  /// `nil` when the commit is unsigned.
+  public var signature: CommitSignature? = nil
 }
