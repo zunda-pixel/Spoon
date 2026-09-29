@@ -1319,7 +1319,7 @@ private actor FakeRepositoryGitClient: GitClient {
   func diff(from: String, to: String) async throws -> [FileDiff] { [] }
   func diffText(from: String, to: String) async throws -> String { "" }
   func stagedDiffText() async throws -> String { "" }
-  func saveStash(message: String?, includeUntracked: Bool) async throws {
+  func saveStash(_ options: StashSaveOptions) async throws {
     throw Failure.unimplemented
   }
   func applyStash(_ stash: Stash, pop: Bool) async throws { throw Failure.unimplemented }

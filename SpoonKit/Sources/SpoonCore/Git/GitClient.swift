@@ -215,7 +215,7 @@ public protocol GitReviewClient: Sendable {
 /// Stash queries and mutations.
 public protocol GitStashClient: Sendable {
   func stashes() async throws -> [Stash]
-  func saveStash(message: String?, includeUntracked: Bool) async throws
+  func saveStash(_ options: StashSaveOptions) async throws
   func applyStash(_ stash: Stash, pop: Bool) async throws
   func dropStash(_ stash: Stash) async throws
   /// The changes a stash would reapply (its parent vs the stash commit).
@@ -236,3 +236,10 @@ public protocol GitClient:
   GitReviewClient,
   GitStashClient
 {}
+
+extension GitStashClient {
+  /// Stashes every change, optionally including untracked files.
+  public func saveStash(message: String?, includeUntracked: Bool) async throws {
+    try await saveStash(StashSaveOptions(message: message, includeUntracked: includeUntracked))
+  }
+}

@@ -35,6 +35,18 @@ struct ChangeFileContextMenu: View {
         moveFiles([], staged.map(\.path))
       }
     }
+    stashButton(paths: Set(targets.filter { $0.area != .conflicted }.map(\.path)).sorted())
+  }
+
+  @ViewBuilder
+  private func stashButton(paths: [String]) -> some View {
+    if !paths.isEmpty {
+      Divider()
+      Button(paths.count == 1 ? "Stash File…" : "Stash \(paths.count) Files…") {
+        navigation.present(.stashChanges(paths: paths))
+      }
+      .disabled(model.isBusy || model.isSequencing)
+    }
   }
 
   @ViewBuilder
@@ -61,6 +73,9 @@ struct ChangeFileContextMenu: View {
         }
         .disabled(model.isBusy)
       }
+    }
+    if area != .conflicted {
+      stashButton(paths: [entry.path])
     }
     if area != .untracked {
       Divider()

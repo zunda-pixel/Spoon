@@ -11,15 +11,8 @@ extension SystemGitClient {
     return GitStashParser.parse(result.standardOutput)
   }
 
-  public func saveStash(message: String?, includeUntracked: Bool) async throws {
-    var arguments = ["stash", "push"]
-    if includeUntracked {
-      arguments.append("--include-untracked")
-    }
-    if let message, !message.isEmpty {
-      arguments.append(contentsOf: ["-m", message])
-    }
-    try await runVoid(arguments)
+  public func saveStash(_ options: StashSaveOptions) async throws {
+    try await runVoid(["stash", "push"] + options.arguments)
   }
 
   public func applyStash(_ stash: Stash, pop: Bool) async throws {

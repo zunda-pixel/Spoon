@@ -410,6 +410,11 @@ extension RepositoryModel {
     await perform { try await $0.saveStash(message: message, includeUntracked: includeUntracked) }
   }
 
+  @discardableResult
+  public func saveStash(_ options: StashSaveOptions) async -> Bool {
+    await perform { try await $0.saveStash(options) }
+  }
+
   public func applyStash(_ stash: Stash, pop: Bool) async {
     await perform { try await $0.applyStash(stash, pop: pop) }
   }

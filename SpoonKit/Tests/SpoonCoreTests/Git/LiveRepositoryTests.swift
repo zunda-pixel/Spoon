@@ -252,6 +252,39 @@ struct LiveRepositoryTests {
     #expect(unsigned.signature == nil)
   }
 
+  @Test func partialStashesSaveOnlyTheRequestedChanges() async throws {
+    let root = try await LiveRepoFixture.makeTemporaryRepo(
+      commits: [
+        .init(file: "a.txt", content: "a\n", message: "a"),
+        .init(file: "b.txt", content: "b\n", message: "b"),
+      ],
+      runner: runner
+    )
+    defer { try? FileManager.default.removeItem(at: root) }
+    let client = makeClient(root)
+    func write(_ file: String, _ text: String) throws {
+      try Data(text.utf8).write(to: root.appending(path: file))
+    }
+
+    try write("a.txt", "a2\n")
+    try write("b.txt", "b2\n")
+    try await client.saveStash(StashSaveOptions(message: "only a", paths: ["a.txt"]))
+    #expect(try await client.status().unstagedEntries.map(\.path) == ["b.txt"])
+
+    try await client.stage(paths: ["b.txt"])
+    try write("new.txt", "new\n")
+    try await client.saveStash(StashSaveOptions(scope: .stagedOnly))
+    let afterStaged = try await client.status()
+    #expect(afterStaged.stagedEntries.isEmpty)
+    #expect(afterStaged.untrackedEntries.map(\.path) == ["new.txt"])
+
+    let stashes = try await client.stashes()
+    #expect(stashes.count == 2)
+    #expect(stashes[1].message.contains("only a"))
+    let stagedStash = try await client.stashDiffs(stashes[0])
+    #expect(stagedStash.map(\.path) == ["b.txt"])
+  }
+
   @Test func cloneCreatesAWorkingLocalCopy() async throws {
     let source = try await LiveRepoFixture.makeTemporaryRepo(
       commits: [.init(file: "base.txt", content: "base\n", message: "base")],
