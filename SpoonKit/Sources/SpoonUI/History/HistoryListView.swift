@@ -165,6 +165,12 @@ struct HistoryListView: View {
       navigation.present(.rebase(commit))
     }
     .disabled(commit.isMerge || model.isBusy || model.isSequencing)
+    if model.canDropCommit(commit) {
+      Button("Drop Commit…", role: .destructive) {
+        navigation.present(.dropCommit(commit))
+      }
+      .disabled(model.isBusy || model.isSequencing)
+    }
     Divider()
     Button("Cherry-Pick onto \(model.currentBranch?.name ?? "HEAD")") {
       Task { await model.cherryPick(commit.oid) }

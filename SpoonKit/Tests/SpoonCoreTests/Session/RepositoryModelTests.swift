@@ -730,6 +730,39 @@ struct RepositoryModelTests {
     #expect(await model.requiresForceDelete(unmerged) == true)
   }
 
+  @Test func dropCommitRequiresGit256AndASingleParent() async {
+    let client = FakeRepositoryGitClient()
+    let head = makeOID("aaaa1111")
+    let parent = makeOID("bbbb2222")
+    var commit = makeCommit("aaaa1111", subject: "change")
+    commit.parents = [parent]
+    var root = makeCommit("bbbb2222", subject: "root")
+    root.parents = []
+    var merge = makeCommit("cccc3333", subject: "merge")
+    merge.parents = [parent, head]
+    await client.configure(
+      status: makeStatus(oid: head, branch: "main"),
+      branches: [makeBranch("main", oid: head, isCurrent: true)],
+      gitVersion: GitVersion(2, 55, 0)
+    )
+    let model = makeModel(client)
+    await model.refresh()
+    #expect(!model.canDropCommit(commit))
+
+    await client.configure(
+      status: makeStatus(oid: head, branch: "main"),
+      branches: [makeBranch("main", oid: head, isCurrent: true)],
+      gitVersion: GitVersion(2, 56, 0)
+    )
+    await model.refresh()
+    #expect(model.canDropCommit(commit))
+    #expect(!model.canDropCommit(root))
+    #expect(!model.canDropCommit(merge))
+
+    #expect(await model.dropCommit(head))
+    #expect(await client.mutationCalls == ["drop:aaaa1111:false"])
+  }
+
   @Test func refreshErrorClearsOnceRefreshRecovers() async {
     let client = FakeRepositoryGitClient()
     let oid = makeOID("99999999")
@@ -815,6 +848,7 @@ private actor FakeRepositoryGitClient: GitClient {
   nonisolated let repositoryRoot = URL(filePath: "/tmp/repository-model-tests")
 
   private var currentStatus = WorkingTreeStatus()
+  private var currentCapabilities = GitCapabilities()
   private var currentBranches: [Branch] = []
   private var currentRemotes: [Remote] = []
   private var currentRemoteBranchesByRemote: [String: [Branch]] = [:]
@@ -842,9 +876,11 @@ private actor FakeRepositoryGitClient: GitClient {
     mergeBases: [String: ObjectID] = [:],
     failBranches: Bool = false,
     failRemoteBranches: Bool = false,
-    failWorktreeMutations: Bool = false
+    failWorktreeMutations: Bool = false,
+    gitVersion: GitVersion? = nil
   ) {
     currentStatus = status
+    currentCapabilities = GitCapabilities(version: gitVersion)
     currentBranches = branches
     currentRemotes = remotes
     currentRemoteBranchesByRemote = remoteBranchesByRemote
@@ -870,7 +906,7 @@ private actor FakeRepositoryGitClient: GitClient {
   func tags() async throws -> [SpoonCore.Tag] { [] }
   func worktrees() async throws -> [Worktree] { currentWorktrees }
   func sequencerState() async throws -> SequencerState? { nil }
-  func capabilities() async -> GitCapabilities { GitCapabilities() }
+  func capabilities() async -> GitCapabilities { currentCapabilities }
   func repositoryPaths() async throws -> GitRepositoryPaths {
     let dotGit = repositoryRoot.appending(path: ".git", directoryHint: .isDirectory)
     return GitRepositoryPaths(gitDirectory: dotGit, commonDirectory: dotGit)
@@ -987,6 +1023,10 @@ private actor FakeRepositoryGitClient: GitClient {
   func interactiveRebase(_ plan: RebasePlan) async throws { throw Failure.unimplemented }
   func cherryPick(_ oid: ObjectID) async throws { throw Failure.unimplemented }
   func revert(_ oid: ObjectID) async throws { throw Failure.unimplemented }
+  func dropCommit(_ oid: ObjectID, dryRun: Bool) async throws -> [RefUpdate] {
+    mutationCalls.append("drop:\(oid.rawValue):\(dryRun)")
+    return []
+  }
   func continueSequencer(_ kind: SequencerState.Kind) async throws { throw Failure.unimplemented }
   func skipSequencer(_ kind: SequencerState.Kind) async throws { throw Failure.unimplemented }
   func abortSequencer(_ kind: SequencerState.Kind) async throws { throw Failure.unimplemented }

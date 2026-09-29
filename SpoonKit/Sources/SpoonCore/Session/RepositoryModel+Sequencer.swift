@@ -35,6 +35,21 @@ extension RepositoryModel {
     await perform { try await $0.revert(oid) }
   }
 
+  /// Whether `git history drop` can remove this commit.
+  public func canDropCommit(_ commit: Commit) -> Bool {
+    gitCapabilities.supportsHistoryDrop && !commit.isMerge && !commit.parents.isEmpty
+  }
+
+  /// The branches `dropCommit` would rewrite, or git's reason for refusing.
+  public func previewDropCommit(_ oid: ObjectID) async throws -> [RefUpdate] {
+    try await gitClient.dropCommit(oid, dryRun: true)
+  }
+
+  @discardableResult
+  public func dropCommit(_ oid: ObjectID) async -> Bool {
+    await perform { try await $0.dropCommit(oid, dryRun: false) }
+  }
+
   public func continueSequencer() async {
     guard let kind = sequencerState?.kind else { return }
     await perform { try await $0.continueSequencer(kind) }

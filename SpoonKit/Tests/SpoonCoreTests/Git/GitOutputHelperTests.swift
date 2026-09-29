@@ -72,6 +72,25 @@ struct GitOutputHelperTests {
     #expect(GitRepositoryPathsParser.parseRevParse("/r/.git\n") == nil)
   }
 
+  @Test func refUpdateParserReadsUpdateRefStdinLines() {
+    let new = String(repeating: "1", count: 40)
+    let old = String(repeating: "2", count: 40)
+    let updates = RefUpdateParser.parse(
+      """
+      update refs/heads/feature/a \(new) \(old)
+      update HEAD \(new) \(old)
+      warning: ignored
+      update refs/heads/bad not-an-oid \(old)
+
+      """
+    )
+
+    #expect(updates.map(\.reference) == ["refs/heads/feature/a", "HEAD"])
+    #expect(updates.map(\.branchName) == ["feature/a", nil])
+    #expect(updates.first?.newOID.rawValue == new)
+    #expect(updates.first?.oldOID.rawValue == old)
+  }
+
   @Test func untrackedDiffBuilderCreatesTextPatch() {
     let diff = UntrackedDiffBuilder.make(path: "notes.txt", data: Data("first\nsecond".utf8))
 

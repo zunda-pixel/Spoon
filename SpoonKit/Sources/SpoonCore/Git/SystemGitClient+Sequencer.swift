@@ -49,6 +49,17 @@ extension SystemGitClient {
     try await runVoid(["revert", "--no-edit", oid.rawValue], timeout: .seconds(120))
   }
 
+  @discardableResult
+  public func dropCommit(_ oid: ObjectID, dryRun: Bool) async throws -> [RefUpdate] {
+    var arguments = ["history", "drop"]
+    if dryRun {
+      arguments.append("--dry-run")
+    }
+    arguments.append(oid.rawValue)
+    let result = try await run(arguments, timeout: .seconds(120))
+    return RefUpdateParser.parse(result.standardOutputText)
+  }
+
   public func sequencerState() async throws -> SequencerState? {
     let result = try await run(
       [
