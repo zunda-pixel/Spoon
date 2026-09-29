@@ -47,6 +47,11 @@ public protocol GitWorkingTreeClient: Sendable {
   /// Whether and how git signs new commits here (`commit.gpgSign`,
   /// `gpg.format`, `user.signingKey`).
   func commitSigningConfiguration() async throws -> CommitSigningConfiguration
+  /// Every value of the settings Spoon edits, from every config file.
+  func repositoryConfig() async throws -> RepositoryConfig
+  /// Sets `setting` in this repository's `.git/config`, or removes it there
+  /// when `value` is `nil` so the user's or system value applies again.
+  func setRepositoryConfig(_ setting: RepositorySetting, to value: String?) async throws
   /// Commits the staged changes as `fixup! <subject of oid>`, to be folded
   /// into that commit later by `autosquash(onto:)`.
   func commitFixup(for oid: ObjectID) async throws

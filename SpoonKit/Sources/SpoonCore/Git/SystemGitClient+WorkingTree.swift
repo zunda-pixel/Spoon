@@ -151,6 +151,36 @@ extension SystemGitClient {
     )
   }
 
+  public func repositoryConfig() async throws -> RepositoryConfig {
+    let command = GitCommand.make(
+      git: git,
+      repository: repositoryRoot,
+      arguments: ["config", "--null", "--show-scope", "--get-regexp", RepositorySetting.pattern],
+      timeout: .seconds(10)
+    )
+    let result = try await runner.run(command)
+    // `git config --get-regexp` exits 1 when nothing matches.
+    if result.exitCode == 1 { return RepositoryConfig() }
+    return RepositoryConfig(
+      entries: GitConfigEntry.parse(try result.checkSuccess(of: command).standardOutputText))
+  }
+
+  public func setRepositoryConfig(_ setting: RepositorySetting, to value: String?) async throws {
+    guard let value else {
+      let command = GitCommand.make(
+        git: git,
+        repository: repositoryRoot,
+        arguments: ["config", "--local", "--unset-all", setting.rawValue],
+        timeout: .seconds(10)
+      )
+      let result = try await runner.run(command)
+      // Exit 5: nothing to unset, which is the state asked for.
+      if result.exitCode != 5 { _ = try result.checkSuccess(of: command) }
+      return
+    }
+    try await runVoid(["config", "--local", "--replace-all", setting.rawValue, value])
+  }
+
   public func commitSigningConfiguration() async throws -> CommitSigningConfiguration {
     let command = GitCommand.make(
       git: git,

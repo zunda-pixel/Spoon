@@ -51,6 +51,7 @@ final class RepositoryNavigationState {
     case blame(path: String)
     case lineHistory(path: String, lines: ClosedRange<Int>)
     case codeSearch
+    case repositorySettings
     case addRemote
     case addSubmodule
     case addWorktree(Branch)
@@ -106,6 +107,8 @@ final class RepositoryNavigationState {
         "delete-merged-branches"
       case .codeSearch:
         "code-search"
+      case .repositorySettings:
+        "repository-settings"
       case .stashBranch(let stash):
         "stash-branch:\(stash.target.rawValue)"
       case .lineHistory(let path, let lines):

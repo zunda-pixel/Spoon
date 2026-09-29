@@ -187,6 +187,12 @@ public struct SpoonCommands: Commands {
 
       Divider()
 
+      Button("Repository Settings…") {
+        navigation?.present(.repositorySettings)
+      }
+      .keyboardShortcut(",", modifiers: [.option, .command])
+      .disabled(model == nil || navigation == nil)
+
       Button("Refresh") {
         run { await $0.refresh() }
       }
