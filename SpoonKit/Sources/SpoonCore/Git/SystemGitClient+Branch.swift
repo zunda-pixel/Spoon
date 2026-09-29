@@ -23,6 +23,31 @@ extension SystemGitClient {
     try await runVoid(options.arguments(branch: branch), timeout: .seconds(120))
   }
 
+  public func mergePreview(branch: String) async throws -> MergePreview {
+    let command = GitCommand.make(
+      git: git,
+      repository: repositoryRoot,
+      arguments: [
+        "merge-tree", "--write-tree", "--name-only", "--no-messages", "-z", "HEAD", branch,
+      ],
+      timeout: .seconds(60)
+    )
+    let result = try await runner.run(command)
+    switch result.exitCode {
+    case 0:
+      return MergePreview(conflictedPaths: [])
+    case 1:
+      // `<tree>\0<path>\0<path>\0…`: the first record is the result tree.
+      let records = result.standardOutput.split(separator: 0).dropFirst()
+      return MergePreview(
+        conflictedPaths: records.map { String(decoding: $0, as: UTF8.self) }
+      )
+    default:
+      _ = try result.checkSuccess(of: command)
+      return MergePreview(conflictedPaths: [])
+    }
+  }
+
   public func createBranch(
     name: String,
     from startPoint: String?,

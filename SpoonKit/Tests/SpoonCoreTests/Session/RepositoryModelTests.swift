@@ -1125,6 +1125,9 @@ private actor FakeRepositoryGitClient: GitClient {
   }
   func switchToRemoteBranch(_ remoteBranch: String) async throws { throw Failure.unimplemented }
   func merge(branch: String, options: MergeOptions) async throws { throw Failure.unimplemented }
+  func mergePreview(branch: String) async throws -> MergePreview {
+    MergePreview(conflictedPaths: [])
+  }
   func deleteBranch(name: String, force: Bool) async throws {
     mutationCalls.append("delete-local:\(name):\(force)")
   }

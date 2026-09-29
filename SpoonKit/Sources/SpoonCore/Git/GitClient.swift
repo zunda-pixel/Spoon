@@ -54,6 +54,9 @@ public protocol GitBranchClient: Sendable {
   func createBranch(name: String, from startPoint: String?, switchToBranch: Bool) async throws
   func switchToRemoteBranch(_ remoteBranch: String) async throws
   func merge(branch: String, options: MergeOptions) async throws
+  /// Simulates merging `branch` into HEAD with Git's default strategy and
+  /// reports the paths that would conflict. Changes no refs, index, or files.
+  func mergePreview(branch: String) async throws -> MergePreview
   func deleteBranch(name: String, force: Bool) async throws
   /// Deletes local branches whose work already landed on the upstream they
   /// track (`git branch --delete-merged`, requires
