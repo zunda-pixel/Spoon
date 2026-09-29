@@ -35,6 +35,9 @@ public struct GitCapabilities: Sendable, Hashable {
   /// `git branch --delete-merged` (2.56+).
   public var supportsDeleteMergedBranches: Bool { supports(GitVersion(2, 56)) }
 
+  /// `git branch --forked` (2.56+).
+  public var supportsForkedBranchFilter: Bool { supports(GitVersion(2, 56)) }
+
   /// `git history drop` (2.56+).
   public var supportsHistoryDrop: Bool { supports(GitVersion(2, 56)) }
 

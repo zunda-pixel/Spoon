@@ -212,6 +212,14 @@ private struct RemoteBranchTreeNodeView: View {
       model.isBusy || model.isSequencing
         || (localBranch?.isCurrent == true && worktree == nil)
     )
+    Button("Show Only Branches Forked from Here") {
+      navigation.select(.history)
+      Task {
+        await model.focusHistoryOnBranches(
+          forkedFrom: .remoteBranch(remote: selection.remote.name, name: selection.fullName)
+        )
+      }
+    }
     Divider()
     Button("Merge into \(model.currentBranch?.name ?? "HEAD")…") {
       navigation.present(.mergeBranch(selection.branch))

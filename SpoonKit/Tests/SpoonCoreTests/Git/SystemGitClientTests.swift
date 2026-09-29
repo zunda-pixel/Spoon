@@ -226,6 +226,36 @@ struct SystemGitClientTests {
     #expect(deleted == ["feature/a"])
   }
 
+  @Test func forkedBranchesUseGitBranchForkedOnGit256() async throws {
+    let runner = FakeCommandRunner()
+    runner.stub(arguments: baseFlags + ["version"], stdout: "git version 2.56.0\n")
+    runner.stub(
+      arguments: baseFlags + [
+        "branch", "--format=%(refname:short)", "--forked", "refs/remotes/origin/main",
+      ],
+      stdout: "feature/a\nfeature/b\n"
+    )
+
+    let names = try await makeClient(runner).branchNames(forkedFrom: "refs/remotes/origin/main")
+
+    #expect(names == ["feature/a", "feature/b"])
+  }
+
+  @Test func forkedBranchesFallBackToUpstreamRefs() async throws {
+    let runner = FakeCommandRunner()
+    runner.stub(arguments: baseFlags + ["version"], stdout: "git version 2.55.0\n")
+    runner.stub(
+      arguments: baseFlags + [
+        "for-each-ref", "refs/heads", "--format=%(refname:short)%09%(upstream)",
+      ],
+      stdout: "main\trefs/remotes/origin/main\nfeature/a\trefs/heads/main\nloose\t\n"
+    )
+
+    let names = try await makeClient(runner).branchNames(forkedFrom: "refs/heads/main")
+
+    #expect(names == ["feature/a"])
+  }
+
   @Test func failedVersionProbeIsRetried() async {
     let runner = FakeCommandRunner()
     runner.stub(arguments: baseFlags + ["version"], stdout: "not a version\n")

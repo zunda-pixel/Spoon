@@ -63,6 +63,24 @@ extension SystemGitClient {
     try await runVoid(["branch", "--set-upstream-to", upstream, branch])
   }
 
+  public func branchNames(forkedFrom upstream: String) async throws -> [String] {
+    if await capabilities().supportsForkedBranchFilter {
+      let result = try await run(
+        ["branch", "--format=%(refname:short)", "--forked", upstream]
+      )
+      return result.standardOutputText.split(whereSeparator: \.isNewline).map(String.init)
+    }
+    // Ref names cannot contain control characters, so a tab separates safely.
+    let result = try await run(
+      ["for-each-ref", "refs/heads", "--format=%(refname:short)%09%(upstream)"]
+    )
+    return result.standardOutputText.split(whereSeparator: \.isNewline).compactMap { line in
+      let fields = line.split(separator: "\t", omittingEmptySubsequences: false)
+      guard fields.count == 2, fields[1] == upstream else { return nil }
+      return String(fields[0])
+    }
+  }
+
   public func defaultBranch() async throws -> String {
     if let result = try? await run(["symbolic-ref", "--short", "refs/remotes/origin/HEAD"]) {
       let name = result.standardOutputText.trimmingCharacters(in: .whitespacesAndNewlines)

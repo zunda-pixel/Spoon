@@ -163,6 +163,10 @@ struct BranchContextMenu: View {
       }
       .disabled(model.isBusy)
     }
+    Button("Show Only Branches Forked from Here") {
+      navigation.select(.history)
+      Task { await model.focusHistoryOnBranches(forkedFrom: .localBranch(branch.name)) }
+    }
     Divider()
     Button("Merge into \(model.currentBranch?.name ?? "HEAD")…") {
       navigation.present(.mergeBranch(branch))

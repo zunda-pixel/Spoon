@@ -780,6 +780,36 @@ struct RepositoryModelTests {
     #expect(await client.mutationCalls == ["delete-merged::true", "delete-merged:merged:false"])
   }
 
+  @Test func forkedBranchFocusShowsTheBaseAndItsForks() async {
+    let client = FakeRepositoryGitClient()
+    let head = makeOID("aaaa1111")
+    await client.configure(
+      status: makeStatus(oid: head, branch: "main"),
+      branches: [
+        makeBranch("main", oid: head, isCurrent: true, upstream: "origin/main"),
+        makeBranch("feature", oid: head, isCurrent: false, upstream: "origin/main"),
+        makeBranch("other", oid: head, isCurrent: false, upstream: "origin/other"),
+      ],
+      remoteBranchesByRemote: [
+        "origin": [makeBranch("origin/main", oid: head, isCurrent: false)]
+      ]
+    )
+    let model = RepositoryModel(
+      repository: Repository(rootURL: URL(filePath: "/tmp/forked-focus-" + UUID().uuidString)),
+      gitClient: client
+    )
+    await model.refresh()
+
+    await model.focusHistoryOnBranches(
+      forkedFrom: .remoteBranch(remote: "origin", name: "origin/main")
+    )
+
+    #expect(
+      model.focusedHistoryReferenceIDs
+        == ["remote:origin:origin/main", "local:main", "local:feature"]
+    )
+  }
+
   @Test func refreshErrorClearsOnceRefreshRecovers() async {
     let client = FakeRepositoryGitClient()
     let oid = makeOID("99999999")
@@ -983,6 +1013,9 @@ private actor FakeRepositoryGitClient: GitClient {
   }
   func setUpstream(of branch: String, to upstream: String) async throws {
     mutationCalls.append("upstream:\(branch):\(upstream)")
+  }
+  func branchNames(forkedFrom upstream: String) async throws -> [String] {
+    currentBranches.filter { "refs/remotes/\($0.upstream ?? "")" == upstream }.map(\.name)
   }
   func defaultBranch() async throws -> String { "main" }
   func remoteBranches(of remoteName: String) async throws -> [Branch] {
