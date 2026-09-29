@@ -1,3 +1,4 @@
+import AppKit
 import SpoonCore
 public import SwiftUI
 
@@ -84,6 +85,12 @@ public struct SpoonCommands: Commands {
         }
         .disabled(unavailable)
       }
+
+      Button("Blame File…") {
+        chooseFileToBlame()
+      }
+      .keyboardShortcut("b", modifiers: [.option, .command])
+      .disabled(model == nil || navigation == nil)
 
       Button("Sparse Checkout…") {
         navigation?.present(.sparseCheckout)
@@ -183,6 +190,24 @@ public struct SpoonCommands: Commands {
     case .revert: "Revert"
     case .merge: "Merge"
     }
+  }
+
+  /// Picks any file inside the repository and opens its blame.
+  private func chooseFileToBlame() {
+    guard let model, let navigation else { return }
+    let root = model.repository.rootURL.standardizedFileURL.resolvingSymlinksInPath()
+    let panel = NSOpenPanel()
+    panel.directoryURL = root
+    panel.canChooseDirectories = false
+    panel.allowsMultipleSelection = false
+    panel.prompt = "Blame"
+    panel.message = "Choose a file in \(model.repository.name) to blame."
+    guard panel.runModal() == .OK, let url = panel.url else { return }
+    let rootPath = root.path(percentEncoded: false)
+    let filePath = url.standardizedFileURL.resolvingSymlinksInPath().path(percentEncoded: false)
+    let prefix = rootPath.hasSuffix("/") ? rootPath : rootPath + "/"
+    guard filePath.hasPrefix(prefix) else { return }
+    navigation.present(.blame(path: String(filePath.dropFirst(prefix.count))))
   }
 
   private func run(_ operation: @escaping @MainActor (RepositoryModel) async -> Void) {

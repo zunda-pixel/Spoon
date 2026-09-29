@@ -1191,6 +1191,7 @@ private actor FakeRepositoryGitClient: GitClient {
   func reset(to target: ObjectID, mode: ResetMode) async throws { throw Failure.unimplemented }
   func commitDetail(_ oid: ObjectID) async throws -> CommitDetail { throw Failure.unimplemented }
   func reflog(maxCount: Int, skip: Int) async throws -> [ReflogEntry] { [] }
+  func blame(path: String, at revision: ObjectID?) async throws -> [BlameLine] { [] }
   func switchBranch(_ branch: String) async throws { throw Failure.unimplemented }
   func switchToRevision(_ oid: ObjectID) async throws { throw Failure.unimplemented }
   func createBranch(

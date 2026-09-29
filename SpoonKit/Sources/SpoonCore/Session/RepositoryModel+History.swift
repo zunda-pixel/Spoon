@@ -111,6 +111,10 @@ extension RepositoryModel {
     await loadHistoryIfNeeded()
   }
 
+  public func blame(path: String, at revision: ObjectID? = nil) async throws -> [BlameLine] {
+    try await gitClient.blame(path: path, at: revision)
+  }
+
   public func fileHistory(_ query: LogQuery) async throws -> LogPage {
     try await gitClient.log(query)
   }

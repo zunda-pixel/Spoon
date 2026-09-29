@@ -52,6 +52,10 @@ public protocol GitHistoryClient: Sendable {
   func log(_ query: LogQuery) async throws -> LogPage
   func commitDetail(_ oid: ObjectID) async throws -> CommitDetail
   func reflog(maxCount: Int, skip: Int) async throws -> [ReflogEntry]
+  /// Line-by-line authorship of `path`: the working-tree file when
+  /// `revision` is `nil` (uncommitted lines use the zero OID), else the
+  /// file at that revision.
+  func blame(path: String, at revision: ObjectID?) async throws -> [BlameLine]
 }
 
 /// Local branch operations.

@@ -117,6 +117,37 @@ struct GitOutputHelperTests {
     )
   }
 
+  @Test func blameParserReusesCommitHeadersAcrossLines() {
+    let first = String(repeating: "a", count: 40)
+    let zero = String(repeating: "0", count: 40)
+    let output = """
+      \(first) 1 1 2
+      author Jane
+      author-mail <jane@example.com>
+      author-time 1700000000
+      summary Add file
+      filename f.txt
+      \tline one
+      \(first) 2 2
+      \t\ttabbed line
+      \(zero) 3 3 1
+      author Not Committed Yet
+      author-time 1800000000
+      summary Version of f.txt from f.txt
+      filename f.txt
+      \t
+      """
+
+    let lines = GitBlameParser.parse(Data(output.utf8))
+
+    #expect(lines.map(\.lineNumber) == [1, 2, 3])
+    #expect(lines.map(\.text) == ["line one", "\ttabbed line", ""])
+    #expect(lines[1].commit.authorName == "Jane")
+    #expect(lines[1].commit.summary == "Add file")
+    #expect(!lines[0].commit.isUncommitted)
+    #expect(lines[2].commit.isUncommitted)
+  }
+
   @Test func untrackedDiffBuilderCreatesTextPatch() {
     let diff = UntrackedDiffBuilder.make(path: "notes.txt", data: Data("first\nsecond".utf8))
 
