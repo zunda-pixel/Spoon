@@ -34,8 +34,9 @@ public struct SoftwareUpdateView: View {
       content
     }
     .padding(20)
-    .frame(width: 620)
-    .frame(minHeight: 160)
+    // One fixed size for every state: the window is sized when it opens,
+    // usually while checking, and would otherwise clip the release notes.
+    .frame(width: 620, height: 440, alignment: .topLeading)
   }
 
   @ViewBuilder
@@ -43,7 +44,7 @@ public struct SoftwareUpdateView: View {
     switch updater.state {
     case .checking:
       ProgressView("Checking for updates…")
-        .frame(maxWidth: .infinity)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     case .available(let release):
       releaseNotes(release)
       HStack {
@@ -72,14 +73,16 @@ public struct SoftwareUpdateView: View {
       .fixedSize(horizontal: false, vertical: true)
     case .installing:
       ProgressView("Downloading and installing…")
-        .frame(maxWidth: .infinity)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     case .readyToRelaunch:
+      Spacer(minLength: 0)
       HStack {
         Spacer()
         Button("Relaunch Now") { AppRelauncher.relaunch(updater.appURL) }
           .keyboardShortcut(.defaultAction)
       }
     case .idle, .upToDate, .failed:
+      Spacer(minLength: 0)
       HStack {
         Spacer()
         if case .failed = updater.state {
@@ -96,18 +99,46 @@ public struct SoftwareUpdateView: View {
 
   private func releaseNotes(_ release: AppRelease) -> some View {
     ScrollView {
-      Text(notes(release))
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .textSelection(.enabled)
-        .padding(10)
+      VStack(alignment: .leading, spacing: 6) {
+        let blocks = ReleaseNotes.blocks(from: release.notes)
+        if blocks.isEmpty {
+          Text("No release notes.")
+            .foregroundStyle(.secondary)
+        }
+        ForEach(Array(blocks.enumerated()), id: \.offset) { _, block in
+          releaseNotesBlock(block)
+        }
+      }
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .textSelection(.enabled)
+      .padding(12)
     }
-    .frame(height: 200)
+    .frame(maxHeight: .infinity)
     .background(.background.secondary, in: RoundedRectangle(cornerRadius: 6))
     .accessibilityLabel("Release notes")
   }
 
-  private func notes(_ release: AppRelease) -> AttributedString {
-    let text = release.notes.isEmpty ? "No release notes." : release.notes
+  @ViewBuilder
+  private func releaseNotesBlock(_ block: ReleaseNotes.Block) -> some View {
+    switch block {
+    case .heading(let level, let text):
+      Text(inline(text))
+        .font(level <= 2 ? .headline : .subheadline.bold())
+        .padding(.top, 4)
+    case .bullet(let text):
+      HStack(alignment: .firstTextBaseline, spacing: 6) {
+        Text("•")
+          .accessibilityHidden(true)
+        Text(inline(text))
+          .fixedSize(horizontal: false, vertical: true)
+      }
+    case .paragraph(let text):
+      Text(inline(text))
+        .fixedSize(horizontal: false, vertical: true)
+    }
+  }
+
+  private func inline(_ text: String) -> AttributedString {
     let options = AttributedString.MarkdownParsingOptions(
       interpretedSyntax: .inlineOnlyPreservingWhitespace)
     return (try? AttributedString(markdown: text, options: options)) ?? AttributedString(text)
