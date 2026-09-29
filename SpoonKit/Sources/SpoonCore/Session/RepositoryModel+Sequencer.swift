@@ -145,17 +145,23 @@ extension RepositoryModel {
   /// Cherry-picks `commits` onto HEAD oldest first, whatever order they
   /// were selected in, so each applies on top of the one it followed.
   /// A merge commit brings the changes it made to its first parent.
-  public func cherryPick(_ commits: [Commit]) async {
+  /// `recordsOrigin` notes each source commit in the new message (`-x`);
+  /// `commit: false` only stages the changes.
+  public func cherryPick(
+    _ commits: [Commit], recordsOrigin: Bool = false, commit: Bool = true
+  ) async {
     let oids = historyOrder(commits).reversed().map(\.oid)
-    let options = CherryPickOptions(mainline: Self.mainline(for: commits))
+    let options = CherryPickOptions(
+      mainline: Self.mainline(for: commits), recordsOrigin: recordsOrigin, commits: commit)
     await perform { try await $0.cherryPick(Array(oids), options: options) }
   }
 
   /// Reverts `commits` newest first, so later changes are undone before the
   /// ones they build on. A merge commit is undone back to its first parent.
-  public func revert(_ commits: [Commit]) async {
+  /// `commit: false` only stages the inverse changes.
+  public func revert(_ commits: [Commit], commit: Bool = true) async {
     let oids = historyOrder(commits).map(\.oid)
-    let options = RevertOptions(mainline: Self.mainline(for: commits))
+    let options = RevertOptions(mainline: Self.mainline(for: commits), commits: commit)
     await perform { try await $0.revert(oids, options: options) }
   }
 

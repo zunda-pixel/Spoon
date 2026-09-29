@@ -962,6 +962,19 @@ struct SystemGitClientTests {
     #expect(runner.invocations.count == 2)
   }
 
+  @Test func pickOptionsAddOriginAndNoCommitFlags() async throws {
+    let runner = FakeCommandRunner()
+    runner.stub(arguments: baseFlags + ["cherry-pick", "-x", "--no-commit", "aaaa1111"])
+    runner.stub(arguments: baseFlags + ["revert", "--no-edit", "--no-commit", "bbbb2222"])
+    let client = makeClient(runner)
+    try await client.cherryPick(
+      [ObjectID(rawValue: "aaaa1111")!],
+      options: CherryPickOptions(recordsOrigin: true, commits: false))
+    try await client.revert(
+      [ObjectID(rawValue: "bbbb2222")!], options: RevertOptions(commits: false))
+    #expect(runner.invocations.count == 2)
+  }
+
   @Test func interactiveRebaseSendsArgvAndEnvironment() async throws {
     let runner = FakeCommandRunner()
     runner.stub(arguments: baseFlags + ["rebase", "--interactive", "beef0000"])

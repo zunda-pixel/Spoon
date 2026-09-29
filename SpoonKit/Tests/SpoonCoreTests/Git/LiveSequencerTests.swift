@@ -168,6 +168,36 @@ struct LiveSequencerTests {
     #expect(try await client.sequencerState() == nil)
   }
 
+  @Test func cherryPickCanNoteItsSourceOrOnlyStageTheChanges() async throws {
+    let root = try await LiveRepoFixture.makeTemporaryRepo(
+      commits: [.init(file: "base.txt", content: "base\n", message: "base")],
+      runner: runner
+    )
+    defer { try? FileManager.default.removeItem(at: root) }
+    try await LiveRepoFixture.run(["switch", "-c", "topic"], in: root, runner: runner)
+    try await LiveRepoFixture.commitFile(
+      "fix.txt", content: "fix\n", message: "fix", in: root, runner: runner)
+    try await LiveRepoFixture.commitFile(
+      "more.txt", content: "more\n", message: "more", in: root, runner: runner)
+    let client = makeClient(root)
+    func oid(_ revision: String) async throws -> ObjectID {
+      let text = try await client.run(["rev-parse", revision]).standardOutputText
+      return try #require(ObjectID(rawValue: text.trimmingCharacters(in: .whitespacesAndNewlines)))
+    }
+    let fix = try await oid("topic~1")
+    let more = try await oid("topic")
+    try await LiveRepoFixture.run(["switch", "main"], in: root, runner: runner)
+
+    try await client.cherryPick([fix], options: CherryPickOptions(recordsOrigin: true))
+    let message = try await client.run(["log", "-1", "--format=%B"]).standardOutputText
+    #expect(message.contains("(cherry picked from commit \(fix.rawValue))"))
+
+    let head = try await oid("HEAD")
+    try await client.cherryPick([more], options: CherryPickOptions(commits: false))
+    #expect(try await oid("HEAD") == head)
+    #expect(try await client.status().stagedEntries.map(\.path) == ["more.txt"])
+  }
+
   @Test func conflictIsDetectedAndAbortRestoresEverything() async throws {
     let root = try await LiveRepoFixture.makeTemporaryRepo(runner: runner)
     defer { try? FileManager.default.removeItem(at: root) }

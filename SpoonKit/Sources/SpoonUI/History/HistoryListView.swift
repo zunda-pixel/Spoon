@@ -11,8 +11,13 @@ struct HistoryListView: View {
   @State private var searchText = ""
   @State private var searchField = HistorySearch.Field.message
   @State private var activeSearch: HistorySearch?
-  /// Commits to revert, including a merge, awaiting confirmation.
-  @State private var revertingWithMerge: [Commit]?
+  /// A revert that includes a merge, awaiting confirmation.
+  @State private var revertingWithMerge: PendingRevert?
+
+  private struct PendingRevert {
+    var commits: [Commit]
+    var commit: Bool
+  }
 
   var body: some View {
     VStack(spacing: 0) {
@@ -34,19 +39,20 @@ struct HistoryListView: View {
       }
     }
     .confirmationDialog(
-      revertingWithMerge?.count == 1 ? "Revert this merge?" : "Revert these commits, including a merge?",
+      revertingWithMerge?.commits.count == 1
+        ? "Revert this merge?" : "Revert these commits, including a merge?",
       isPresented: .init(
         get: { revertingWithMerge != nil },
         set: { if !$0 { revertingWithMerge = nil } }
       )
     ) {
-      Button("Revert") {
-        guard let commits = revertingWithMerge else { return }
-        Task { await model.revert(commits) }
+      Button(revertingWithMerge?.commit == false ? "Revert Without Committing" : "Revert") {
+        guard let pending = revertingWithMerge else { return }
+        Task { await model.revert(pending.commits, commit: pending.commit) }
       }
     } message: {
       Text(
-        "A new commit undoes the changes the merge brought into its first parent. git will then consider that branch already merged: merging it again won’t bring those changes back until this revert is itself reverted."
+        "The changes the merge brought into its first parent are undone. Once the revert is committed, git treats that branch as already merged: merging it again won’t bring those changes back until the revert is itself reverted."
       )
     }
   }
@@ -184,16 +190,17 @@ struct HistoryListView: View {
     }
     .disabled(model.isBusy || model.isSequencing)
     .help(containsMerge ? mergeHelp : "")
+    cherryPickOptionsMenu(commits)
+    let canRevert = commits.allSatisfy { model.canRevert($0.oid) }
     Button("Revert \(commits.count) Commits\(containsMerge ? "…" : "")") {
-      if containsMerge {
-        revertingWithMerge = commits
-      } else {
-        Task { await model.revert(commits) }
-      }
+      revert(commits, commit: true)
     }
-    .disabled(
-      model.isBusy || model.isSequencing || !commits.allSatisfy { model.canRevert($0.oid) }
-    )
+    .disabled(model.isBusy || model.isSequencing || !canRevert)
+    Button("Revert \(commits.count) Commits Without Committing\(containsMerge ? "…" : "")") {
+      revert(commits, commit: false)
+    }
+    .disabled(model.isBusy || model.isSequencing || !canRevert)
+    .help(revertWithoutCommittingHelp)
   }
 
   @ViewBuilder
@@ -318,16 +325,47 @@ struct HistoryListView: View {
     }
     .disabled(model.isBusy || model.isSequencing)
     .help(commit.isMerge ? mergeHelp : "")
+    cherryPickOptionsMenu([commit])
     if model.canRevert(commit.oid) {
       Button(commit.isMerge ? "Revert Merge…" : "Revert Commit") {
-        if commit.isMerge {
-          revertingWithMerge = [commit]
-        } else {
-          Task { await model.revert([commit]) }
-        }
+        revert([commit], commit: true)
       }
       .disabled(model.isBusy || model.isSequencing)
+      Button(
+        commit.isMerge ? "Revert Merge Without Committing…" : "Revert Without Committing"
+      ) {
+        revert([commit], commit: false)
+      }
+      .disabled(model.isBusy || model.isSequencing)
+      .help(revertWithoutCommittingHelp)
     }
+  }
+
+  private func cherryPickOptionsMenu(_ commits: [Commit]) -> some View {
+    Menu("More Cherry-Pick Options") {
+      Button("Cherry-Pick and Note the Source Commit") {
+        Task { await model.cherryPick(commits, recordsOrigin: true) }
+      }
+      .help("Add “(cherry picked from commit …)” to the message, as backports usually do")
+      Button("Apply Changes Without Committing") {
+        Task { await model.cherryPick(commits, commit: false) }
+      }
+      .help("Stage the changes so you can adjust them and commit yourself")
+    }
+    .disabled(model.isBusy || model.isSequencing)
+  }
+
+  /// Reverts right away, or asks first when a merge is among `commits`.
+  private func revert(_ commits: [Commit], commit: Bool) {
+    if commits.contains(where: \.isMerge) {
+      revertingWithMerge = PendingRevert(commits: commits, commit: commit)
+    } else {
+      Task { await model.revert(commits, commit: commit) }
+    }
+  }
+
+  private var revertWithoutCommittingHelp: String {
+    "Stage the inverse changes so you can adjust them and commit yourself"
   }
 
   private var mergeHelp: String {

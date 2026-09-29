@@ -1236,10 +1236,14 @@ struct RepositoryModelTests {
     await model.cherryPick([merge])
     await model.revert([plain, merge])
     await model.revert([plain])
+    await model.cherryPick([plain], recordsOrigin: true)
+    await model.cherryPick([plain, merge], commit: false)
+    await model.revert([plain], commit: false)
 
     #expect(
       await client.mutationCalls == [
         "cherry-pick:-m1:bbbb2222", "revert:-m1:eeee5555,bbbb2222", "revert:eeee5555",
+        "cherry-pick:-x:eeee5555", "cherry-pick:-m1:-n:bbbb2222,eeee5555", "revert:-n:eeee5555",
       ]
     )
   }
@@ -1610,11 +1614,14 @@ private actor FakeRepositoryGitClient: GitClient {
   func revert(_ oid: ObjectID) async throws { throw Failure.unimplemented }
   func cherryPick(_ oids: [ObjectID], options: CherryPickOptions) async throws {
     let mainline = options.mainline.map { "-m\($0):" } ?? ""
-    mutationCalls.append("cherry-pick:\(mainline)" + oids.map(\.rawValue).joined(separator: ","))
+    let flags = (options.recordsOrigin ? "-x:" : "") + (options.commits ? "" : "-n:")
+    mutationCalls.append(
+      "cherry-pick:\(mainline)\(flags)" + oids.map(\.rawValue).joined(separator: ","))
   }
   func revert(_ oids: [ObjectID], options: RevertOptions) async throws {
     let mainline = options.mainline.map { "-m\($0):" } ?? ""
-    mutationCalls.append("revert:\(mainline)" + oids.map(\.rawValue).joined(separator: ","))
+    let flags = options.commits ? "" : "-n:"
+    mutationCalls.append("revert:\(mainline)\(flags)" + oids.map(\.rawValue).joined(separator: ","))
   }
   func replayBranch(_ branch: String, onto newBase: ObjectID, linearize: Bool) async throws {
     mutationCalls.append("replay:\(branch):\(newBase.rawValue):\(linearize)")
