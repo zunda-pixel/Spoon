@@ -30,4 +30,13 @@ extension Defaults.Keys {
 
   /// Release tag the user chose to skip; not offered again at launch.
   public static let skippedUpdateVersion = Key<String?>("skippedUpdateVersion", default: nil)
+
+  /// Hide whitespace-only changes in diffs (`git diff -w`).
+  public static let diffIgnoresWhitespace = Key<Bool>("diffIgnoresWhitespace", default: false)
+
+  /// Highlight the changed words within modified lines.
+  public static let diffHighlightsWordChanges = Key<Bool>(
+    "diffHighlightsWordChanges",
+    default: true
+  )
 }

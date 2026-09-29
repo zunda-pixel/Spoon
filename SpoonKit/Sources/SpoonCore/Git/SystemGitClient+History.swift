@@ -70,7 +70,7 @@ extension SystemGitClient {
     return GitBlameParser.parse(result.standardOutput)
   }
 
-  public func commitDetail(_ oid: ObjectID) async throws -> CommitDetail {
+  public func commitDetail(_ oid: ObjectID, options: DiffOptions) async throws -> CommitDetail {
     let metadata = try await run([
       "log", "-1", "-z", "--format=\(GitLogParser.logFormat)", oid.rawValue, "--",
     ])
@@ -91,16 +91,15 @@ extension SystemGitClient {
 
     // First-parent patch; `diff-tree` prints nothing for merges, so diff
     // against parent 1 explicitly. Root commits use --root.
-    let patch: CommandResult
-    if let firstParent = commit.parents.first {
-      patch = try await run([
-        "diff", "--patch", "--find-renames", "\(firstParent.rawValue)..\(oid.rawValue)", "--",
-      ])
-    } else {
-      patch = try await run([
-        "diff-tree", "--patch", "--root", "--find-renames", oid.rawValue, "--",
-      ])
-    }
+    let patchArguments =
+      if let firstParent = commit.parents.first {
+        ["diff", "--patch", "--find-renames"] + options.arguments
+          + ["\(firstParent.rawValue)..\(oid.rawValue)", "--"]
+      } else {
+        ["diff-tree", "--patch", "--root", "--find-renames"] + options.arguments
+          + [oid.rawValue, "--"]
+      }
+    let patch = try await run(patchArguments)
 
     return CommitDetail(
       commit: commit,

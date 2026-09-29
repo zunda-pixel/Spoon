@@ -11,7 +11,7 @@ public protocol GitWorkingTreeClient: Sendable {
 
   /// Working-tree patch: index vs HEAD when `staged`, else worktree vs index.
   /// `path` narrows to one file; `nil` diffs everything.
-  func diffWorkingTree(path: String?, staged: Bool) async throws -> [FileDiff]
+  func diffWorkingTree(path: String?, staged: Bool, options: DiffOptions) async throws -> [FileDiff]
   /// Synthesized all-added diff for an untracked file.
   func untrackedFileDiff(path: String) async throws -> FileDiff
   /// Metadata, full message, and first-parent patch for one commit.
@@ -54,7 +54,7 @@ public protocol GitCapabilityClient: Sendable {
 /// Commit history and reflog queries.
 public protocol GitHistoryClient: Sendable {
   func log(_ query: LogQuery) async throws -> LogPage
-  func commitDetail(_ oid: ObjectID) async throws -> CommitDetail
+  func commitDetail(_ oid: ObjectID, options: DiffOptions) async throws -> CommitDetail
   func reflog(maxCount: Int, skip: Int) async throws -> [ReflogEntry]
   /// Line-by-line authorship of `path`: the working-tree file when
   /// `revision` is `nil` (uncommitted lines use the zero OID), else the
@@ -276,5 +276,17 @@ extension GitStashClient {
   /// Stashes every change, optionally including untracked files.
   public func saveStash(message: String?, includeUntracked: Bool) async throws {
     try await saveStash(StashSaveOptions(message: message, includeUntracked: includeUntracked))
+  }
+}
+
+extension GitWorkingTreeClient {
+  public func diffWorkingTree(path: String?, staged: Bool) async throws -> [FileDiff] {
+    try await diffWorkingTree(path: path, staged: staged, options: .standard)
+  }
+}
+
+extension GitHistoryClient {
+  public func commitDetail(_ oid: ObjectID) async throws -> CommitDetail {
+    try await commitDetail(oid, options: .standard)
   }
 }

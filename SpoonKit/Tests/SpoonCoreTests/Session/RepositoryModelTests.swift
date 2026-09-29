@@ -1306,7 +1306,9 @@ private actor FakeRepositoryGitClient: GitClient {
     return pages[query.skip] ?? LogPage(commits: [], hasMore: false)
   }
 
-  func diffWorkingTree(path: String?, staged: Bool) async throws -> [FileDiff] { [] }
+  func diffWorkingTree(path: String?, staged: Bool, options: DiffOptions) async throws
+    -> [FileDiff]
+  { [] }
   func untrackedFileDiff(path: String) async throws -> FileDiff { throw Failure.unimplemented }
   func unstage(paths: [String]) async throws { throw Failure.unimplemented }
   func applyPatch(_ patch: String, reverse: Bool, toIndex: Bool) async throws {
@@ -1319,7 +1321,9 @@ private actor FakeRepositoryGitClient: GitClient {
   func deleteUntracked(paths: [String]) async throws { throw Failure.unimplemented }
   func commit(message: String, amend: Bool) async throws { throw Failure.unimplemented }
   func reset(to target: ObjectID, mode: ResetMode) async throws { throw Failure.unimplemented }
-  func commitDetail(_ oid: ObjectID) async throws -> CommitDetail { throw Failure.unimplemented }
+  func commitDetail(_ oid: ObjectID, options: DiffOptions) async throws -> CommitDetail {
+    throw Failure.unimplemented
+  }
   func reflog(maxCount: Int, skip: Int) async throws -> [ReflogEntry] { [] }
   func blame(path: String, at revision: ObjectID?) async throws -> [BlameLine] { [] }
   func switchBranch(_ branch: String) async throws { throw Failure.unimplemented }

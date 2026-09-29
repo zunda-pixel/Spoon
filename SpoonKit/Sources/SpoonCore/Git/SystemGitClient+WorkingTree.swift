@@ -34,13 +34,16 @@ extension SystemGitClient {
     return try GitStatusParser.parse(result.standardOutput)
   }
 
-  public func diffWorkingTree(path: String?, staged: Bool) async throws -> [FileDiff] {
+  public func diffWorkingTree(
+    path: String?, staged: Bool, options: DiffOptions
+  ) async throws -> [FileDiff] {
     var arguments = ["diff"]
     if staged {
       arguments.append("--cached")
     }
     arguments.append("--patch")
     arguments.append("--find-renames")
+    arguments.append(contentsOf: options.arguments)
     arguments.append("--")
     if let path {
       arguments.append(path)

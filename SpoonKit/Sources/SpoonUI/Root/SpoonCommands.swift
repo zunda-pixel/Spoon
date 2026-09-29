@@ -161,6 +161,12 @@ public struct SpoonCommands: Commands {
       .disabled(model == nil)
     }
 
+    CommandGroup(after: .toolbar) {
+      if let model {
+        DiffViewMenuItems(model: model)
+      }
+    }
+
     CommandGroup(after: .sidebar) {
       Button("Show Changes") {
         navigation?.select(.changes)
@@ -239,5 +245,17 @@ public struct SpoonCommands: Commands {
   private func run(_ operation: @escaping @MainActor (RepositoryModel) async -> Void) {
     guard let model else { return }
     Task { await operation(model) }
+  }
+}
+
+/// View menu toggles for how diffs are shown.
+@MainActor
+private struct DiffViewMenuItems: View {
+  @Bindable var model: RepositoryModel
+
+  var body: some View {
+    Toggle("Ignore Whitespace in Diffs", isOn: $model.diffIgnoresWhitespace)
+      .keyboardShortcut("w", modifiers: [.option, .shift, .command])
+    Toggle("Highlight Changed Words", isOn: $model.diffHighlightsWordChanges)
   }
 }

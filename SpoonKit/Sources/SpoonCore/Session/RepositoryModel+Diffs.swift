@@ -20,15 +20,21 @@ extension RepositoryModel {
   public func diff(for selection: FileSelection) async throws -> [FileDiff] {
     switch selection.area {
     case .staged:
-      try await gitClient.diffWorkingTree(path: selection.path, staged: true)
+      try await gitClient.diffWorkingTree(path: selection.path, staged: true, options: diffOptions)
     case .unstaged, .conflicted:
-      try await gitClient.diffWorkingTree(path: selection.path, staged: false)
+      try await gitClient.diffWorkingTree(
+        path: selection.path, staged: false, options: diffOptions)
     case .untracked:
       [try await gitClient.untrackedFileDiff(path: selection.path)]
     }
   }
 
   public func commitDetail(_ oid: ObjectID) async throws -> CommitDetail {
-    try await gitClient.commitDetail(oid)
+    try await gitClient.commitDetail(oid, options: diffOptions)
+  }
+
+  /// The diff settings chosen in the View menu.
+  public var diffOptions: DiffOptions {
+    DiffOptions(ignoresWhitespace: diffIgnoresWhitespace)
   }
 }

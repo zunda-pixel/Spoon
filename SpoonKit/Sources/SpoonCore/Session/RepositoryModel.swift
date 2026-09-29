@@ -30,6 +30,14 @@ public final class RepositoryModel {
   /// A long-running mutation (fetch/pull/push/commit/…) is in flight.
   public internal(set) var isBusy = false
   public internal(set) var lastErrorMessage: String?
+  /// Hide whitespace-only changes in diffs, app-wide.
+  public var diffIgnoresWhitespace = Defaults[.diffIgnoresWhitespace] {
+    didSet { Defaults[.diffIgnoresWhitespace] = diffIgnoresWhitespace }
+  }
+  /// Highlight changed words within modified diff lines, app-wide.
+  public var diffHighlightsWordChanges = Defaults[.diffHighlightsWordChanges] {
+    didSet { Defaults[.diffHighlightsWordChanges] = diffHighlightsWordChanges }
+  }
   /// Stash local changes around every pull (`--autostash`), app-wide.
   public var pullAutostash = Defaults[.pullAutostash] {
     didSet { Defaults[.pullAutostash] = pullAutostash }

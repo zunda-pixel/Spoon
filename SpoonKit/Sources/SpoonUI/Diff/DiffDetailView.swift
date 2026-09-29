@@ -40,6 +40,8 @@ struct DiffDetailView: View {
           )
         } else {
           VStack(spacing: 0) {
+            DiffOptionsBar(model: model)
+            Divider()
             if let lineSelection, supportsLineSelection {
               selectionBar(lineSelection, diffs: diffs)
               Divider()
@@ -48,9 +50,10 @@ struct DiffDetailView: View {
               diffs: diffs,
               hunkAction: hunkAction,
               lineSelection: supportsLineSelection ? $lineSelection : nil,
-              onDiscardHunk: selection.area == .unstaged
+              onDiscardHunk: selection.area == .unstaged && canEditHunks
                 ? { diff, hunk in pendingDiscard = .hunk(diff, hunk) }
-                : nil
+                : nil,
+              highlightsWordChanges: model.diffHighlightsWordChanges
             )
           }
         }
@@ -92,8 +95,12 @@ struct DiffDetailView: View {
   /// Line selection exists where a line-level action does: discard for
   /// unstaged diffs, unstage for staged diffs.
   private var supportsLineSelection: Bool {
-    selection.area == .unstaged || selection.area == .staged
+    canEditHunks && (selection.area == .unstaged || selection.area == .staged)
   }
+
+  /// A whitespace-ignoring diff no longer matches the file byte for byte,
+  /// so its hunks and lines cannot be turned into patches.
+  private var canEditHunks: Bool { !model.diffIgnoresWhitespace }
 
   private func selectionBar(_ lineSelection: DiffLineSelection, diffs: [FileDiff]) -> some View {
     LineSelectionBar(
@@ -135,13 +142,14 @@ struct DiffDetailView: View {
   /// Reload when the selected file, its area, or the underlying status
   /// snapshot changes (e.g. after staging from another view).
   private var taskKey: String {
-    "\(selection.area)|\(selection.path)|\(model.status.hashValue)"
+    "\(selection.area)|\(selection.path)|\(model.status.hashValue)|\(model.diffIgnoresWhitespace)"
   }
 
   /// Hunk-level staging is only well-defined for content edits to
   /// tracked files (see DiffPatchBuilder).
   private var hunkAction: HunkAction? {
-    switch selection.area {
+    guard canEditHunks else { return nil }
+    return switch selection.area {
     case .unstaged:
       HunkAction(
         title: "Stage Hunk",
