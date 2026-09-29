@@ -44,6 +44,7 @@ final class RepositoryNavigationState {
     case newBranch(startPoint: String?)
     case sparseCheckout
     case stashChanges(paths: [String])
+    case stashBranch(Stash)
     case dropLargeBlobs
     case backfill
     case fileHistory(path: String)
@@ -105,6 +106,8 @@ final class RepositoryNavigationState {
         "delete-merged-branches"
       case .codeSearch:
         "code-search"
+      case .stashBranch(let stash):
+        "stash-branch:\(stash.target.rawValue)"
       case .lineHistory(let path, let lines):
         "line-history:\(path):\(lines.lowerBound)-\(lines.upperBound)"
       case .addSubmodule:

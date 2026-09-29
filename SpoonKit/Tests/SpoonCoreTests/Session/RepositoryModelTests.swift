@@ -720,6 +720,16 @@ struct RepositoryModelTests {
       ])
   }
 
+  @Test func branchFromStashPassesTheStashAndName() async {
+    let client = FakeRepositoryGitClient()
+    let model = makeModel(client)
+    let stash = Stash(
+      index: 1, target: makeOID("12345678"), helperCommitOIDs: [], message: "WIP on main")
+
+    #expect(await model.branchFromStash(stash, name: "rescued"))
+    #expect(await client.mutationCalls == ["stash-branch:stash@{1}:rescued"])
+  }
+
   @Test func failedMutationErrorSurvivesTheFollowUpRefresh() async {
     let client = FakeRepositoryGitClient()
     let oid = makeOID("88888888")
@@ -1683,5 +1693,8 @@ private actor FakeRepositoryGitClient: GitClient {
   }
   func applyStash(_ stash: Stash, pop: Bool) async throws { throw Failure.unimplemented }
   func dropStash(_ stash: Stash) async throws { throw Failure.unimplemented }
+  func branchFromStash(_ stash: Stash, name: String) async throws {
+    mutationCalls.append("stash-branch:\(stash.reference):\(name)")
+  }
   func stashDiffs(_ stash: Stash) async throws -> [FileDiff] { [] }
 }

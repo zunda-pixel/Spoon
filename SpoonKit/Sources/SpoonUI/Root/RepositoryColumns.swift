@@ -25,7 +25,7 @@ struct RepositoryContentColumn: View {
     case .remote(let name):
       RemoteDetailView(model: model, remoteName: name)
     case .stash(let index):
-      StashDetailView(model: model, stashIndex: index)
+      StashDetailView(model: model, navigation: navigation, stashIndex: index)
     }
   }
 

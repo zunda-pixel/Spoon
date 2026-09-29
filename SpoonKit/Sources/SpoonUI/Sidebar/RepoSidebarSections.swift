@@ -28,6 +28,7 @@ struct WorkspaceSidebarSection: View {
 @MainActor
 struct StashesSidebarSection: View {
   let model: RepositoryModel
+  let navigation: RepositoryNavigationState
   let searchText: String
   @State private var isExpanded = true
 
@@ -57,6 +58,8 @@ struct StashesSidebarSection: View {
             Button("Pop (Apply and Drop)") {
               Task { await model.applyStash(stash, pop: true) }
             }
+            Button("New Branch from Stash…") { navigation.present(.stashBranch(stash)) }
+              .help("Apply the stash on a new branch made where it was stashed")
             Divider()
             Button("Drop…", role: .destructive) { Task { await model.dropStash(stash) } }
           }

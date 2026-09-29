@@ -23,6 +23,10 @@ extension SystemGitClient {
     try await runVoid(["stash", "drop", stash.reference])
   }
 
+  public func branchFromStash(_ stash: Stash, name: String) async throws {
+    try await runVoid(["stash", "branch", name, stash.reference])
+  }
+
   public func stashDiffs(_ stash: Stash) async throws -> [FileDiff] {
     // `stash show` emits a regular unified diff; --include-untracked also
     // surfaces the untracked-files commit our saveStash records.

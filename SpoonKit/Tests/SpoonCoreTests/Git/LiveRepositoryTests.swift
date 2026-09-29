@@ -402,6 +402,29 @@ struct LiveRepositoryTests {
     #expect(try await subjects("answer = 42", .code) == ["Add the answer"])
   }
 
+  @Test func stashThatConflictsWhereItIsAppliesOnABranchFromItsBase() async throws {
+    let root = try await LiveRepoFixture.makeTemporaryRepo(
+      commits: [.init(file: "file.txt", content: "base\n", message: "base")],
+      runner: runner
+    )
+    defer { try? FileManager.default.removeItem(at: root) }
+    let fileURL = root.appending(path: "file.txt")
+    try Data("stashed\n".utf8).write(to: fileURL)
+    let client = makeClient(root)
+    try await client.saveStash(message: "work in progress", includeUntracked: false)
+    try await LiveRepoFixture.commitFile(
+      "file.txt", content: "moved on\n", message: "moved on", in: root, runner: runner)
+    let stash = try #require(try await client.stashes().first)
+
+    try await client.branchFromStash(stash, name: "rescued")
+
+    let status = try await client.status()
+    #expect(status.headBranch == "rescued")
+    #expect(status.conflictedEntries.isEmpty)
+    #expect(try String(contentsOf: fileURL, encoding: .utf8) == "stashed\n")
+    #expect(try await client.stashes().isEmpty)
+  }
+
   @Test func pullRebaseReplaysLocalCommitsAndAutostashesChanges() async throws {
     let bare = try await LiveRepoFixture.makeBareRepo(runner: runner)
     let root = try await LiveRepoFixture.makeTemporaryRepo(

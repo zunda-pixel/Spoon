@@ -20,7 +20,7 @@ struct RepoSidebarView: View {
         searchText: searchText,
         openWorktree: openWorktree
       )
-      StashesSidebarSection(model: model, searchText: searchText)
+      StashesSidebarSection(model: model, navigation: navigation, searchText: searchText)
       RemotesSidebarSection(
         model: model,
         navigation: navigation,

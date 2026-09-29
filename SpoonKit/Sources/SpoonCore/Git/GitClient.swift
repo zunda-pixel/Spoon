@@ -307,6 +307,11 @@ public protocol GitStashClient: Sendable {
   func saveStash(_ options: StashSaveOptions) async throws
   func applyStash(_ stash: Stash, pop: Bool) async throws
   func dropStash(_ stash: Stash) async throws
+  /// Creates branch `name` at the commit the stash was made on, switches to
+  /// it, and applies the stash there, dropping it if that succeeds
+  /// (`git stash branch`). The stash applies cleanly on its own base, so
+  /// this recovers a stash that conflicts where it is.
+  func branchFromStash(_ stash: Stash, name: String) async throws
   /// The changes a stash would reapply (its parent vs the stash commit).
   func stashDiffs(_ stash: Stash) async throws -> [FileDiff]
 }
