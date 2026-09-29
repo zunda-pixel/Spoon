@@ -186,6 +186,25 @@ struct SystemGitClientTests {
     #expect(paths.commonDirectory.path == "/repo/.git")
   }
 
+  @Test func dropCommitSendsExactArgvAndParsesDryRun() async throws {
+    let runner = FakeCommandRunner()
+    let oid = String(repeating: "a", count: 40)
+    runner.stub(
+      arguments: baseFlags + ["history", "drop", "--dry-run", oid],
+      stdout: "update refs/heads/main \(String(repeating: "b", count: 40)) "
+        + "\(String(repeating: "c", count: 40))\n"
+    )
+    runner.stub(arguments: baseFlags + ["history", "drop", oid])
+    let client = makeClient(runner)
+    let target = try #require(ObjectID(rawValue: oid))
+
+    let preview = try await client.dropCommit(target, dryRun: true)
+    try await client.dropCommit(target, dryRun: false)
+
+    #expect(preview.map(\.branchName) == ["main"])
+    #expect(runner.invocations.count == 2)
+  }
+
   @Test func failedVersionProbeIsRetried() async {
     let runner = FakeCommandRunner()
     runner.stub(arguments: baseFlags + ["version"], stdout: "not a version\n")

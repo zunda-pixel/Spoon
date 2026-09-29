@@ -36,6 +36,7 @@ final class RepositoryNavigationState {
     case renameRemoteBranch(RemoteBranchSelection)
     case mergeBranch(Branch)
     case rebase(Commit)
+    case dropCommit(Commit)
     case tag(Commit)
     case reset(target: ObjectID, description: String)
     case review(ReviewReport)
@@ -66,6 +67,8 @@ final class RepositoryNavigationState {
         "merge-branch:\(branch.id)"
       case .rebase(let commit):
         "rebase:\(commit.id)"
+      case .dropCommit(let commit):
+        "drop-commit:\(commit.id)"
       case .tag(let commit):
         "tag:\(commit.id)"
       case .reset(let target, _):

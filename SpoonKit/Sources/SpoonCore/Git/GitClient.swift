@@ -126,6 +126,13 @@ public protocol GitSequencerClient: Sendable {
   func cherryPick(_ oid: ObjectID) async throws
   /// Adds one inverse commit with git's default revert message.
   func revert(_ oid: ObjectID) async throws
+  /// Removes one non-merge, non-root commit and replays its descendants onto
+  /// its parent, updating every descendant local branch (`git history drop`,
+  /// requires `GitCapabilities.supportsHistoryDrop`). Aborts without
+  /// changing anything on conflicts, merges, or local changes it would
+  /// overwrite. `dryRun` reports the ref updates without applying them.
+  @discardableResult
+  func dropCommit(_ oid: ObjectID, dryRun: Bool) async throws -> [RefUpdate]
   /// `nil` when no rebase/cherry-pick/revert is in progress.
   func sequencerState() async throws -> SequencerState?
   func continueSequencer(_ kind: SequencerState.Kind) async throws

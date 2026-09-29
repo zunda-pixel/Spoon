@@ -32,6 +32,9 @@ public struct GitCapabilities: Sendable, Hashable {
   /// `git backfill` (2.49+).
   public var supportsBackfill: Bool { supports(GitVersion(2, 49)) }
 
+  /// `git history drop` (2.56+).
+  public var supportsHistoryDrop: Bool { supports(GitVersion(2, 56)) }
+
   /// `git repo info` path keys such as `path.gitdir.absolute` (2.56+).
   public var supportsRepoInfoPaths: Bool { supports(GitVersion(2, 56)) }
 
