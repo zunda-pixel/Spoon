@@ -692,6 +692,31 @@ struct RepositoryModelTests {
     #expect(!makeModel(client).commitSignsOff)
   }
 
+  @Test func refreshLoadsSubmodulesAndUpdatesPassTheirPaths() async throws {
+    let client = FakeRepositoryGitClient()
+    let oid = makeOID("88888888")
+    await client.configure(
+      status: makeStatus(oid: oid, branch: "main"),
+      branches: [makeBranch("main", oid: oid, isCurrent: true)]
+    )
+    let lib = Submodule(path: "Vendor/Lib", state: .notInitialized, commit: oid)
+    await client.setSubmodules([lib])
+    let model = makeModel(client)
+
+    await model.refresh()
+    #expect(model.submodules == [lib])
+
+    await model.updateSubmodules([lib])
+    await model.updateSubmodules()
+    await model.syncSubmodules([lib])
+    #expect(await model.addSubmodule(url: "https://example.com/kit.git", path: "Kit"))
+    #expect(
+      await client.mutationCalls == [
+        "submodule-update:Vendor/Lib", "submodule-update:", "submodule-sync:Vendor/Lib",
+        "submodule-add:https://example.com/kit.git:Kit",
+      ])
+  }
+
   @Test func failedMutationErrorSurvivesTheFollowUpRefresh() async {
     let client = FakeRepositoryGitClient()
     let oid = makeOID("88888888")
@@ -1538,6 +1563,18 @@ private actor FakeRepositoryGitClient: GitClient {
   }
   func moveWorktree(path: URL, to destination: URL) async throws {
     mutationCalls.append("worktree-move:\(path.lastPathComponent)>\(destination.lastPathComponent)")
+  }
+  private var currentSubmodules: [Submodule] = []
+  func setSubmodules(_ submodules: [Submodule]) { currentSubmodules = submodules }
+  func submodules() async throws -> [Submodule] { currentSubmodules }
+  func updateSubmodules(paths: [String]) async throws {
+    mutationCalls.append("submodule-update:\(paths.joined(separator: ","))")
+  }
+  func syncSubmodules(paths: [String]) async throws {
+    mutationCalls.append("submodule-sync:\(paths.joined(separator: ","))")
+  }
+  func addSubmodule(url: String, path: String) async throws {
+    mutationCalls.append("submodule-add:\(url):\(path)")
   }
   func sparseCheckoutPaths() async throws -> [String]? { nil }
   func setSparseCheckout(paths: [String]) async throws { throw Failure.unimplemented }

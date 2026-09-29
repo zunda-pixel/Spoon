@@ -184,6 +184,21 @@ public protocol GitWorktreeClient: Sendable {
   func moveWorktree(path: URL, to destination: URL) async throws
 }
 
+/// Submodule queries and mutations.
+public protocol GitSubmoduleClient: Sendable {
+  /// Top-level submodules, sorted by path; empty without `.gitmodules`.
+  func submodules() async throws -> [Submodule]
+  /// Initializes and checks out the recorded commit of each path, and of
+  /// their own submodules (`git submodule update --init --recursive`).
+  /// Empty `paths` updates every submodule.
+  func updateSubmodules(paths: [String]) async throws
+  /// Copies URLs from `.gitmodules` into the local config
+  /// (`git submodule sync --recursive`). Empty `paths` syncs every one.
+  func syncSubmodules(paths: [String]) async throws
+  /// Clones `url` into `path` and stages it as a new submodule.
+  func addSubmodule(url: String, path: String) async throws
+}
+
 /// Sparse-checkout configuration.
 public protocol GitSparseCheckoutClient: Sendable {
   /// Current cone-mode sparse paths; `nil` when sparse checkout is disabled.
@@ -292,6 +307,7 @@ public protocol GitClient:
   GitRemoteClient,
   GitTagClient,
   GitWorktreeClient,
+  GitSubmoduleClient,
   GitSparseCheckoutClient,
   GitSequencerClient,
   GitBisectClient,

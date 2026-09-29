@@ -731,6 +731,40 @@ struct LiveRepositoryTests {
     #expect(try await clone.log(LogQuery()).commits.map(\.subject) == ["base"])
   }
 
+  @Test func submodulesCanBeAddedListedDeinitializedAndUpdated() async throws {
+    let git = try LiveRepoFixture.makeFileProtocolGitWrapper()
+    let library = try await LiveRepoFixture.makeTemporaryRepo(
+      commits: [.init(file: "lib.txt", content: "lib\n", message: "lib")],
+      runner: runner
+    )
+    let root = try await LiveRepoFixture.makeTemporaryRepo(
+      commits: [.init(file: "app.txt", content: "app\n", message: "app")],
+      runner: runner
+    )
+    defer {
+      for url in [git, library, root] { try? FileManager.default.removeItem(at: url) }
+    }
+    let client = SystemGitClient(repositoryRoot: root, git: git, runner: runner)
+    #expect(try await client.submodules().isEmpty)
+
+    try await client.addSubmodule(url: library.path, path: "Vendor/Lib")
+    let added = try await client.submodules()
+    #expect(added.map(\.path) == ["Vendor/Lib"])
+    #expect(added.first?.state == .upToDate)
+    #expect(added.first?.url == library.path)
+    #expect(added.first?.name == "Vendor/Lib")
+
+    try await LiveRepoFixture.run(["commit", "-m", "add lib"], in: root, runner: runner)
+    try await LiveRepoFixture.run(
+      ["submodule", "deinit", "--force", "--", "Vendor/Lib"], in: root, runner: runner)
+    #expect(try await client.submodules().first?.state == .notInitialized)
+
+    try await client.syncSubmodules(paths: [])
+    try await client.updateSubmodules(paths: ["Vendor/Lib"])
+    #expect(try await client.submodules().first?.state == .upToDate)
+    #expect(FileManager.default.fileExists(atPath: root.appending(path: "Vendor/Lib/lib.txt").path))
+  }
+
   @Test func recursiveCloneChecksOutSubmoduleContent() async throws {
     let git = try LiveRepoFixture.makeFileProtocolGitWrapper()
     let submodule = try await LiveRepoFixture.makeTemporaryRepo(

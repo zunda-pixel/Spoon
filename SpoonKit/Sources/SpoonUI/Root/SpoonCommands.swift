@@ -129,6 +129,21 @@ public struct SpoonCommands: Commands {
         .disabled(repositoryMutationUnavailable)
       }
 
+      Menu("Submodules") {
+        Button("Add Submodule…") {
+          navigation?.present(.addSubmodule)
+        }
+        Button("Update All Submodules") {
+          run { await $0.updateSubmodules() }
+        }
+        .disabled(model?.submodules.isEmpty != false)
+        Button("Sync All Submodule URLs") {
+          run { await $0.syncSubmodules() }
+        }
+        .disabled(model?.submodules.isEmpty != false)
+      }
+      .disabled(repositoryMutationUnavailable)
+
       Button("Sparse Checkout…") {
         navigation?.present(.sparseCheckout)
       }
