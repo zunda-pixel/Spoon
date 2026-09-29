@@ -230,6 +230,14 @@ public protocol GitReviewClient: Sendable {
   func diff(from: String, to: String) async throws -> [FileDiff]
   /// Raw unified diff text between two refs, for AI prompts.
   func diffText(from: String, to: String) async throws -> String
+  /// How the commits of `new` correspond to those of `old`
+  /// (`git range-diff <oldBase>..<oldTip> <newBase>..<newTip>`).
+  func rangeDiff(
+    oldBase: ObjectID, oldTip: ObjectID, newBase: ObjectID, newTip: ObjectID
+  ) async throws -> [RangeDiffEntry]
+  /// The commit `reference` pointed to before its latest move
+  /// (`<reference>@{1}`), or `nil` when the reflog has no earlier entry.
+  func previousTip(of reference: String) async throws -> ObjectID?
   /// Raw staged diff text, for AI prompts.
   func stagedDiffText() async throws -> String
 }

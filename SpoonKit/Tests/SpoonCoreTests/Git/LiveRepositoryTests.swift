@@ -428,6 +428,41 @@ struct LiveRepositoryTests {
     #expect(Set(status.unstagedEntries.map(\.path)) == ["f.txt", "g.txt"])
   }
 
+  @Test func rangeDiffComparesABranchBeforeAndAfterRewriting() async throws {
+    let root = try await LiveRepoFixture.makeTemporaryRepo(
+      commits: [.init(file: "base.txt", content: "base\n", message: "base")],
+      runner: runner
+    )
+    defer { try? FileManager.default.removeItem(at: root) }
+    func git(_ arguments: [String]) async throws {
+      try await LiveRepoFixture.run(arguments, in: root, runner: runner)
+    }
+    let lines = (1...20).map { "line \($0)" }.joined(separator: "\n") + "\n"
+    try await git(["switch", "-c", "topic"])
+    try await LiveRepoFixture.commitFile(
+      "one.txt", content: lines, message: "add one", in: root, runner: runner
+    )
+    try await LiveRepoFixture.commitFile(
+      "two.txt", content: lines, message: "add two", in: root, runner: runner
+    )
+    let client = makeClient(root)
+    let oldTip = try #require(try await client.branches().first { $0.name == "topic" }).tip
+    try Data(lines.replacingOccurrences(of: "line 20", with: "line twenty").utf8)
+      .write(to: root.appending(path: "two.txt"))
+    try await git(["commit", "-a", "--amend", "--no-edit"])
+    let newTip = try #require(try await client.branches().first { $0.name == "topic" }).tip
+
+    #expect(try await client.previousTip(of: "refs/heads/topic") == oldTip)
+    #expect(try await client.previousTip(of: "refs/heads/main") == nil)
+    let base = try await client.mergeBase("main", "topic")
+    let entries = try await client.rangeDiff(
+      oldBase: base, oldTip: oldTip, newBase: base, newTip: newTip
+    )
+
+    #expect(entries.map(\.relation) == [.unchanged, .changed])
+    #expect(entries[1].patchDiff.contains { $0.contains("+line twenty") })
+  }
+
   @Test func cloneCreatesAWorkingLocalCopy() async throws {
     let source = try await LiveRepoFixture.makeTemporaryRepo(
       commits: [.init(file: "base.txt", content: "base\n", message: "base")],

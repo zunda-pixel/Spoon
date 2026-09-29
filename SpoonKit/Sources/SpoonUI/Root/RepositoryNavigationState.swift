@@ -40,6 +40,7 @@ final class RepositoryNavigationState {
     case deleteWorktree(Worktree)
     case renameRemoteBranch(RemoteBranchSelection)
     case mergeBranch(Branch)
+    case compareBranchVersions(Branch)
     case replayBranch(Branch)
     case rebase(Commit)
     case startBisect(Commit)
@@ -85,6 +86,8 @@ final class RepositoryNavigationState {
         "rename-remote-branch:\(selection.id)"
       case .mergeBranch(let branch):
         "merge-branch:\(branch.id)"
+      case .compareBranchVersions(let branch):
+        "compare-branch-versions:\(branch.id)"
       case .replayBranch(let branch):
         "replay-branch:\(branch.id)"
       case .rebase(let commit):

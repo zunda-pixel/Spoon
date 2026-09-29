@@ -28,4 +28,31 @@ extension SystemGitClient {
     let result = try await run(["diff", "--cached", "--patch", "--find-renames", "--"])
     return result.standardOutputText
   }
+
+  public func rangeDiff(
+    oldBase: ObjectID, oldTip: ObjectID, newBase: ObjectID, newTip: ObjectID
+  ) async throws -> [RangeDiffEntry] {
+    let result = try await run(
+      [
+        "range-diff", "--no-color",
+        "\(oldBase.rawValue)..\(oldTip.rawValue)", "\(newBase.rawValue)..\(newTip.rawValue)",
+      ],
+      timeout: .seconds(120)
+    )
+    return GitRangeDiffParser.parse(result.standardOutputText)
+  }
+
+  public func previousTip(of reference: String) async throws -> ObjectID? {
+    let command = GitCommand.make(
+      git: git,
+      repository: repositoryRoot,
+      arguments: ["rev-parse", "--verify", "--quiet", "\(reference)@{1}^{commit}"],
+      timeout: .seconds(10)
+    )
+    let result = try await runner.run(command)
+    // `--verify --quiet` exits 1 without output when there is no such entry.
+    guard result.exitCode == 0 else { return nil }
+    return ObjectID(
+      rawValue: result.standardOutputText.trimmingCharacters(in: .whitespacesAndNewlines))
+  }
 }

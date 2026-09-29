@@ -126,6 +126,46 @@ extension RepositoryModel {
     return page
   }
 
+  /// Pairs the commits of `branch` with those of an earlier version of it
+  /// (`git range-diff`). Both ranges start where each version forked from
+  /// the branch it builds on (its upstream, else the default branch), so a
+  /// rebase onto a newer base shows only the branch's own commits.
+  public func compareBranchVersions(
+    _ branch: Branch,
+    with baseline: BranchVersionBaseline
+  ) async throws -> [RangeDiffEntry] {
+    let oldTip: ObjectID
+    let baseReference: String
+    switch baseline {
+    case .previousPosition:
+      guard let previous = try await gitClient.previousTip(of: "refs/heads/\(branch.name)") else {
+        throw BranchVersionComparisonError.noPreviousPosition(branch: branch.name)
+      }
+      oldTip = previous
+      if let upstream = existingRemoteUpstream(of: branch) {
+        baseReference = upstream
+      } else {
+        baseReference = try await gitClient.defaultBranch()
+      }
+    case .upstream:
+      guard
+        let upstream = existingRemoteUpstream(of: branch),
+        let remoteName = branch.upstreamRemoteName,
+        let upstreamTip = remoteBranchesByRemote[remoteName]?.first(where: { $0.name == upstream })?
+          .tip
+      else {
+        throw BranchVersionComparisonError.noUpstream(branch: branch.name)
+      }
+      oldTip = upstreamTip
+      baseReference = try await gitClient.defaultBranch()
+    }
+    async let oldBase = gitClient.mergeBase(baseReference, oldTip.rawValue)
+    async let newBase = gitClient.mergeBase(baseReference, branch.tip.rawValue)
+    return try await gitClient.rangeDiff(
+      oldBase: oldBase, oldTip: oldTip, newBase: newBase, newTip: branch.tip
+    )
+  }
+
   public func fileHistory(_ query: LogQuery) async throws -> LogPage {
     try await gitClient.log(query)
   }
