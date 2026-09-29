@@ -337,6 +337,33 @@ struct LiveRepositoryTests {
     #expect(try await client.status().headBranch == "main")
   }
 
+  @Test func historySearchMatchesMessagesAuthorsAndCode() async throws {
+    let root = try await LiveRepoFixture.makeTemporaryRepo(
+      commits: [
+        .init(file: "a.swift", content: "let answer = 42\n", message: "Add the answer"),
+        .init(file: "b.swift", content: "print(1)\n", message: "Fix [crash] on launch"),
+      ],
+      runner: runner
+    )
+    defer { try? FileManager.default.removeItem(at: root) }
+    try Data("print(2)\n".utf8).write(to: root.appending(path: "b.swift"))
+    try await LiveRepoFixture.run(["add", "b.swift"], in: root, runner: runner)
+    try await LiveRepoFixture.run(
+      ["commit", "-m", "Tweak output", "--author", "Other Person <other@example.com>"],
+      in: root,
+      runner: runner
+    )
+    let client = makeClient(root)
+    func subjects(_ text: String, _ field: HistorySearch.Field) async throws -> [String] {
+      let query = LogQuery(allReferences: true, search: HistorySearch(text: text, field: field))
+      return try await client.log(query).commits.map(\.subject)
+    }
+
+    #expect(try await subjects("[CRASH]", .message) == ["Fix [crash] on launch"])
+    #expect(try await subjects("other person", .author) == ["Tweak output"])
+    #expect(try await subjects("answer = 42", .code) == ["Add the answer"])
+  }
+
   @Test func cloneCreatesAWorkingLocalCopy() async throws {
     let source = try await LiveRepoFixture.makeTemporaryRepo(
       commits: [.init(file: "base.txt", content: "base\n", message: "base")],

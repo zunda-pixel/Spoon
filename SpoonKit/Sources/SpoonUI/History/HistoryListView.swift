@@ -8,8 +8,42 @@ struct HistoryListView: View {
   @Bindable var navigation: RepositoryNavigationState
   let openWorktree: (Worktree) -> Void
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
+  @State private var searchText = ""
+  @State private var searchField = HistorySearch.Field.message
+  @State private var activeSearch: HistorySearch?
 
   var body: some View {
+    VStack(spacing: 0) {
+      HistorySearchBar(
+        text: $searchText,
+        field: $searchField,
+        submit: submitSearch,
+        clear: clearSearch
+      )
+      if let activeSearch {
+        HistorySearchResultsView(model: model, search: activeSearch, navigation: navigation)
+      } else {
+        graphHistory
+      }
+    }
+    .onChange(of: searchText) {
+      if searchText.trimmingCharacters(in: .whitespaces).isEmpty {
+        activeSearch = nil
+      }
+    }
+  }
+
+  private func submitSearch() {
+    let text = searchText.trimmingCharacters(in: .whitespaces)
+    activeSearch = text.isEmpty ? nil : HistorySearch(text: text, field: searchField)
+  }
+
+  private func clearSearch() {
+    searchText = ""
+    activeSearch = nil
+  }
+
+  private var graphHistory: some View {
     ScrollViewReader { proxy in
       Group {
         if model.historyRows.isEmpty {

@@ -115,6 +115,17 @@ extension RepositoryModel {
     try await gitClient.blame(path: path, at: revision)
   }
 
+  /// One page of commits, across every reference, that match `search`.
+  public func searchHistory(_ search: HistorySearch, skip: Int = 0) async throws -> LogPage {
+    var page = try await gitClient.log(
+      LogQuery(maxCount: 200, skip: skip, allReferences: true, search: search)
+    )
+    // `--all` reaches stash helper commits, which the history graph hides too.
+    let hidden = stashHelperCommitOIDs
+    page.commits.removeAll { hidden.contains($0.oid) }
+    return page
+  }
+
   public func fileHistory(_ query: LogQuery) async throws -> LogPage {
     try await gitClient.log(query)
   }

@@ -17,6 +17,35 @@ public struct Commit: Sendable, Hashable, Identifiable {
   public var isMerge: Bool { parents.count > 1 }
 }
 
+/// A history filter: commits whose message, author, or code changes match.
+public struct HistorySearch: Sendable, Hashable {
+  public enum Field: String, Sendable, Hashable, CaseIterable {
+    /// Commit message (`--grep`), case-insensitive.
+    case message
+    /// Author name or email (`--author`), case-insensitive.
+    case author
+    /// Commits that add or remove the text (`-S`, the "pickaxe").
+    case code
+  }
+
+  public var text: String
+  public var field: Field
+
+  public init(text: String, field: Field) {
+    self.text = text
+    self.field = field
+  }
+
+  /// The text is matched literally, never as a regular expression.
+  var arguments: [String] {
+    switch field {
+    case .message: ["--regexp-ignore-case", "--fixed-strings", "--grep=\(text)"]
+    case .author: ["--regexp-ignore-case", "--fixed-strings", "--author=\(text)"]
+    case .code: ["-S\(text)"]
+    }
+  }
+}
+
 /// Parameters for one `git log` page.
 public struct LogQuery: Sendable, Hashable {
   /// Ref to walk from; `nil` means HEAD unless `allReferences` is enabled.
@@ -35,6 +64,8 @@ public struct LogQuery: Sendable, Hashable {
   public var excludedReferences: [String]
   /// Extra commit tips to walk, such as detached worktree HEADs.
   public var additionalRevisions: [ObjectID]
+  /// Only commits matching this search; `nil` means every commit.
+  public var search: HistorySearch?
 
   public init(
     reference: String? = nil,
@@ -45,7 +76,8 @@ public struct LogQuery: Sendable, Hashable {
     allReferences: Bool = false,
     additionalRevisions: [ObjectID] = [],
     references: [String] = [],
-    excludedReferences: [String] = []
+    excludedReferences: [String] = [],
+    search: HistorySearch? = nil
   ) {
     self.reference = reference
     self.path = path
@@ -56,6 +88,7 @@ public struct LogQuery: Sendable, Hashable {
     self.additionalRevisions = additionalRevisions
     self.references = references
     self.excludedReferences = excludedReferences
+    self.search = search
   }
 
   public func next() -> LogQuery {
@@ -68,7 +101,8 @@ public struct LogQuery: Sendable, Hashable {
       allReferences: allReferences,
       additionalRevisions: additionalRevisions,
       references: references,
-      excludedReferences: excludedReferences
+      excludedReferences: excludedReferences,
+      search: search
     )
   }
 }

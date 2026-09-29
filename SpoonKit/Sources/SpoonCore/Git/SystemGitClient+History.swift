@@ -15,6 +15,9 @@ extension SystemGitClient {
     if query.followRenames, query.path != nil {
       arguments.append("--follow")
     }
+    if let search = query.search {
+      arguments.append(contentsOf: search.arguments)
+    }
     if query.allReferences {
       arguments.append("--all")
     }
@@ -34,7 +37,8 @@ extension SystemGitClient {
     if let path = query.path {
       arguments.append(path)
     }
-    let result = try await run(arguments)
+    // A code search diffs every commit, so allow it much longer.
+    let result = try await run(arguments, timeout: .seconds(query.search == nil ? 30 : 180))
     var commits = try GitLogParser.parse(result.standardOutput)
     let hasMore = commits.count > query.maxCount
     if hasMore {

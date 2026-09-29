@@ -627,6 +627,30 @@ struct SystemGitClientTests {
     #expect(runner.invocations.count == 2)
   }
 
+  @Test(
+    arguments: [
+      (.message, ["--regexp-ignore-case", "--fixed-strings", "--grep=fix (ui)"]),
+      (.author, ["--regexp-ignore-case", "--fixed-strings", "--author=fix (ui)"]),
+      (.code, ["-Sfix (ui)"]),
+    ] as [(HistorySearch.Field, [String])]
+  )
+  func historySearchSendsLiteralFilters(field: HistorySearch.Field, filter: [String]) async throws {
+    let runner = FakeCommandRunner()
+    runner.stub(
+      arguments: baseFlags + [
+        "log", "--topo-order", "-z", "--format=\(GitLogParser.logFormat)", "--max-count=11",
+      ] + filter + ["--all", "--"]
+    )
+
+    let search = HistorySearch(text: "fix (ui)", field: field)
+    _ = try await makeClient(runner).log(
+      LogQuery(maxCount: 10, allReferences: true, search: search)
+    )
+
+    let command = try #require(runner.invocations.first)
+    #expect(command.timeout == .seconds(180))
+  }
+
   @Test func filteredAllReferenceLogSendsIncludedAndExcludedReferences() async throws {
     let runner = FakeCommandRunner()
     runner.stub(
