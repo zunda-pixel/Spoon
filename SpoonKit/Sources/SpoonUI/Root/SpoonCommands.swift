@@ -105,6 +105,12 @@ public struct SpoonCommands: Commands {
         .disabled(unavailable)
       }
 
+      Button("Search Code…") {
+        navigation?.present(.codeSearch)
+      }
+      .keyboardShortcut("f", modifiers: [.option, .command])
+      .disabled(model == nil || navigation == nil)
+
       Button("Blame File…") {
         chooseFileToBlame()
       }

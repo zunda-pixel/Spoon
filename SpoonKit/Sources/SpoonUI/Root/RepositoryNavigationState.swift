@@ -48,6 +48,7 @@ final class RepositoryNavigationState {
     case backfill
     case fileHistory(path: String)
     case blame(path: String)
+    case codeSearch
     case addRemote
     case addWorktree(Branch)
     case addRemoteWorktree(RemoteBranchSelection)
@@ -100,6 +101,8 @@ final class RepositoryNavigationState {
         "delete-branch:\(branch.id)"
       case .deleteMergedBranches:
         "delete-merged-branches"
+      case .codeSearch:
+        "code-search"
       case .deleteWorktree(let worktree):
         "delete-worktree:\(worktree.id)"
       case .lockWorktree(let worktree):
