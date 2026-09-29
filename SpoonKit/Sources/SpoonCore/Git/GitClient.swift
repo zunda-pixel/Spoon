@@ -98,6 +98,14 @@ public protocol GitRemoteClient: Sendable {
   /// Downloads blobs omitted by a partial clone (requires
   /// `GitCapabilities.supportsBackfill`).
   func backfill() async throws
+  /// The promisor remote of a partial clone (`extensions.partialClone`), or
+  /// `nil` for a full clone.
+  func partialCloneRemote() async throws -> String?
+  /// Deletes local blobs larger than `byteLimit` that the promisor remote can
+  /// serve again on demand (`git repack -a -d --drop-filtered`, requires
+  /// `GitCapabilities.supportsRepackDropFiltered`). git keeps blobs the index
+  /// uses and refuses while a merge, rebase, or similar operation runs.
+  func dropLargeBlobs(largerThan byteLimit: Int) async throws
   func pull() async throws
   /// Pushes the current branch; sets upstream on first push.
   func push(force: Bool) async throws

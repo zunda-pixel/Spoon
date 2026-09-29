@@ -869,6 +869,32 @@ struct RepositoryModelTests {
     #expect(await client.mutationCalls == ["replay:topic:aaaa1111:true"])
   }
 
+  @Test func largeBlobRemovalNeedsAPartialCloneOnGit256() async {
+    let client = FakeRepositoryGitClient()
+    let head = makeOID("aaaa1111")
+    await client.configure(
+      status: makeStatus(oid: head, branch: "main"),
+      branches: [makeBranch("main", oid: head, isCurrent: true)],
+      gitVersion: GitVersion(2, 56, 0)
+    )
+    let model = makeModel(client)
+    await model.refresh()
+    #expect(!model.canDropLargeBlobs)
+
+    await client.configure(
+      status: makeStatus(oid: head, branch: "main"),
+      branches: [makeBranch("main", oid: head, isCurrent: true)],
+      gitVersion: GitVersion(2, 56, 0),
+      partialCloneRemote: "origin"
+    )
+    await model.refresh()
+    #expect(model.canDropLargeBlobs)
+    #expect(model.partialCloneRemote == "origin")
+
+    await model.dropLargeBlobs(largerThan: 10)
+    #expect(await client.mutationCalls == ["drop-blobs:10"])
+  }
+
   @Test func refreshErrorClearsOnceRefreshRecovers() async {
     let client = FakeRepositoryGitClient()
     let oid = makeOID("99999999")
@@ -955,6 +981,7 @@ private actor FakeRepositoryGitClient: GitClient {
 
   private var currentStatus = WorkingTreeStatus()
   private var currentCapabilities = GitCapabilities()
+  private var currentPartialCloneRemote: String?
   private var currentBranches: [Branch] = []
   private var currentRemotes: [Remote] = []
   private var currentRemoteBranchesByRemote: [String: [Branch]] = [:]
@@ -983,9 +1010,11 @@ private actor FakeRepositoryGitClient: GitClient {
     failBranches: Bool = false,
     failRemoteBranches: Bool = false,
     failWorktreeMutations: Bool = false,
-    gitVersion: GitVersion? = nil
+    gitVersion: GitVersion? = nil,
+    partialCloneRemote: String? = nil
   ) {
     currentStatus = status
+    currentPartialCloneRemote = partialCloneRemote
     currentCapabilities = GitCapabilities(version: gitVersion)
     currentBranches = branches
     currentRemotes = remotes
@@ -1104,6 +1133,10 @@ private actor FakeRepositoryGitClient: GitClient {
   }
   func fetch() async throws { throw Failure.unimplemented }
   func backfill() async throws { throw Failure.unimplemented }
+  func partialCloneRemote() async throws -> String? { currentPartialCloneRemote }
+  func dropLargeBlobs(largerThan byteLimit: Int) async throws {
+    mutationCalls.append("drop-blobs:\(byteLimit)")
+  }
   func pull() async throws { throw Failure.unimplemented }
   func push(force: Bool) async throws { throw Failure.unimplemented }
   func createTag(name: String, at target: ObjectID?, message: String?) async throws {

@@ -26,6 +26,7 @@ final class RepositoryNavigationState {
   enum ActiveSheet: Hashable, Identifiable {
     case newBranch(startPoint: String?)
     case sparseCheckout
+    case dropLargeBlobs
     case fileHistory(path: String)
     case addRemote
     case addWorktree(Branch)
@@ -50,6 +51,8 @@ final class RepositoryNavigationState {
         "new-branch:\(startPoint ?? "HEAD")"
       case .sparseCheckout:
         "sparse-checkout"
+      case .dropLargeBlobs:
+        "drop-large-blobs"
       case .fileHistory(let path):
         "file-history:\(path)"
       case .addRemote:

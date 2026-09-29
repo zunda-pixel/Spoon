@@ -69,6 +69,33 @@ extension SystemGitClient {
     try await runVoid(["backfill"], timeout: .seconds(3600))
   }
 
+  public func partialCloneRemote() async throws -> String? {
+    let command = GitCommand.make(
+      git: git,
+      repository: repositoryRoot,
+      arguments: ["config", "--get", "extensions.partialClone"],
+      timeout: .seconds(10)
+    )
+    let result = try await runner.run(command)
+    // `git config --get` exits 1 when the key is unset.
+    if result.exitCode == 1 { return nil }
+    let remote = try result.checkSuccess(of: command).standardOutputText
+      .trimmingCharacters(in: .whitespacesAndNewlines)
+    return remote.isEmpty ? nil : remote
+  }
+
+  public func dropLargeBlobs(largerThan byteLimit: Int) async throws {
+    try await runVoid(
+      [
+        "repack", "-a", "-d", "--drop-filtered",
+        "--filter=blob:limit=\(byteLimit)",
+        // Bitmaps assume one pack holding every object, which a filter breaks.
+        "--no-write-bitmap-index",
+      ],
+      timeout: .seconds(3600)
+    )
+  }
+
   public func pull() async throws {
     try await runVoid(["pull"], timeout: .seconds(300))
   }

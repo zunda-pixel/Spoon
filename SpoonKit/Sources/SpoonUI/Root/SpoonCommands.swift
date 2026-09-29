@@ -51,6 +51,13 @@ public struct SpoonCommands: Commands {
         .disabled(repositoryMutationUnavailable)
       }
 
+      if model?.canDropLargeBlobs == true {
+        Button("Remove Large Downloaded Blobs…") {
+          navigation?.present(.dropLargeBlobs)
+        }
+        .disabled(repositoryMutationUnavailable)
+      }
+
       Button("Push") {
         run { await $0.push(force: false) }
       }

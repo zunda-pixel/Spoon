@@ -11,6 +11,8 @@ public struct RepositoryGitSnapshot: Sendable, Hashable {
   public var worktrees: [Worktree]
   public var sequencerState: SequencerState?
   public var capabilities: GitCapabilities
+  /// Promisor remote of a partial clone; `nil` for a full clone.
+  public var partialCloneRemote: String?
 
   public init(
     status: WorkingTreeStatus,
@@ -21,7 +23,8 @@ public struct RepositoryGitSnapshot: Sendable, Hashable {
     tags: [Tag],
     worktrees: [Worktree],
     sequencerState: SequencerState?,
-    capabilities: GitCapabilities
+    capabilities: GitCapabilities,
+    partialCloneRemote: String? = nil
   ) {
     self.status = status
     self.branches = branches
@@ -32,6 +35,7 @@ public struct RepositoryGitSnapshot: Sendable, Hashable {
     self.worktrees = worktrees
     self.sequencerState = sequencerState
     self.capabilities = capabilities
+    self.partialCloneRemote = partialCloneRemote
   }
 
   static func load(from gitClient: any GitClient) async throws -> Self {
@@ -43,6 +47,8 @@ public struct RepositoryGitSnapshot: Sendable, Hashable {
     async let worktrees = gitClient.worktrees()
     async let sequencerState = gitClient.sequencerState()
     async let capabilities = gitClient.capabilities()
+    // Optional metadata: an unreadable config must not fail the refresh.
+    async let partialCloneRemote = try? gitClient.partialCloneRemote()
 
     let loadedRemotes = try await remotes
     let remoteBranchesByRemote = try await loadRemoteBranches(
@@ -59,7 +65,8 @@ public struct RepositoryGitSnapshot: Sendable, Hashable {
       tags: tags,
       worktrees: worktrees,
       sequencerState: sequencerState,
-      capabilities: capabilities
+      capabilities: capabilities,
+      partialCloneRemote: partialCloneRemote ?? nil
     )
   }
 
@@ -141,5 +148,6 @@ extension RepositoryModel {
     worktrees = snapshot.worktrees
     sequencerState = snapshot.sequencerState
     gitCapabilities = snapshot.capabilities
+    partialCloneRemote = snapshot.partialCloneRemote
   }
 }

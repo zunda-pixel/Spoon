@@ -18,6 +18,8 @@ public final class RepositoryModel {
   public internal(set) var worktrees: [Worktree] = []
   /// Optional features of the installed git, used to hide unsupported actions.
   public internal(set) var gitCapabilities = GitCapabilities()
+  /// Promisor remote of a partial clone; `nil` for a full clone.
+  public internal(set) var partialCloneRemote: String?
   /// An in-progress rebase / cherry-pick / revert (conflict or edit pause).
   public internal(set) var sequencerState: SequencerState?
   public internal(set) var isRefreshing = false
