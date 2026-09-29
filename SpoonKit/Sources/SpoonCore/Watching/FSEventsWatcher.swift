@@ -1,16 +1,16 @@
 import CoreServices
 public import Foundation
 
-/// Streams batches of changed directory paths under a root via FSEvents.
+/// Streams batches of changed directory paths under one or more roots via FSEvents.
 ///
 /// This file is the app's only unsafe-interop quarantine zone: the FSEvents
 /// C API needs raw pointers for its context and path array. Nothing outside
 /// this file touches `unsafe` constructs.
 public enum FSEventsWatcher {
   /// Directory-granularity change events (no per-file flags — cheaper, and
-  /// classification only needs directories). The stream ends when the
-  /// consumer cancels.
-  public static func changes(under root: URL) -> AsyncStream<[String]> {
+  /// classification only needs directories) for every tree under `roots`.
+  /// The stream ends when the consumer cancels.
+  public static func changes(under roots: [URL]) -> AsyncStream<[String]> {
     AsyncStream { continuation in
       let queue = DispatchQueue(label: "com.spoon.fsevents")
 
@@ -52,7 +52,7 @@ public enum FSEventsWatcher {
         kCFAllocatorDefault,
         callback,
         &context,
-        [root.path(percentEncoded: false)] as CFArray,
+        roots.map { $0.path(percentEncoded: false) } as CFArray,
         FSEventStreamEventId(kFSEventStreamEventIdSinceNow),
         0.3,  // seconds of kernel-side coalescing
         FSEventStreamCreateFlags(kFSEventStreamCreateFlagNoDefer)

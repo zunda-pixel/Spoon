@@ -871,6 +871,10 @@ private actor FakeRepositoryGitClient: GitClient {
   func worktrees() async throws -> [Worktree] { currentWorktrees }
   func sequencerState() async throws -> SequencerState? { nil }
   func capabilities() async -> GitCapabilities { GitCapabilities() }
+  func repositoryPaths() async throws -> GitRepositoryPaths {
+    let dotGit = repositoryRoot.appending(path: ".git", directoryHint: .isDirectory)
+    return GitRepositoryPaths(gitDirectory: dotGit, commonDirectory: dotGit)
+  }
 
   func stage(paths: [String]) async throws {
     stageCallCount += 1

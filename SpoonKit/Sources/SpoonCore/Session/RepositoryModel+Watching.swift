@@ -4,8 +4,16 @@ extension RepositoryModel {
   public func startWatching() {
     guard watchTask == nil else { return }
     let root = repository.rootURL
+    let gitClient = gitClient
     watchTask = Task { [weak self] in
-      for await _ in RepoWatcher.changes(under: root) {
+      // A linked worktree's HEAD, index, and refs live outside its root.
+      let layout =
+        if let paths = try? await gitClient.repositoryPaths() {
+          RepoWatcher.Layout(root: root, paths: paths)
+        } else {
+          RepoWatcher.Layout(root: root)
+        }
+      for await _ in RepoWatcher.changes(in: layout) {
         guard let self else { break }
         if self.isBusy || self.isRefreshing { continue }
         await self.refresh()
