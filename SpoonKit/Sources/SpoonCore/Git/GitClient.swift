@@ -74,6 +74,10 @@ public protocol GitBranchClient: Sendable {
   /// reports the paths that would conflict. Changes no refs, index, or files.
   func mergePreview(branch: String) async throws -> MergePreview
   func deleteBranch(name: String, force: Bool) async throws
+  /// Whether every change of `branch` is already in `target`, even though
+  /// git's own check (`branch -d`) does not see it: the branch was rebased
+  /// onto `target` commit by commit, or squashed into a single commit there.
+  func isContentMerged(branch: String, into target: String) async throws -> Bool
   /// Deletes local branches whose work already landed on the upstream they
   /// track (`git branch --delete-merged`, requires
   /// `GitCapabilities.supportsDeleteMergedBranches`). git skips branches

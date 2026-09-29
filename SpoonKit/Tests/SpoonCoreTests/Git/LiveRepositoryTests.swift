@@ -489,6 +489,40 @@ struct LiveRepositoryTests {
     }
   }
 
+  @Test func squashAndRebaseMergedBranchesCountAsMerged() async throws {
+    let root = try await LiveRepoFixture.makeTemporaryRepo(
+      commits: [.init(file: "base.txt", content: "base\n", message: "base")],
+      runner: runner
+    )
+    defer { try? FileManager.default.removeItem(at: root) }
+    func git(_ arguments: [String]) async throws {
+      try await LiveRepoFixture.run(arguments, in: root, runner: runner)
+    }
+    func commit(_ file: String, _ message: String) async throws {
+      try await LiveRepoFixture.commitFile(
+        file, content: "\(message)\n", message: message, in: root, runner: runner)
+    }
+    let branches = [("squashed", ["s1", "s2"]), ("rebased", ["r1", "r2"]), ("open", ["o1"])]
+    for (branch, files) in branches {
+      try await git(["switch", "-c", branch, "main"])
+      for file in files { try await commit("\(file).txt", "\(branch) \(file)") }
+    }
+    try await git(["switch", "main"])
+    try await commit("main.txt", "main moves on")
+    try await git(["merge", "--squash", "squashed"])
+    try await git(["commit", "-m", "Squash-merge squashed"])
+    try await git(["cherry-pick", "main..rebased"])
+    let client = makeClient(root)
+
+    #expect(try await client.isContentMerged(branch: "squashed", into: "main"))
+    #expect(try await client.isContentMerged(branch: "rebased", into: "main"))
+    #expect(try await client.isContentMerged(branch: "open", into: "main") == false)
+    // git itself still calls the merged branches unmerged.
+    await #expect(throws: CommandError.self) {
+      try await client.deleteBranch(name: "squashed", force: false)
+    }
+  }
+
   @Test func cloneCreatesAWorkingLocalCopy() async throws {
     let source = try await LiveRepoFixture.makeTemporaryRepo(
       commits: [.init(file: "base.txt", content: "base\n", message: "base")],

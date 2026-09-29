@@ -196,6 +196,49 @@ extension RepositoryModel {
     return true
   }
 
+  /// How safe deleting a local branch is.
+  public enum BranchDeletionSafety: Sendable, Hashable {
+    /// `git branch -d` accepts it.
+    case merged
+    /// git needs `-D`, but every change is already in `target` (a squash or
+    /// rebase merge), so nothing is lost.
+    case contentMerged(into: String)
+    /// Deleting discards commits that exist nowhere else.
+    case unmerged
+
+    /// Whether the delete must use `-D`.
+    public var requiresForce: Bool { self != .merged }
+  }
+
+  public func deletionSafety(of branch: Branch) async -> BranchDeletionSafety {
+    guard await requiresForceDelete(branch) else { return .merged }
+    if let target = await contentMergedTarget(of: branch) {
+      return .contentMerged(into: target)
+    }
+    return .unmerged
+  }
+
+  /// The branch whose history already contains `branch`'s changes although
+  /// `git branch -d` refuses it, typically after a squash or rebase merge on
+  /// GitHub. Checks HEAD, the default branch, and its remote-tracking copy
+  /// (which is ahead after merging a pull request and fetching).
+  public func contentMergedTarget(of branch: Branch) async -> String? {
+    guard let defaultBranch = try? await gitClient.defaultBranch() else { return nil }
+    var targets = ["HEAD", defaultBranch]
+    if remotes.contains(where: { $0.name == "origin" }) {
+      targets.append("origin/\(defaultBranch)")
+    }
+    let knownRefs =
+      Set(branches.map(\.name))
+      .union(remoteBranchesByRemote.values.flatMap { $0.map(\.name) })
+    for target in targets where target == "HEAD" || knownRefs.contains(target) {
+      if (try? await gitClient.isContentMerged(branch: branch.name, into: target)) == true {
+        return target == "HEAD" ? (currentBranch?.name ?? "HEAD") : target
+      }
+    }
+    return nil
+  }
+
   public func deleteBranch(
     name: String,
     force: Bool = false,

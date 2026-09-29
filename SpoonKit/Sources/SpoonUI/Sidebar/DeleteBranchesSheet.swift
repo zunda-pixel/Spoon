@@ -9,6 +9,9 @@ struct DeleteBranchesSheet: View {
   let branches: [Branch]
   @Environment(\.dismiss) private var dismiss
   @State private var unmergedNames: Set<String>?
+  /// Branches git calls unmerged whose changes are already in the default
+  /// branch (squash or rebase merges); deleted with -D without asking.
+  @State private var contentMergedNames: Set<String> = []
   @State private var forceDelete = false
   @State private var deleteRemoteBranches = false
 
@@ -28,6 +31,10 @@ struct DeleteBranchesSheet: View {
             Text("Unmerged")
               .font(.caption)
               .foregroundStyle(.orange)
+          } else if contentMergedNames.contains(branch.name) {
+            Text("Squash or rebase merged")
+              .font(.caption)
+              .foregroundStyle(.secondary)
           }
         }
       }
@@ -65,9 +72,15 @@ struct DeleteBranchesSheet: View {
     }
     .task {
       var unmerged: Set<String> = []
-      for branch in deletable where await model.requiresForceDelete(branch) {
-        unmerged.insert(branch.name)
+      var contentMerged: Set<String> = []
+      for branch in deletable {
+        switch await model.deletionSafety(of: branch) {
+        case .unmerged: unmerged.insert(branch.name)
+        case .contentMerged: contentMerged.insert(branch.name)
+        case .merged: break
+        }
       }
+      contentMergedNames = contentMerged
       unmergedNames = unmerged
     }
   }
@@ -100,7 +113,8 @@ struct DeleteBranchesSheet: View {
     let deletions = targets.map { branch in
       RepositoryModel.BranchDeletion(
         name: branch.name,
-        force: unmergedNames?.contains(branch.name) == true,
+        force: unmergedNames?.contains(branch.name) == true
+          || contentMergedNames.contains(branch.name),
         remoteUpstream: deleteRemoteBranches ? model.existingRemoteUpstream(of: branch) : nil
       )
     }

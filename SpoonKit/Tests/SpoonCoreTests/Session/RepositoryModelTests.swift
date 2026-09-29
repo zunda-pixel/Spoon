@@ -1093,6 +1093,27 @@ struct RepositoryModelTests {
     )
   }
 
+  @Test func squashMergedBranchesAreSafeToDeleteWithForce() async {
+    let client = FakeRepositoryGitClient()
+    let head = makeOID("aaaa1111")
+    let squashed = makeBranch("squashed", oid: makeOID("bbbb2222"), isCurrent: false)
+    let open = makeBranch("open", oid: makeOID("cccc3333"), isCurrent: false)
+    await client.configure(
+      status: makeStatus(oid: head, branch: "topic"),
+      branches: [makeBranch("topic", oid: head, isCurrent: true), squashed, open],
+      remotes: [Remote(name: "origin", fetchURL: "https://example.com/r.git")],
+      remoteBranchesByRemote: ["origin": [makeBranch("origin/main", oid: head, isCurrent: false)]],
+      mergeBases: ["squashed...HEAD": head, "open...HEAD": head]
+    )
+    await client.setContentMerged(["squashed>origin/main"])
+    let model = makeModel(client)
+    await model.refresh()
+
+    #expect(await model.deletionSafety(of: squashed) == .contentMerged(into: "origin/main"))
+    #expect(await model.deletionSafety(of: open) == .unmerged)
+    #expect(RepositoryModel.BranchDeletionSafety.contentMerged(into: "main").requiresForce)
+  }
+
   @Test func refreshErrorClearsOnceRefreshRecovers() async {
     let client = FakeRepositoryGitClient()
     let oid = makeOID("99999999")
@@ -1179,6 +1200,7 @@ private actor FakeRepositoryGitClient: GitClient {
 
   private var currentStatus = WorkingTreeStatus()
   private var currentCapabilities = GitCapabilities()
+  private var contentMerged: Set<String> = []
   private var currentBisectState: BisectState?
   private var previousTips: [String: ObjectID] = [:]
   func setPreviousTip(_ oid: ObjectID, of reference: String) { previousTips[reference] = oid }
@@ -1317,6 +1339,10 @@ private actor FakeRepositoryGitClient: GitClient {
   func deleteBranch(name: String, force: Bool) async throws {
     mutationCalls.append("delete-local:\(name):\(force)")
   }
+  func isContentMerged(branch: String, into target: String) async throws -> Bool {
+    contentMerged.contains("\(branch)>\(target)")
+  }
+  func setContentMerged(_ pairs: Set<String>) { contentMerged = pairs }
   func deleteMergedBranches(branches: [String], dryRun: Bool) async throws -> [String] {
     mutationCalls.append("delete-merged:\(branches.joined(separator: ",")):\(dryRun)")
     return dryRun ? ["merged"] : branches
