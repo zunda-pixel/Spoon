@@ -10,7 +10,7 @@ public struct RepositoryGitSnapshot: Sendable, Hashable {
   public var tags: [Tag]
   public var worktrees: [Worktree]
   public var sequencerState: SequencerState?
-  public var supportsBackfill: Bool
+  public var capabilities: GitCapabilities
 
   public init(
     status: WorkingTreeStatus,
@@ -21,7 +21,7 @@ public struct RepositoryGitSnapshot: Sendable, Hashable {
     tags: [Tag],
     worktrees: [Worktree],
     sequencerState: SequencerState?,
-    supportsBackfill: Bool
+    capabilities: GitCapabilities
   ) {
     self.status = status
     self.branches = branches
@@ -31,7 +31,7 @@ public struct RepositoryGitSnapshot: Sendable, Hashable {
     self.tags = tags
     self.worktrees = worktrees
     self.sequencerState = sequencerState
-    self.supportsBackfill = supportsBackfill
+    self.capabilities = capabilities
   }
 
   static func load(from gitClient: any GitClient) async throws -> Self {
@@ -42,7 +42,7 @@ public struct RepositoryGitSnapshot: Sendable, Hashable {
     async let tags = gitClient.tags()
     async let worktrees = gitClient.worktrees()
     async let sequencerState = gitClient.sequencerState()
-    async let supportsBackfill = gitClient.supportsBackfill()
+    async let capabilities = gitClient.capabilities()
 
     let loadedRemotes = try await remotes
     let remoteBranchesByRemote = try await loadRemoteBranches(
@@ -59,7 +59,7 @@ public struct RepositoryGitSnapshot: Sendable, Hashable {
       tags: tags,
       worktrees: worktrees,
       sequencerState: sequencerState,
-      supportsBackfill: supportsBackfill
+      capabilities: capabilities
     )
   }
 
@@ -140,6 +140,6 @@ extension RepositoryModel {
     tags = snapshot.tags
     worktrees = snapshot.worktrees
     sequencerState = snapshot.sequencerState
-    supportsBackfill = snapshot.supportsBackfill
+    gitCapabilities = snapshot.capabilities
   }
 }

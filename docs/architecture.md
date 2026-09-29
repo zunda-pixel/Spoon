@@ -9,6 +9,7 @@ presentation (`SpoonUI`). The app target owns scene and application lifecycle.
 `GitClient.swift` divides repository behavior into focused, `Sendable`
 protocols:
 
+- `GitCapabilityClient`
 - `GitWorkingTreeClient`
 - `GitHistoryClient`
 - `GitBranchClient`

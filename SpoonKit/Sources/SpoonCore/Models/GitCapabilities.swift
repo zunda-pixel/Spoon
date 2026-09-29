@@ -1,0 +1,39 @@
+/// A `major.minor.patch` git release, ignoring vendor and release-candidate suffixes.
+public struct GitVersion: Sendable, Hashable, Comparable, CustomStringConvertible {
+  public var major: Int
+  public var minor: Int
+  public var patch: Int
+
+  public init(_ major: Int, _ minor: Int, _ patch: Int = 0) {
+    self.major = major
+    self.minor = minor
+    self.patch = patch
+  }
+
+  public var description: String { "\(major).\(minor).\(patch)" }
+
+  public static func < (lhs: Self, rhs: Self) -> Bool {
+    (lhs.major, lhs.minor, lhs.patch) < (rhs.major, rhs.minor, rhs.patch)
+  }
+}
+
+/// Optional git features Spoon can use, derived from the installed git version.
+///
+/// Every feature defaults to unavailable, so an unknown or unparsable version
+/// hides version-gated UI instead of offering commands git would reject.
+public struct GitCapabilities: Sendable, Hashable {
+  /// `nil` when `git version` failed or printed something unrecognizable.
+  public var version: GitVersion?
+
+  public init(version: GitVersion? = nil) {
+    self.version = version
+  }
+
+  /// `git backfill` (2.49+).
+  public var supportsBackfill: Bool { supports(GitVersion(2, 49)) }
+
+  private func supports(_ minimum: GitVersion) -> Bool {
+    guard let version else { return false }
+    return version >= minimum
+  }
+}

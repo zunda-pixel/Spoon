@@ -65,11 +65,6 @@ extension SystemGitClient {
     try await runVoid(["fetch", "--all", "--prune"], timeout: .seconds(300))
   }
 
-  public func supportsBackfill() async -> Bool {
-    guard let result = try? await run(["version"], timeout: .seconds(10)) else { return false }
-    return GitVersionParser.supportsBackfill(result.standardOutputText)
-  }
-
   public func backfill() async throws {
     try await runVoid(["backfill"], timeout: .seconds(3600))
   }
