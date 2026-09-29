@@ -55,6 +55,15 @@ public protocol GitBranchClient: Sendable {
   func switchToRemoteBranch(_ remoteBranch: String) async throws
   func merge(branch: String, options: MergeOptions) async throws
   func deleteBranch(name: String, force: Bool) async throws
+  /// Deletes local branches whose work already landed on the upstream they
+  /// track (`git branch --delete-merged`, requires
+  /// `GitCapabilities.supportsDeleteMergedBranches`). git skips branches
+  /// checked out in any worktree, branches that push to their own upstream,
+  /// bases of other branches, and `branch.<name>.deleteMerged = false`.
+  /// `branches` restricts the candidates; empty means every local branch.
+  /// Returns the branch names deleted, or that would be with `dryRun`.
+  @discardableResult
+  func deleteMergedBranches(branches: [String], dryRun: Bool) async throws -> [String]
   func renameBranch(from oldName: String, to newName: String) async throws
   func setUpstream(of branch: String, to upstream: String) async throws
   func defaultBranch() async throws -> String

@@ -71,6 +71,13 @@ public struct SpoonCommands: Commands {
       .keyboardShortcut("n", modifiers: [.shift, .command])
       .disabled(repositoryMutationUnavailable)
 
+      if model?.gitCapabilities.supportsDeleteMergedBranches == true {
+        Button("Delete Merged Branches…") {
+          navigation?.present(.deleteMergedBranches)
+        }
+        .disabled(unavailable)
+      }
+
       Button("Sparse Checkout…") {
         navigation?.present(.sparseCheckout)
       }

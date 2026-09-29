@@ -205,6 +205,27 @@ struct SystemGitClientTests {
     #expect(runner.invocations.count == 2)
   }
 
+  @Test func deleteMergedBranchesSendsExactArgv() async throws {
+    let runner = FakeCommandRunner()
+    runner.stub(
+      arguments: baseFlags + ["branch", "--delete-merged", "**", "--dry-run"],
+      stdout: "Would delete branch feature/a (was 1234567).\n"
+        + "Would delete branch b (was 89abcde).\n",
+      stderr: "Skipping 'keep' (branch.keep.deleteMerged is false)\n"
+    )
+    runner.stub(
+      arguments: baseFlags + ["branch", "--delete-merged", "**", "feature/a", "b"],
+      stdout: "Deleted branch feature/a (was 1234567).\n"
+    )
+    let client = makeClient(runner)
+
+    let preview = try await client.deleteMergedBranches(branches: [], dryRun: true)
+    let deleted = try await client.deleteMergedBranches(branches: preview, dryRun: false)
+
+    #expect(preview == ["feature/a", "b"])
+    #expect(deleted == ["feature/a"])
+  }
+
   @Test func failedVersionProbeIsRetried() async {
     let runner = FakeCommandRunner()
     runner.stub(arguments: baseFlags + ["version"], stdout: "not a version\n")

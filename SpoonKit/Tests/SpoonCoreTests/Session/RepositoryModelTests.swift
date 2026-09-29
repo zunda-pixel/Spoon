@@ -763,6 +763,23 @@ struct RepositoryModelTests {
     #expect(await client.mutationCalls == ["drop:aaaa1111:false"])
   }
 
+  @Test func deleteMergedBranchesDeletesOnlyThePreviewedNames() async {
+    let client = FakeRepositoryGitClient()
+    let head = makeOID("aaaa1111")
+    await client.configure(
+      status: makeStatus(oid: head, branch: "main"),
+      branches: [makeBranch("main", oid: head, isCurrent: true)]
+    )
+    let model = makeModel(client)
+
+    let preview = (try? await model.mergedBranchesToDelete()) ?? []
+    await model.deleteMergedBranches(preview)
+    await model.deleteMergedBranches([])
+
+    #expect(preview == ["merged"])
+    #expect(await client.mutationCalls == ["delete-merged::true", "delete-merged:merged:false"])
+  }
+
   @Test func refreshErrorClearsOnceRefreshRecovers() async {
     let client = FakeRepositoryGitClient()
     let oid = makeOID("99999999")
@@ -956,6 +973,10 @@ private actor FakeRepositoryGitClient: GitClient {
   func merge(branch: String, options: MergeOptions) async throws { throw Failure.unimplemented }
   func deleteBranch(name: String, force: Bool) async throws {
     mutationCalls.append("delete-local:\(name):\(force)")
+  }
+  func deleteMergedBranches(branches: [String], dryRun: Bool) async throws -> [String] {
+    mutationCalls.append("delete-merged:\(branches.joined(separator: ",")):\(dryRun)")
+    return dryRun ? ["merged"] : branches
   }
   func renameBranch(from oldName: String, to newName: String) async throws {
     mutationCalls.append("rename-local:\(oldName):\(newName)")

@@ -36,6 +36,21 @@ public enum GitRefParser {
 
   /// `%(upstream:track)` renders as `[ahead 1, behind 2]`, `[ahead 1]`,
   /// `[behind 2]`, `[gone]`, or empty (in sync / no upstream).
+  /// Branch names from `git branch -d`/`--delete-merged` reports:
+  /// `Deleted branch <name> (was <oid>).` or, with `--dry-run`,
+  /// `Would delete branch <name> (was <oid>).` (LC_ALL=C keeps them English).
+  public static func parseDeletedBranchNames(_ output: String) -> [String] {
+    output.split(whereSeparator: \.isNewline).compactMap { line in
+      let prefixes = ["Deleted branch ", "Would delete branch "]
+      guard
+        let prefix = prefixes.first(where: { line.hasPrefix($0) }),
+        let suffix = line.range(of: " (was ", options: .backwards)
+      else { return nil }
+      let name = line[line.index(line.startIndex, offsetBy: prefix.count)..<suffix.lowerBound]
+      return name.isEmpty ? nil : String(name)
+    }
+  }
+
   private static func parseTrack(_ field: Substring) -> (ahead: Int?, behind: Int?, gone: Bool) {
     guard field.hasPrefix("["), field.hasSuffix("]") else { return (nil, nil, false) }
     let inner = field.dropFirst().dropLast()
