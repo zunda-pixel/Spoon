@@ -97,6 +97,12 @@ public struct SpoonCommands: Commands {
       .keyboardShortcut("s", modifiers: [.option, .command])
       .disabled(repositoryMutationUnavailable || model?.status?.isClean != false)
 
+      Button("Stash with Options…") {
+        navigation?.present(.stashChanges(paths: []))
+      }
+      .keyboardShortcut("s", modifiers: [.option, .shift, .command])
+      .disabled(repositoryMutationUnavailable || model?.status?.isClean != false)
+
       if let state = model?.sequencerState {
         Divider()
 

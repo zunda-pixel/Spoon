@@ -104,6 +104,19 @@ struct GitOutputHelperTests {
     #expect(GitSignatureParser.parse("") == nil)
   }
 
+  @Test func stashOptionsBuildPushArguments() {
+    #expect(StashSaveOptions().arguments.isEmpty)
+    #expect(
+      StashSaveOptions(message: " wip ", includeUntracked: true, paths: ["a.txt", "-odd"])
+        .arguments == ["--include-untracked", "-m", "wip", "--", "a.txt", "-odd"]
+    )
+    #expect(StashSaveOptions(scope: .stagedOnly, includeUntracked: true).arguments == ["--staged"])
+    #expect(
+      StashSaveOptions(scope: .keepingIndex, includeUntracked: true).arguments
+        == ["--keep-index", "--include-untracked"]
+    )
+  }
+
   @Test func untrackedDiffBuilderCreatesTextPatch() {
     let diff = UntrackedDiffBuilder.make(path: "notes.txt", data: Data("first\nsecond".utf8))
 

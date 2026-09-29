@@ -1,3 +1,5 @@
+import Foundation
+
 /// One entry from `git stash list`.
 public struct Stash: Sendable, Hashable, Identifiable {
   /// Position in the stash stack (`stash@{index}`).
@@ -24,4 +26,57 @@ public struct Stash: Sendable, Hashable, Identifiable {
   public var id: Int { index }
 
   public var reference: String { "stash@{\(index)}" }
+}
+
+/// What `git stash push` saves.
+public struct StashSaveOptions: Sendable, Hashable {
+  public enum Scope: Sendable, Hashable {
+    /// Staged and unstaged changes; both are removed from the working tree.
+    case allChanges
+    /// Only the staged changes (`--staged`); unstaged edits stay in place.
+    case stagedOnly
+    /// Everything, but the staged changes also stay in the index and
+    /// working tree (`--keep-index`).
+    case keepingIndex
+  }
+
+  public var message: String?
+  public var scope: Scope
+  /// Also stash untracked files. Not available with `.stagedOnly`.
+  public var includeUntracked: Bool
+  /// Limits the stash to these paths; empty means every change.
+  public var paths: [String]
+
+  public init(
+    message: String? = nil,
+    scope: Scope = .allChanges,
+    includeUntracked: Bool = false,
+    paths: [String] = []
+  ) {
+    self.message = message
+    self.scope = scope
+    self.includeUntracked = includeUntracked
+    self.paths = paths
+  }
+
+  /// `git stash push` arguments after `push`.
+  var arguments: [String] {
+    var arguments: [String] = []
+    switch scope {
+    case .allChanges: break
+    case .stagedOnly: arguments.append("--staged")
+    case .keepingIndex: arguments.append("--keep-index")
+    }
+    if includeUntracked, scope != .stagedOnly {
+      arguments.append("--include-untracked")
+    }
+    if let message = message?.trimmingCharacters(in: .whitespacesAndNewlines), !message.isEmpty {
+      arguments.append(contentsOf: ["-m", message])
+    }
+    if !paths.isEmpty {
+      arguments.append("--")
+      arguments.append(contentsOf: paths)
+    }
+    return arguments
+  }
 }

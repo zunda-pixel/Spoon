@@ -26,6 +26,7 @@ final class RepositoryNavigationState {
   enum ActiveSheet: Hashable, Identifiable {
     case newBranch(startPoint: String?)
     case sparseCheckout
+    case stashChanges(paths: [String])
     case dropLargeBlobs
     case backfill
     case fileHistory(path: String)
@@ -54,6 +55,8 @@ final class RepositoryNavigationState {
         "new-branch:\(startPoint ?? "HEAD")"
       case .sparseCheckout:
         "sparse-checkout"
+      case .stashChanges(let paths):
+        "stash-changes:\(paths.joined(separator: "\u{0}"))"
       case .dropLargeBlobs:
         "drop-large-blobs"
       case .backfill:
