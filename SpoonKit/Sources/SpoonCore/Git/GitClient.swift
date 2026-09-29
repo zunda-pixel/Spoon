@@ -42,6 +42,14 @@ public protocol GitWorkingTreeClient: Sendable {
   func discardWorkingTree(paths: [String]) async throws
   /// Deletes untracked files.
   func deleteUntracked(paths: [String]) async throws
+  /// Untracked paths the ignore rules hide, a wholly ignored folder as one
+  /// `folder/` entry (`git ls-files --others --ignored --directory`).
+  func ignoredPaths() async throws -> [String]
+  /// The pattern that last matched each path (`git check-ignore`); `nil`
+  /// for a path no pattern matches.
+  func ignoreRules(for paths: [String]) async throws -> [String: IgnoreRule?]
+  /// Whether `path` is in the index, where ignore rules don't apply.
+  func isTracked(path: String) async throws -> Bool
   /// Commits staged changes; message may be multi-line.
   func commit(message: String, options: CommitOptions) async throws
   /// Whether and how git signs new commits here (`commit.gpgSign`,

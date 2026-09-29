@@ -133,6 +133,34 @@ extension SystemGitClient {
     try await runVoid(["clean", "-f", "--"] + paths)
   }
 
+  public func ignoredPaths() async throws -> [String] {
+    let result = try await run(
+      ["ls-files", "-z", "--others", "--ignored", "--exclude-standard", "--directory"],
+      timeout: .seconds(60)
+    )
+    return result.standardOutputText.split(separator: "\0").map(String.init)
+  }
+
+  public func ignoreRules(for paths: [String]) async throws -> [String: IgnoreRule?] {
+    guard !paths.isEmpty else { return [:] }
+    var command = GitCommand.make(
+      git: git,
+      repository: repositoryRoot,
+      arguments: ["check-ignore", "--stdin", "-z", "--verbose", "--non-matching"],
+      timeout: .seconds(60)
+    )
+    command.standardInput = Data(paths.map { $0 + "\0" }.joined().utf8)
+    let result = try await runner.run(command)
+    // Exit 1 means no path matched a pattern; the records still list them.
+    if result.exitCode != 1 { _ = try result.checkSuccess(of: command) }
+    return IgnoreRule.parse(result.standardOutputText)
+  }
+
+  public func isTracked(path: String) async throws -> Bool {
+    let result = try await run(["ls-files", "-z", "--", path])
+    return !result.standardOutput.isEmpty
+  }
+
   public func commitFixup(for oid: ObjectID) async throws {
     try await runVoid(
       ["commit", "--fixup=\(oid.rawValue)"],

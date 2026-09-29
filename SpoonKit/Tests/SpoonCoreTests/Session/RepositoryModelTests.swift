@@ -1481,6 +1481,9 @@ private actor FakeRepositoryGitClient: GitClient {
     mutationCalls.append("restore:\(path):\(revision.rawValue)")
   }
   func deleteUntracked(paths: [String]) async throws { throw Failure.unimplemented }
+  func ignoredPaths() async throws -> [String] { [] }
+  func ignoreRules(for paths: [String]) async throws -> [String: IgnoreRule?] { [:] }
+  func isTracked(path: String) async throws -> Bool { false }
   private var commitsSucceed = false
   func allowCommits() { commitsSucceed = true }
   func commit(message: String, options: CommitOptions) async throws {
