@@ -11,8 +11,11 @@ public struct FileTreeNode: Sendable, Hashable, Identifiable {
   public var entry: FileStatusEntry?
   /// nil for files, the sorted children for directories.
   public var children: [FileTreeNode]?
+  /// Distinguishes trees shown in one list: the same folder or file can be in
+  /// several areas at once (e.g. partly staged), and list rows need unique IDs.
+  public var namespace: String = ""
 
-  public var id: String { path }
+  public var id: String { namespace.isEmpty ? path : "\(namespace)|\(path)" }
 }
 
 /// The Changes list's four area trees for one status snapshot, built once
@@ -37,10 +40,10 @@ public struct ChangeTrees: Sendable, Hashable {
   }
 
   public init(status: WorkingTreeStatus) {
-    conflicted = FileTreeBuilder.build(status.conflictedEntries)
-    staged = FileTreeBuilder.build(status.stagedEntries)
-    unstaged = FileTreeBuilder.build(status.unstagedEntries)
-    untracked = FileTreeBuilder.build(status.untrackedEntries)
+    conflicted = FileTreeBuilder.build(status.conflictedEntries, namespace: "conflicted")
+    staged = FileTreeBuilder.build(status.stagedEntries, namespace: "staged")
+    unstaged = FileTreeBuilder.build(status.unstagedEntries, namespace: "unstaged")
+    untracked = FileTreeBuilder.build(status.untrackedEntries, namespace: "untracked")
   }
 }
 
@@ -48,13 +51,15 @@ public struct ChangeTrees: Sendable, Hashable {
 public enum FileTreeBuilder {
   /// Directories sort before files, each alphabetically; single-child
   /// directory chains fold into one node so deep paths stay scannable.
-  public static func build(_ entries: [FileStatusEntry]) -> [FileTreeNode] {
+  public static func build(_ entries: [FileStatusEntry], namespace: String = "")
+    -> [FileTreeNode]
+  {
     let root = Directory()
     for entry in entries {
       let components = entry.path.split(separator: "/").map(String.init)
       guard var fileName = components.last else { continue }
-      // Untracked directories arrive as one entry with a trailing slash;
-      // keep it so the row reads as a directory.
+      // A nested repository still arrives as one untracked entry with a
+      // trailing slash; keep it so the row reads as a directory.
       if entry.path.hasSuffix("/") {
         fileName += "/"
       }
@@ -64,7 +69,7 @@ public enum FileTreeBuilder {
       }
       directory.files.append((fileName, entry))
     }
-    return nodes(of: root, pathPrefix: "")
+    return nodes(of: root, pathPrefix: "", namespace: namespace)
   }
 
   /// The files of `nodes` in depth-first display order — the flat order
@@ -93,7 +98,9 @@ public enum FileTreeBuilder {
     }
   }
 
-  private static func nodes(of directory: Directory, pathPrefix: String) -> [FileTreeNode] {
+  private static func nodes(
+    of directory: Directory, pathPrefix: String, namespace: String
+  ) -> [FileTreeNode] {
     var result: [FileTreeNode] = []
     for (name, subdirectory) in directory.subdirectories.sorted(by: { compare($0.key, $1.key) }) {
       // Fold chains of empty directories with a single subdirectory.
@@ -110,12 +117,16 @@ public enum FileTreeBuilder {
         FileTreeNode(
           name: foldedName,
           path: path,
-          children: nodes(of: current, pathPrefix: path + "/")
+          children: nodes(of: current, pathPrefix: path + "/", namespace: namespace),
+          namespace: namespace
         )
       )
     }
     for (name, entry) in directory.files.sorted(by: { compare($0.name, $1.name) }) {
-      result.append(FileTreeNode(name: name, path: entry.path, entry: entry, children: nil))
+      result.append(
+        FileTreeNode(
+          name: name, path: entry.path, entry: entry, children: nil, namespace: namespace)
+      )
     }
     return result
   }

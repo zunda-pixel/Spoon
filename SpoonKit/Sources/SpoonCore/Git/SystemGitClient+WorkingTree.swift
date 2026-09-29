@@ -26,7 +26,11 @@ extension SystemGitClient {
   }
 
   public func status() async throws -> WorkingTreeStatus {
-    let result = try await run(["status", "--porcelain=v2", "--branch", "--show-stash", "-z"])
+    // `all` lists each file of a new folder instead of one `folder/` entry,
+    // so every untracked file can be diffed, staged, and discarded on its own.
+    let result = try await run([
+      "status", "--porcelain=v2", "--branch", "--show-stash", "--untracked-files=all", "-z",
+    ])
     return try GitStatusParser.parse(result.standardOutput)
   }
 
@@ -47,6 +51,11 @@ extension SystemGitClient {
 
   public func untrackedFileDiff(path: String) async throws -> FileDiff {
     let url = repositoryRoot.appending(path: path)
+    if (try? url.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory == true {
+      // Even with --untracked-files=all, git reports a nested repository as
+      // a single folder entry.
+      throw UntrackedDiffError.nestedRepository(path: path)
+    }
     let data = try Data(contentsOf: url)
     return UntrackedDiffBuilder.make(path: path, data: data)
   }
