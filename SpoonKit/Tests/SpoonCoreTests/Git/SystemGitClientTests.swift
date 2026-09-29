@@ -275,6 +275,22 @@ struct SystemGitClientTests {
     #expect(runner.invocations.count == 2)
   }
 
+  @Test func replayBranchSendsExactArgv() async throws {
+    let runner = FakeCommandRunner()
+    let base = try #require(ObjectID(rawValue: String(repeating: "a", count: 40)))
+    let replay = ["replay", "--onto=\(base.rawValue)", "--ref-action=update"]
+    runner.stub(arguments: baseFlags + replay + ["\(base.rawValue)..refs/heads/topic"])
+    runner.stub(
+      arguments: baseFlags + replay + ["--linearize", "\(base.rawValue)..refs/heads/topic"]
+    )
+    let client = makeClient(runner)
+
+    try await client.replayBranch("topic", onto: base, linearize: false)
+    try await client.replayBranch("topic", onto: base, linearize: true)
+
+    #expect(runner.invocations.count == 2)
+  }
+
   @Test func failedVersionProbeIsRetried() async {
     let runner = FakeCommandRunner()
     runner.stub(arguments: baseFlags + ["version"], stdout: "not a version\n")

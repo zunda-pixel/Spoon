@@ -149,6 +149,11 @@ public protocol GitSequencerClient: Sendable {
   /// overwrite. `dryRun` reports the ref updates without applying them.
   @discardableResult
   func dropCommit(_ oid: ObjectID, dryRun: Bool) async throws -> [RefUpdate]
+  /// Rebases local `branch` onto `newBase` without touching the index or any
+  /// worktree (`git replay`, requires `GitCapabilities.supportsReplayLinearize`).
+  /// The branch is updated atomically, or not at all on conflicts.
+  /// `linearize` drops merge commits and replays their commits individually.
+  func replayBranch(_ branch: String, onto newBase: ObjectID, linearize: Bool) async throws
   /// `nil` when no rebase/cherry-pick/revert is in progress.
   func sequencerState() async throws -> SequencerState?
   func continueSequencer(_ kind: SequencerState.Kind) async throws
