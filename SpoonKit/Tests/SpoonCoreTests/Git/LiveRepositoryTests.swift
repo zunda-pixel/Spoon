@@ -82,6 +82,18 @@ struct LiveRepositoryTests {
     #expect(topic?.tip == first)
   }
 
+  @Test func partialCloneRemoteIsNilUntilConfigured() async throws {
+    let root = try await LiveRepoFixture.makeTemporaryRepo(runner: runner)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let client = makeClient(root)
+
+    #expect(try await client.partialCloneRemote() == nil)
+    try await LiveRepoFixture.run(
+      ["config", "extensions.partialClone", "origin"], in: root, runner: runner
+    )
+    #expect(try await client.partialCloneRemote() == "origin")
+  }
+
   @Test func cloneCreatesAWorkingLocalCopy() async throws {
     let source = try await LiveRepoFixture.makeTemporaryRepo(
       commits: [.init(file: "base.txt", content: "base\n", message: "base")],

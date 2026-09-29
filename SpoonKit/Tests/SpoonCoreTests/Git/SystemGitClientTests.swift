@@ -291,6 +291,32 @@ struct SystemGitClientTests {
     #expect(runner.invocations.count == 2)
   }
 
+  @Test func partialCloneRemoteReadsExtensionConfig() async throws {
+    let runner = FakeCommandRunner()
+    let key = baseFlags + ["config", "--get", "extensions.partialClone"]
+    runner.stub(arguments: key, stdout: "origin\n")
+    #expect(try await makeClient(runner).partialCloneRemote() == "origin")
+
+    let fullClone = FakeCommandRunner()
+    fullClone.stub(arguments: key, exitCode: 1)
+    #expect(try await makeClient(fullClone).partialCloneRemote() == nil)
+  }
+
+  @Test func dropLargeBlobsSendsExactArgv() async throws {
+    let runner = FakeCommandRunner()
+    runner.stub(
+      arguments: baseFlags + [
+        "repack", "-a", "-d", "--drop-filtered", "--filter=blob:limit=1048576",
+        "--no-write-bitmap-index",
+      ]
+    )
+
+    try await makeClient(runner).dropLargeBlobs(largerThan: 1_048_576)
+
+    let command = try #require(runner.invocations.first)
+    #expect(command.timeout == .seconds(3600))
+  }
+
   @Test func failedVersionProbeIsRetried() async {
     let runner = FakeCommandRunner()
     runner.stub(arguments: baseFlags + ["version"], stdout: "not a version\n")

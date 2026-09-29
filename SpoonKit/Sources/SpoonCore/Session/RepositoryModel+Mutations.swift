@@ -324,6 +324,16 @@ extension RepositoryModel {
     await perform { try await $0.backfill() }
   }
 
+  /// Whether "Remove Large Downloaded Blobs" applies: a partial clone on a
+  /// git that supports `repack --drop-filtered`.
+  public var canDropLargeBlobs: Bool {
+    gitCapabilities.supportsRepackDropFiltered && partialCloneRemote != nil
+  }
+
+  public func dropLargeBlobs(largerThan byteLimit: Int) async {
+    await perform { try await $0.dropLargeBlobs(largerThan: byteLimit) }
+  }
+
   public func pull() async {
     await perform { try await $0.pull() }
   }

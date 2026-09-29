@@ -18,6 +18,8 @@ struct RepositorySheetHost: ViewModifier {
         NewBranchSheet(model: model, startPoint: startPoint)
       case .sparseCheckout:
         SparseCheckoutSheet(model: model)
+      case .dropLargeBlobs:
+        DropLargeBlobsSheet(model: model)
       case .fileHistory(let path):
         FileHistorySheet(model: model, path: path)
       case .addRemote:
