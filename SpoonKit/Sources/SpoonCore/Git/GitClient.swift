@@ -43,7 +43,10 @@ public protocol GitWorkingTreeClient: Sendable {
   /// Deletes untracked files.
   func deleteUntracked(paths: [String]) async throws
   /// Commits staged changes; message may be multi-line.
-  func commit(message: String, amend: Bool) async throws
+  func commit(message: String, options: CommitOptions) async throws
+  /// Whether and how git signs new commits here (`commit.gpgSign`,
+  /// `gpg.format`, `user.signingKey`).
+  func commitSigningConfiguration() async throws -> CommitSigningConfiguration
   /// Commits the staged changes as `fixup! <subject of oid>`, to be folded
   /// into that commit later by `autosquash(onto:)`.
   func commitFixup(for oid: ObjectID) async throws
@@ -302,6 +305,10 @@ extension GitStashClient {
 }
 
 extension GitWorkingTreeClient {
+  public func commit(message: String, amend: Bool) async throws {
+    try await commit(message: message, options: CommitOptions(amend: amend))
+  }
+
   public func diffWorkingTree(path: String?, staged: Bool) async throws -> [FileDiff] {
     try await diffWorkingTree(path: path, staged: staged, options: .standard)
   }

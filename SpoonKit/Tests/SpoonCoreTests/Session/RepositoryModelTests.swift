@@ -673,6 +673,25 @@ struct RepositoryModelTests {
     #expect(model.lastErrorMessage == FakeRepositoryGitClient.Failure.refresh.localizedDescription)
   }
 
+  @Test func signOffIsRememberedPerRepositoryAndAddedToCommits() async {
+    let client = FakeRepositoryGitClient()
+    await client.allowCommits()
+    let root = URL(filePath: "/tmp/sign-off-\(UUID().uuidString)")
+    let model = RepositoryModel(repository: Repository(rootURL: root), gitClient: client)
+    #expect(!model.commitSignsOff)
+
+    model.commitSignsOff = true
+    defer { model.commitSignsOff = false }
+    #expect(await model.commit(message: "message"))
+    #expect(await model.commit(message: "amend", amend: true))
+
+    #expect(
+      await client.mutationCalls == ["commit:false:true:configured", "commit:true:true:configured"])
+    let reopened = RepositoryModel(repository: Repository(rootURL: root), gitClient: client)
+    #expect(reopened.commitSignsOff)
+    #expect(!makeModel(client).commitSignsOff)
+  }
+
   @Test func failedMutationErrorSurvivesTheFollowUpRefresh() async {
     let client = FakeRepositoryGitClient()
     let oid = makeOID("88888888")
@@ -1382,7 +1401,15 @@ private actor FakeRepositoryGitClient: GitClient {
     mutationCalls.append("restore:\(path):\(revision.rawValue)")
   }
   func deleteUntracked(paths: [String]) async throws { throw Failure.unimplemented }
-  func commit(message: String, amend: Bool) async throws { throw Failure.unimplemented }
+  private var commitsSucceed = false
+  func allowCommits() { commitsSucceed = true }
+  func commit(message: String, options: CommitOptions) async throws {
+    guard commitsSucceed else { throw Failure.unimplemented }
+    mutationCalls.append("commit:\(options.amend):\(options.signOff):\(options.signing)")
+  }
+  func commitSigningConfiguration() async throws -> CommitSigningConfiguration {
+    CommitSigningConfiguration()
+  }
   func commitFixup(for oid: ObjectID) async throws {
     mutationCalls.append("fixup-commit:\(oid.rawValue)")
   }

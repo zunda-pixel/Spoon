@@ -19,6 +19,38 @@ struct LiveGitTests {
     try await LiveRepoFixture.run(arguments, in: root, runner: runner)
   }
 
+  @Test func commitsCanBeSignedWithAnSSHKeyAndSignedOff() async throws {
+    let root = try await makeTemporaryRepo()
+    let keyDirectory = URL.temporaryDirectory.appending(path: "spoon-key-\(UUID().uuidString)")
+    defer {
+      try? FileManager.default.removeItem(at: root)
+      try? FileManager.default.removeItem(at: keyDirectory)
+    }
+    try FileManager.default.createDirectory(at: keyDirectory, withIntermediateDirectories: true)
+    let key = keyDirectory.appending(path: "id_ed25519")
+    let keygen = Command(
+      executable: URL(filePath: "/usr/bin/ssh-keygen"),
+      arguments: ["-q", "-t", "ed25519", "-N", "", "-C", "spoon-tests", "-f", key.path],
+      workingDirectory: keyDirectory
+    )
+    _ = try await runner.run(keygen).checkSuccess(of: keygen)
+    try await runGit(["config", "gpg.format", "ssh"], in: root)
+    try await runGit(["config", "user.signingkey", key.path + ".pub"], in: root)
+    try Data("signed\n".utf8).write(to: root.appending(path: "signed.txt"))
+    try await runGit(["add", "signed.txt"], in: root)
+    let client = SystemGitClient(repositoryRoot: root, git: git, runner: runner)
+
+    let configuration = try await client.commitSigningConfiguration()
+    #expect(configuration.format == .ssh)
+    #expect(!configuration.signsByDefault)
+    try await client.commit(
+      message: "signed", options: CommitOptions(signOff: true, signing: .sign))
+
+    let raw = try await client.run(["cat-file", "commit", "HEAD"]).standardOutputText
+    #expect(raw.contains("gpgsig -----BEGIN SSH SIGNATURE-----"))
+    #expect(raw.contains("Signed-off-by: Spoon Tests <test@example.com>"))
+  }
+
   @Test func statusAndBranchesOnRealRepo() async throws {
     let root = try await makeTemporaryRepo()
     defer { try? FileManager.default.removeItem(at: root) }
