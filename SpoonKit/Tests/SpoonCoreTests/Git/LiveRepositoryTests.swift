@@ -179,6 +179,49 @@ struct LiveRepositoryTests {
     #expect(try await model.conflictDocument(path: "file.txt")?.blocks.count == 2)
   }
 
+  @MainActor
+  @Test func blameLooksPastListedAndPickedCommits() async throws {
+    let root = try await LiveRepoFixture.makeTemporaryRepo(
+      commits: [.init(file: "f.txt", content: "a\nb\n", message: "content")],
+      runner: runner
+    )
+    defer { try? FileManager.default.removeItem(at: root) }
+    try await LiveRepoFixture.commitFile(
+      "f.txt", content: "a \nb \n", message: "reformat", in: root, runner: runner)
+    let client = makeClient(root)
+    let model = RepositoryModel(repository: Repository(rootURL: root), gitClient: client)
+    func summaries(_ options: BlameOptions) async throws -> [String] {
+      try await model.blame(path: "f.txt", options: options).map(\.commit.summary)
+    }
+    let reformat = try #require(try await model.blame(path: "f.txt").first?.commit)
+    #expect(reformat.summary == "reformat")
+
+    #expect(try await summaries(BlameOptions(ignoredRevisions: [reformat.oid])) == ["content", "content"])
+
+    // Listed in .git-blame-ignore-revs, which git reads only when passed.
+    var settings = await model.blameIgnoreSettings()
+    #expect(!settings.hasList)
+    #expect(await model.addToBlameIgnoreList(reformat, settings: settings))
+    let list = try String(
+      contentsOf: root.appending(path: ".git-blame-ignore-revs"), encoding: .utf8)
+    #expect(list == "# reformat\n\(reformat.oid.rawValue)\n")
+    settings = await model.blameIgnoreSettings()
+    #expect(settings.hasConventionalFile)
+    #expect(
+      try await summaries(settings.options(skippingListedCommits: true, ignoring: []))
+        == ["content", "content"])
+
+    // Configured files apply on their own and can be switched off.
+    try await LiveRepoFixture.run(
+      ["config", "blame.ignoreRevsFile", ".git-blame-ignore-revs"], in: root, runner: runner)
+    settings = await model.blameIgnoreSettings()
+    #expect(settings.configuredFiles == [".git-blame-ignore-revs"])
+    #expect(try await summaries(BlameOptions()) == ["content", "content"])
+    #expect(
+      try await summaries(settings.options(skippingListedCommits: false, ignoring: []))
+        == ["reformat", "reformat"])
+  }
+
   @Test func conflictsResolveToEitherSideOrADeletion() async throws {
     let root = try await LiveRepoFixture.makeTemporaryRepo(
       commits: [

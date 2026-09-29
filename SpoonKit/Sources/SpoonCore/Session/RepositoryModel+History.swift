@@ -140,8 +140,57 @@ extension RepositoryModel {
     await loadHistoryIfNeeded()
   }
 
-  public func blame(path: String, at revision: ObjectID? = nil) async throws -> [BlameLine] {
-    try await gitClient.blame(path: path, at: revision)
+  public func blame(
+    path: String, at revision: ObjectID? = nil, options: BlameOptions = BlameOptions()
+  ) async throws -> [BlameLine] {
+    try await gitClient.blame(path: path, at: revision, options: options)
+  }
+
+  /// Where this repository lists commits for blame to look past.
+  public func blameIgnoreSettings() async -> BlameIgnoreSettings {
+    let configured = (try? await gitClient.blameIgnoreRevsFiles()) ?? []
+    let conventional = repository.rootURL.appending(path: BlameOptions.conventionalIgnoreRevsFile)
+    let hasConventionalFile = await Task.detached {
+      FileManager.default.fileExists(atPath: conventional.path)
+    }.value
+    return BlameIgnoreSettings(configuredFiles: configured, hasConventionalFile: hasConventionalFile)
+  }
+
+  /// Appends `commit` to the repository's ignore list (the configured
+  /// `blame.ignoreRevsFile`, else `.git-blame-ignore-revs`, created if
+  /// needed) with its summary as a comment. The file is left for the user
+  /// to commit, so the whole team's blame skips it.
+  @discardableResult
+  public func addToBlameIgnoreList(_ commit: BlameCommit, settings: BlameIgnoreSettings) async
+    -> Bool
+  {
+    let url = repository.rootURL.appending(path: settings.listFileForAdding)
+    let entry = "# \(commit.summary)\n\(commit.oid.rawValue)\n"
+    do {
+      try await Task.detached {
+        if let handle = try? FileHandle(forWritingTo: url) {
+          defer { try? handle.close() }
+          let end = try handle.seekToEnd()
+          // Start on a new line if the file doesn't end with one.
+          if end > 0 {
+            try handle.seek(toOffset: end - 1)
+            let last = try handle.read(upToCount: 1)
+            try handle.seekToEnd()
+            if last != Data("\n".utf8) { try handle.write(contentsOf: Data("\n".utf8)) }
+          }
+          try handle.write(contentsOf: Data(entry.utf8))
+        } else {
+          try Data(entry.utf8).write(to: url)
+        }
+      }.value
+      clearError()
+      await refresh()
+      return true
+    } catch {
+      lastErrorMessage = error.localizedDescription
+      lastErrorIsFromBackgroundRead = false
+      return false
+    }
   }
 
   /// One page of commits, across every reference, that match `search`.

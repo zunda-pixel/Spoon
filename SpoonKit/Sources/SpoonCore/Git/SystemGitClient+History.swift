@@ -60,8 +60,24 @@ extension SystemGitClient {
     return try GitReflogParser.parse(result.standardOutput)
   }
 
-  public func blame(path: String, at revision: ObjectID?) async throws -> [BlameLine] {
-    var arguments = ["blame", "--porcelain"]
+  public func blameIgnoreRevsFiles() async throws -> [String] {
+    let command = GitCommand.make(
+      git: git,
+      repository: repositoryRoot,
+      arguments: ["config", "--get-all", "blame.ignoreRevsFile"],
+      timeout: .seconds(10)
+    )
+    let result = try await runner.run(command)
+    // `git config --get-all` exits 1 when the key is unset.
+    if result.exitCode == 1 { return [] }
+    return try result.checkSuccess(of: command).standardOutputText
+      .split(whereSeparator: \.isNewline).map(String.init).filter { !$0.isEmpty }
+  }
+
+  public func blame(path: String, at revision: ObjectID?, options: BlameOptions) async throws
+    -> [BlameLine]
+  {
+    var arguments = ["blame", "--porcelain"] + options.arguments
     if let revision {
       arguments.append(revision.rawValue)
     }

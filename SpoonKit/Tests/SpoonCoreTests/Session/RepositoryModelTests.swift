@@ -1489,7 +1489,15 @@ private actor FakeRepositoryGitClient: GitClient {
     throw Failure.unimplemented
   }
   func reflog(maxCount: Int, skip: Int) async throws -> [ReflogEntry] { [] }
-  func blame(path: String, at revision: ObjectID?) async throws -> [BlameLine] { [] }
+  func blame(path: String, at revision: ObjectID?, options: BlameOptions) async throws
+    -> [BlameLine]
+  {
+    mutationCalls.append("blame:\(path):\(options.arguments.joined(separator: " "))")
+    return []
+  }
+  private var configuredIgnoreRevsFiles: [String] = []
+  func setIgnoreRevsFiles(_ files: [String]) { configuredIgnoreRevsFiles = files }
+  func blameIgnoreRevsFiles() async throws -> [String] { configuredIgnoreRevsFiles }
   func lineHistory(path: String, lines: ClosedRange<Int>, limit: Int) async throws
     -> [LineHistoryEntry]
   { [] }
