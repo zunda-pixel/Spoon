@@ -15,6 +15,11 @@ extension RepositoryModel {
     status?.entries.contains { $0.path == path && !$0.isIgnored } ?? false
   }
 
+  /// Where `oid` sits relative to the tags; `nil` when git can't say.
+  public func describe(_ oid: ObjectID) async -> CommitDescription? {
+    try? await gitClient.describe(oid)
+  }
+
   /// Lines matching `query` in the working tree or a revision.
   public func searchCode(_ query: CodeSearchQuery, limit: Int = 2_000) async throws
     -> CodeSearchResult

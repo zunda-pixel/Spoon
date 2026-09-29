@@ -12,6 +12,8 @@ struct CommitDetailView: View {
   @State private var errorMessage: String?
   @State private var lineSelection: DiffLineSelection?
   @State private var pendingRestore: FileRestoreRequest?
+  /// Tags around the commit, loaded after the detail since it is optional.
+  @State private var description: (oid: ObjectID, value: CommitDescription)?
 
   init(model: RepositoryModel, oid: ObjectID) {
     self.model = model
@@ -74,6 +76,9 @@ struct CommitDetailView: View {
         // the current one; it must not overwrite it.
         guard !Task.isCancelled else { return }
         detail = loaded
+        if let value = await model.describe(oid), !Task.isCancelled {
+          description = (oid, value)
+        }
       } catch {
         guard !Task.isCancelled else { return }
         detail = nil
@@ -158,6 +163,9 @@ struct CommitDetailView: View {
         if let signature = detail.signature {
           SignatureBadge(signature: signature)
         }
+        if let description, description.oid == detail.commit.oid {
+          TagPositionLabels(description: description.value)
+        }
       }
       .font(.caption)
       .foregroundStyle(.secondary)
@@ -201,4 +209,31 @@ private struct FileRestoreRequest: Hashable {
 private struct DetailKey: Hashable {
   let oid: ObjectID
   let options: DiffOptions
+}
+
+/// "0.0.9 + 1" (the nearest earlier tag) and "In 0.0.10" (the first tag
+/// that contains the commit), from `git describe`.
+@MainActor
+private struct TagPositionLabels: View {
+  let description: CommitDescription
+
+  var body: some View {
+    if let tag = description.nearestTag {
+      if description.commitsSinceTag == 0 {
+        Label(tag, systemImage: "tag")
+          .help("Tagged \(tag)")
+      } else {
+        Label("\(tag) + \(description.commitsSinceTag)", systemImage: "tag")
+          .help(
+            "\(description.commitsSinceTag) \(description.commitsSinceTag == 1 ? "commit" : "commits") after \(tag) (git describe)"
+          )
+      }
+    }
+    if let released = description.firstContainingTag,
+      released != description.nearestTag || description.commitsSinceTag != 0
+    {
+      Label("In \(released)", systemImage: "shippingbox")
+        .help("First included in \(released) (git describe --contains)")
+    }
+  }
 }

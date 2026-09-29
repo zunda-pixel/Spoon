@@ -99,6 +99,22 @@ extension SystemGitClient {
     return try LineHistoryParser.parse(result.standardOutput)
   }
 
+  public func describe(_ oid: ObjectID) async throws -> CommitDescription {
+    // Each fails when no tag qualifies, which only means "none".
+    async let nearest = describeOutput(["describe", "--tags", "--long", "--abbrev=7", oid.rawValue])
+    async let containing = describeOutput(["describe", "--tags", "--contains", oid.rawValue])
+    let parsed = await nearest.flatMap(CommitDescription.parseNearest)
+    return CommitDescription(
+      nearestTag: parsed?.tag,
+      commitsSinceTag: parsed?.distance ?? 0,
+      firstContainingTag: await containing.flatMap(CommitDescription.parseContaining)
+    )
+  }
+
+  private func describeOutput(_ arguments: [String]) async -> String? {
+    try? await run(arguments, timeout: .seconds(20)).standardOutputText
+  }
+
   public func searchCode(_ query: CodeSearchQuery, limit: Int) async throws -> CodeSearchResult {
     let command = GitCommand.make(
       git: git,
