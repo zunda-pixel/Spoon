@@ -55,6 +55,7 @@ final class RepositoryNavigationState {
     case deleteBranch(Branch)
     case deleteMergedBranches
     case deleteWorktree(Worktree)
+    case lockWorktree(Worktree)
     case renameRemoteBranch(RemoteBranchSelection)
     case mergeBranch(Branch)
     case compareBranchVersions(Branch)
@@ -101,6 +102,8 @@ final class RepositoryNavigationState {
         "delete-merged-branches"
       case .deleteWorktree(let worktree):
         "delete-worktree:\(worktree.id)"
+      case .lockWorktree(let worktree):
+        "lock-worktree:\(worktree.id)"
       case .renameRemoteBranch(let selection):
         "rename-remote-branch:\(selection.id)"
       case .mergeBranch(let branch):

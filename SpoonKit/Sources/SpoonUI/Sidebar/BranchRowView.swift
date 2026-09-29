@@ -12,6 +12,26 @@ struct BranchRowView: View {
   var historyModel: RepositoryModel?
   @State private var isHovered = false
 
+  private func worktreeSymbol(_ worktree: Worktree) -> String {
+    if worktree.isPrunable { return "folder.badge.questionmark" }
+    return worktree.isLocked ? "lock.fill" : "folder"
+  }
+
+  private func worktreeStyle(_ worktree: Worktree) -> AnyShapeStyle {
+    worktree.isPrunable ? AnyShapeStyle(.orange) : AnyShapeStyle(.secondary)
+  }
+
+  private func worktreeHelp(_ worktree: Worktree) -> String {
+    var text = "Checked out in worktree: \(worktree.path.path)"
+    if let reason = worktree.prunableReason {
+      text += "\nMissing: \(reason.isEmpty ? "the folder no longer exists" : reason)"
+    }
+    if let reason = worktree.lockReason {
+      text += reason.isEmpty ? "\nLocked" : "\nLocked: \(reason)"
+    }
+    return text
+  }
+
   var body: some View {
     HStack(spacing: 4) {
       branchLabel
@@ -41,9 +61,9 @@ struct BranchRowView: View {
           PRBadgeView(pullRequest: pullRequest)
         }
         if let worktree {
-          Image(systemName: "folder")
-            .foregroundStyle(.secondary)
-            .help("Checked out in worktree: \(worktree.path.path)")
+          Image(systemName: worktreeSymbol(worktree))
+            .foregroundStyle(worktreeStyle(worktree))
+            .help(worktreeHelp(worktree))
         }
         if showsTrackingStatus {
           trackingIndicator

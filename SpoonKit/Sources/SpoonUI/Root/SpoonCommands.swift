@@ -116,6 +116,13 @@ public struct SpoonCommands: Commands {
       }
       .disabled(repositoryMutationUnavailable || model?.currentBranch == nil)
 
+      if let stale = model?.prunableWorktrees, !stale.isEmpty {
+        Button("Prune \(stale.count) Missing \(stale.count == 1 ? "Worktree" : "Worktrees")") {
+          run { await $0.pruneWorktrees() }
+        }
+        .disabled(repositoryMutationUnavailable)
+      }
+
       Button("Sparse Checkout…") {
         navigation?.present(.sparseCheckout)
       }

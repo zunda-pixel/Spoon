@@ -11,6 +11,14 @@ public struct Worktree: Sendable, Hashable, Identifiable {
   public var headOID: ObjectID?
   /// The main worktree (the repository itself; listed first by git).
   public var isMain: Bool
+  /// Locked against pruning, moving, and removal (`git worktree lock`);
+  /// the reason is empty when none was given.
+  public var lockReason: String? = nil
+  /// Why git would prune it, typically that its folder no longer exists.
+  public var prunableReason: String? = nil
+
+  public var isLocked: Bool { lockReason != nil }
+  public var isPrunable: Bool { prunableReason != nil }
 
   public var id: String { path.path }
 

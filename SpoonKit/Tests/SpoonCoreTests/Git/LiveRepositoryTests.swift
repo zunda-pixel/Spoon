@@ -599,6 +599,46 @@ struct LiveRepositoryTests {
     #expect(file == "0\n1\n")
   }
 
+  @Test func worktreesLockMoveAndPrune() async throws {
+    let root = try await LiveRepoFixture.makeTemporaryRepo(
+      commits: [.init(file: "base.txt", content: "base\n", message: "base")],
+      runner: runner
+    )
+    let parent = URL.temporaryDirectory.appending(path: "spoon-wt-\(UUID().uuidString)")
+    defer {
+      try? FileManager.default.removeItem(at: root)
+      try? FileManager.default.removeItem(at: parent)
+    }
+    try FileManager.default.createDirectory(at: parent, withIntermediateDirectories: true)
+    for branch in ["a", "b"] {
+      try await LiveRepoFixture.run(["branch", branch], in: root, runner: runner)
+    }
+    let client = makeClient(root)
+    let first = parent.appending(path: "first")
+    let moved = parent.appending(path: "moved")
+    let doomed = parent.appending(path: "doomed")
+    try await client.addWorktree(path: first, branch: "a")
+    try await client.addWorktree(path: doomed, branch: "b")
+    func worktree(_ branch: String) async throws -> Worktree? {
+      try await client.worktrees().first { $0.branch == branch }
+    }
+
+    try await client.lockWorktree(path: first, reason: "on external drive")
+    #expect(try await worktree("a")?.lockReason == "on external drive")
+    await #expect(throws: CommandError.self) {
+      try await client.moveWorktree(path: first, to: moved)
+    }
+    try await client.unlockWorktree(path: first)
+    try await client.moveWorktree(path: first, to: moved)
+    let movedPath = try #require(try await worktree("a")).path.resolvingSymlinksInPath().path
+    #expect(movedPath == moved.resolvingSymlinksInPath().path)
+
+    try FileManager.default.removeItem(at: doomed)
+    #expect(try await worktree("b")?.isPrunable == true)
+    try await client.pruneWorktrees()
+    #expect(try await worktree("b") == nil)
+  }
+
   @Test func cloneCreatesAWorkingLocalCopy() async throws {
     let source = try await LiveRepoFixture.makeTemporaryRepo(
       commits: [.init(file: "base.txt", content: "base\n", message: "base")],

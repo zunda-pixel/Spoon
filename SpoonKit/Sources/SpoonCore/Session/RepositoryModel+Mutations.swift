@@ -418,6 +418,26 @@ extension RepositoryModel {
     }
   }
 
+  /// Linked worktrees whose folders are gone.
+  public var prunableWorktrees: [Worktree] { worktrees.filter(\.isPrunable) }
+
+  public func pruneWorktrees() async {
+    await perform { try await $0.pruneWorktrees() }
+  }
+
+  public func lockWorktree(_ worktree: Worktree, reason: String?) async {
+    await perform { try await $0.lockWorktree(path: worktree.path, reason: reason) }
+  }
+
+  public func unlockWorktree(_ worktree: Worktree) async {
+    await perform { try await $0.unlockWorktree(path: worktree.path) }
+  }
+
+  @discardableResult
+  public func moveWorktree(_ worktree: Worktree, to destination: URL) async -> Bool {
+    await perform { try await $0.moveWorktree(path: worktree.path, to: destination) }
+  }
+
   public func sparseCheckoutPaths() async throws -> [String]? {
     try await gitClient.sparseCheckoutPaths()
   }

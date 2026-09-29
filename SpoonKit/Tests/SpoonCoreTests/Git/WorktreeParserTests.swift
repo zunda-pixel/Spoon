@@ -45,4 +45,34 @@ struct WorktreeParserTests {
   @Test func emptyInputParsesToNoWorktrees() {
     #expect(WorktreeParser.parse(Data()).isEmpty)
   }
+
+  @Test func lockedAndPrunableWorktreesKeepTheirReasons() {
+    let output = """
+      worktree /repo
+      HEAD 1111111111111111111111111111111111111111
+      branch refs/heads/main
+
+      worktree /wt/locked
+      HEAD 2222222222222222222222222222222222222222
+      branch refs/heads/a
+      locked on external drive
+
+      worktree /wt/plain-lock
+      HEAD 3333333333333333333333333333333333333333
+      detached
+      locked
+
+      worktree /wt/gone
+      HEAD 4444444444444444444444444444444444444444
+      branch refs/heads/b
+      prunable gitdir file points to non-existent location
+
+      """
+
+    let worktrees = WorktreeParser.parse(Data(output.utf8))
+
+    #expect(worktrees.map(\.lockReason) == [nil, "on external drive", "", nil])
+    #expect(worktrees.map(\.isPrunable) == [false, false, false, true])
+    #expect(worktrees[3].prunableReason == "gitdir file points to non-existent location")
+  }
 }
