@@ -94,6 +94,23 @@ struct LiveRepositoryTests {
     #expect(try await client.partialCloneRemote() == "origin")
   }
 
+  @Test func fileHistoryCanFollowRenames() async throws {
+    let root = try await LiveRepoFixture.makeTemporaryRepo(
+      commits: [.init(file: "old.txt", content: "one\n", message: "add old")],
+      runner: runner
+    )
+    defer { try? FileManager.default.removeItem(at: root) }
+    try await LiveRepoFixture.run(["mv", "old.txt", "new.txt"], in: root, runner: runner)
+    try await LiveRepoFixture.run(["commit", "-m", "rename"], in: root, runner: runner)
+    let client = makeClient(root)
+
+    let plain = try await client.log(LogQuery(path: "new.txt"))
+    let followed = try await client.log(LogQuery(path: "new.txt", followRenames: true))
+
+    #expect(plain.commits.map(\.subject) == ["rename"])
+    #expect(followed.commits.map(\.subject) == ["rename", "add old"])
+  }
+
   @Test func cloneCreatesAWorkingLocalCopy() async throws {
     let source = try await LiveRepoFixture.makeTemporaryRepo(
       commits: [.init(file: "base.txt", content: "base\n", message: "base")],

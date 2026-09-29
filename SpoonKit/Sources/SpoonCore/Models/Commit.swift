@@ -23,6 +23,8 @@ public struct LogQuery: Sendable, Hashable {
   public var reference: String?
   /// Repository-relative path to follow; `nil` means all paths.
   public var path: String?
+  /// Keep following `path` across renames (`--follow`). Ignored without `path`.
+  public var followRenames: Bool
   public var maxCount: Int
   public var skip: Int
   /// Include commits reachable from every ref.
@@ -37,6 +39,7 @@ public struct LogQuery: Sendable, Hashable {
   public init(
     reference: String? = nil,
     path: String? = nil,
+    followRenames: Bool = false,
     maxCount: Int = 500,
     skip: Int = 0,
     allReferences: Bool = false,
@@ -46,6 +49,7 @@ public struct LogQuery: Sendable, Hashable {
   ) {
     self.reference = reference
     self.path = path
+    self.followRenames = followRenames
     self.maxCount = maxCount
     self.skip = skip
     self.allReferences = allReferences
@@ -58,6 +62,7 @@ public struct LogQuery: Sendable, Hashable {
     LogQuery(
       reference: reference,
       path: path,
+      followRenames: followRenames,
       maxCount: maxCount,
       skip: skip + maxCount,
       allReferences: allReferences,
