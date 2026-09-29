@@ -20,7 +20,9 @@ struct CommitDetailView: View {
 
   var body: some View {
     Group {
-      if let detail {
+      // A detail for another commit stays in state until the selected one
+      // loads; showing it would look like the selection didn't change.
+      if let detail, detail.commit.oid == oid {
         VStack(spacing: 0) {
           header(detail)
           Divider()
@@ -64,11 +66,16 @@ struct CommitDetailView: View {
       )
     }
     .task(id: DetailKey(oid: oid, options: model.diffOptions)) {
+      errorMessage = nil
+      lineSelection = nil
       do {
-        errorMessage = nil
-        lineSelection = nil
-        detail = try await model.commitDetail(oid)
+        let loaded = try await model.commitDetail(oid)
+        // git calls run concurrently, so a superseded load can finish after
+        // the current one; it must not overwrite it.
+        guard !Task.isCancelled else { return }
+        detail = loaded
       } catch {
+        guard !Task.isCancelled else { return }
         detail = nil
         errorMessage = error.localizedDescription
       }

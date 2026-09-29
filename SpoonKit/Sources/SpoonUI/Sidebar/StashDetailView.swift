@@ -7,6 +7,9 @@ struct StashDetailView: View {
   let model: RepositoryModel
   let stashIndex: Int
   @State private var diffs: [FileDiff]?
+  /// Which stash `diffs` belongs to, so another stash's diff never stands
+  /// in while the selected one loads.
+  @State private var loadedStash: Stash?
   @State private var loadErrorMessage: String?
   @State private var confirmingDrop = false
 
@@ -24,7 +27,12 @@ struct StashDetailView: View {
       VStack(spacing: 0) {
         header(stash)
         Divider()
-        content
+        if loadedStash == stash {
+          content
+        } else {
+          ProgressView()
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
       }
       // Keyed on the stash value: index shifts after drops still reload,
       // unrelated stack changes don't.
@@ -98,11 +106,16 @@ struct StashDetailView: View {
 
   private func load(_ stash: Stash) async {
     do {
-      diffs = try await model.stashDiffs(stash)
+      let loaded = try await model.stashDiffs(stash)
+      // A superseded load (another stash) can finish after this one.
+      guard !Task.isCancelled else { return }
+      diffs = loaded
       loadErrorMessage = nil
     } catch {
+      guard !Task.isCancelled else { return }
       diffs = nil
       loadErrorMessage = error.localizedDescription
     }
+    loadedStash = stash
   }
 }
