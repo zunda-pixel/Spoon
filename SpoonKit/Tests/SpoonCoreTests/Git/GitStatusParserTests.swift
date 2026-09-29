@@ -137,4 +137,18 @@ struct GitStatusParserTests {
     #expect(status.entries.isEmpty)
     #expect(status.isClean)
   }
+
+  @Test func conflictSidesKnowWhenTheyDeletedTheFile() {
+    func entry(_ conflict: FileStatusEntry.Conflict) -> FileStatusEntry {
+      FileStatusEntry(path: "f", conflict: conflict)
+    }
+    #expect(entry(.bothModified).conflictSideHasFile(.ours))
+    #expect(entry(.bothModified).conflictSideHasFile(.theirs))
+    #expect(!entry(.deletedByUs).conflictSideHasFile(.ours))
+    #expect(entry(.deletedByUs).conflictSideHasFile(.theirs))
+    #expect(!entry(.deletedByThem).conflictSideHasFile(.theirs))
+    #expect(!entry(.addedByUs).conflictSideHasFile(.theirs))
+    #expect(!entry(.addedByThem).conflictSideHasFile(.ours))
+    #expect(!entry(.bothDeleted).conflictSideHasFile(.ours))
+  }
 }

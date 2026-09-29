@@ -371,6 +371,30 @@ struct SystemGitClientTests {
     }
   }
 
+  @Test(arguments: [("2.56.0", ["add", "--resolved", "--"]), ("2.55.0", ["add", "--"])])
+  func markResolvedUsesAddResolvedOnGit256(version: String, command: [String]) async throws {
+    let runner = FakeCommandRunner()
+    runner.stub(arguments: baseFlags + ["version"], stdout: "git version \(version)\n")
+    runner.stub(arguments: baseFlags + command + ["a.txt"])
+
+    try await makeClient(runner).markResolved(paths: ["a.txt"])
+
+    #expect(runner.invocations.count == 2)
+  }
+
+  @Test func resolveConflictChecksOutOrRemovesTheChosenSide() async throws {
+    let runner = FakeCommandRunner()
+    runner.stub(arguments: baseFlags + ["checkout", "--ours", "--", "a.txt"])
+    runner.stub(arguments: baseFlags + ["add", "--", "a.txt"])
+    runner.stub(arguments: baseFlags + ["rm", "--quiet", "--", "gone.txt"])
+    let client = makeClient(runner)
+
+    try await client.resolveConflict(path: "a.txt", using: .ours, sideHasFile: true)
+    try await client.resolveConflict(path: "gone.txt", using: .theirs, sideHasFile: false)
+
+    #expect(runner.invocations.count == 3)
+  }
+
   @Test func failedVersionProbeIsRetried() async {
     let runner = FakeCommandRunner()
     runner.stub(arguments: baseFlags + ["version"], stdout: "not a version\n")

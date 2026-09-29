@@ -58,6 +58,28 @@ extension SystemGitClient {
     try await runVoid(["add", "--"] + paths)
   }
 
+  public func markResolved(paths: [String]) async throws {
+    guard !paths.isEmpty else { return }
+    if await capabilities().supportsAddResolved {
+      try await runVoid(["add", "--resolved", "--"] + paths)
+    } else {
+      try await runVoid(["add", "--"] + paths)
+    }
+  }
+
+  public func resolveConflict(
+    path: String,
+    using side: FileStatusEntry.ConflictSide,
+    sideHasFile: Bool
+  ) async throws {
+    if sideHasFile {
+      try await runVoid(["checkout", "--\(side.rawValue)", "--", path])
+      try await runVoid(["add", "--", path])
+    } else {
+      try await runVoid(["rm", "--quiet", "--", path])
+    }
+  }
+
   public func unstage(paths: [String]) async throws {
     guard !paths.isEmpty else { return }
     do {

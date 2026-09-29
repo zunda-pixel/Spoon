@@ -141,6 +141,53 @@ struct LiveRepositoryTests {
     #expect(try await client.status().entries.isEmpty)
   }
 
+  @Test func conflictsResolveToEitherSideOrADeletion() async throws {
+    let root = try await LiveRepoFixture.makeTemporaryRepo(
+      commits: [
+        .init(file: "shared.txt", content: "base\n", message: "base"),
+        .init(file: "doomed.txt", content: "base\n", message: "doomed"),
+      ],
+      runner: runner
+    )
+    defer { try? FileManager.default.removeItem(at: root) }
+    func git(_ arguments: [String]) async throws {
+      try await LiveRepoFixture.run(arguments, in: root, runner: runner)
+    }
+    try await git(["switch", "-c", "topic"])
+    try await LiveRepoFixture.commitFile(
+      "shared.txt", content: "topic\n", message: "topic edit", in: root, runner: runner
+    )
+    try await git(["rm", "-q", "doomed.txt"])
+    try await git(["commit", "-m", "delete doomed"])
+    try await git(["switch", "main"])
+    try await LiveRepoFixture.commitFile(
+      "shared.txt", content: "main\n", message: "main edit", in: root, runner: runner
+    )
+    try await LiveRepoFixture.commitFile(
+      "doomed.txt", content: "main\n", message: "main keeps doomed", in: root, runner: runner
+    )
+    let client = makeClient(root)
+    await #expect(throws: CommandError.self) {
+      try await client.merge(branch: "topic", options: .standard)
+    }
+
+    let conflicts = try await client.status().conflictedEntries
+    let shared = try #require(conflicts.first { $0.path == "shared.txt" })
+    let doomed = try #require(conflicts.first { $0.path == "doomed.txt" })
+    try await client.resolveConflict(
+      path: shared.path, using: .theirs, sideHasFile: shared.conflictSideHasFile(.theirs)
+    )
+    try await client.resolveConflict(
+      path: doomed.path, using: .theirs, sideHasFile: doomed.conflictSideHasFile(.theirs)
+    )
+
+    let status = try await client.status()
+    #expect(status.conflictedEntries.isEmpty)
+    let merged = try String(contentsOf: root.appending(path: "shared.txt"), encoding: .utf8)
+    #expect(merged == "topic\n")
+    #expect(!FileManager.default.fileExists(atPath: root.appending(path: "doomed.txt").path))
+  }
+
   @Test func cloneCreatesAWorkingLocalCopy() async throws {
     let source = try await LiveRepoFixture.makeTemporaryRepo(
       commits: [.init(file: "base.txt", content: "base\n", message: "base")],
