@@ -48,10 +48,24 @@ extension SystemGitClient {
   }
 
   public func deleteRemoteBranch(name: String, from remoteName: String) async throws {
-    try await runVoid(
-      ["push", remoteName, "--delete", name],
-      timeout: .seconds(300)
-    )
+    do {
+      try await runVoid(
+        ["push", remoteName, "--delete", name],
+        timeout: .seconds(300)
+      )
+    } catch let error as CommandError where Self.isMissingRemoteRef(error) {
+      // Deleting an already-removed remote branch is idempotent. The remote
+      // state may have changed after the branch list was loaded, so Git can
+      // report this as a failed push even though the requested end state is
+      // already true.
+    }
+  }
+
+  private static func isMissingRemoteRef(_ error: CommandError) -> Bool {
+    let message = error.standardErrorExcerpt.lowercased()
+    return message.contains("remote ref does not exist")
+      || message.contains("dst ref not found")
+      || (message.contains("unable to delete") && message.contains("not found"))
   }
 
   public func publishBranch(_ branch: String, to remoteName: String) async throws {

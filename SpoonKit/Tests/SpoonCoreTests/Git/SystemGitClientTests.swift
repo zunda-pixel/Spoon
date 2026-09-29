@@ -737,6 +737,18 @@ struct SystemGitClientTests {
     #expect(runner.invocations.count == 1)
   }
 
+  @Test func deletingMissingRemoteBranchIsAlreadySuccessful() async throws {
+    let runner = FakeCommandRunner()
+    runner.stub(
+      arguments: baseFlags + ["push", "origin", "--delete", "already-gone"],
+      stderr: "remote: error: remote ref does not exist\n",
+      exitCode: 1
+    )
+
+    try await makeClient(runner).deleteRemoteBranch(name: "already-gone", from: "origin")
+    #expect(runner.invocations.count == 1)
+  }
+
   @Test func worktreeOperationsSendExactArgv() async throws {
     let runner = FakeCommandRunner()
     runner.stub(
