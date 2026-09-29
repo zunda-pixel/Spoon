@@ -216,6 +216,21 @@ struct HistoryListView: View {
       }
       .disabled(model.isBusy || model.isSequencing)
     }
+    if model.canCommitFixup(for: commit) {
+      Button("Commit Staged Changes as Fixup") {
+        Task { await model.commitFixup(for: commit) }
+      }
+      .disabled(model.isBusy)
+      .help("Record the staged changes as “fixup! \(commit.subject)” to fold in with Autosquash")
+    }
+    if commit.subject.hasPrefix("fixup! ") || commit.subject.hasPrefix("squash! ")
+      || commit.subject.hasPrefix("amend! ")
+    {
+      Button("Autosquash Fixup Commits…") {
+        navigation.present(.autosquash)
+      }
+      .disabled(model.isBusy || model.isSequencing)
+    }
     if model.canFixupCommit(commit) {
       Button("Fixup Staged Changes into This Commit…") {
         navigation.present(.fixupCommit(commit))

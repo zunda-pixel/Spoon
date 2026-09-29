@@ -62,6 +62,8 @@ struct RepositorySheetHost: ViewModifier {
         ReplayBranchSheet(model: model, branch: branch)
       case .rebase(let commit):
         RebaseSheet(model: model, fromCommit: commit)
+      case .autosquash:
+        AutosquashSheet(model: model)
       case .startBisect(let commit):
         StartBisectSheet(model: model, goodCommit: commit)
       case .moveBranch(let branch, let commit):

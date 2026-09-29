@@ -41,6 +41,16 @@ extension SystemGitClient {
     )
   }
 
+  public func autosquash(onto base: ObjectID) async throws {
+    // `true` accepts the todo list git generates; squash! message editors
+    // keep the combined message as git proposes it.
+    try await runVoid(
+      ["rebase", "--interactive", "--autosquash", base.rawValue],
+      extraEnvironment: ["GIT_SEQUENCE_EDITOR": "true", "GIT_EDITOR": "true"],
+      timeout: .seconds(300)
+    )
+  }
+
   public func cherryPick(_ oid: ObjectID) async throws {
     try await runVoid(["cherry-pick", oid.rawValue], timeout: .seconds(120))
   }

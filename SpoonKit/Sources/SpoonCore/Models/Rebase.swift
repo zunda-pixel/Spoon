@@ -99,3 +99,23 @@ public struct RebasePlan: Sendable, Hashable {
     }.joined()
   }
 }
+
+/// The `fixup!` / `squash!` / `amend!` commits an autosquash rebase would fold.
+public struct AutosquashPlan: Sendable, Hashable {
+  /// The commit rebased onto; everything after it is replayed.
+  public var base: ObjectID
+  /// The branch `base` was taken from, for display.
+  public var baseReference: String
+  /// Fixup commits, newest first.
+  public var fixups: [Commit]
+
+  public init(base: ObjectID, baseReference: String, fixups: [Commit]) {
+    self.base = base
+    self.baseReference = baseReference
+    self.fixups = fixups
+  }
+
+  static func isFixup(_ commit: Commit) -> Bool {
+    ["fixup! ", "squash! ", "amend! "].contains { commit.subject.hasPrefix($0) }
+  }
+}

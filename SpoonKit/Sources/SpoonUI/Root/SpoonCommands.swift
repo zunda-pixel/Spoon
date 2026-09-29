@@ -111,6 +111,11 @@ public struct SpoonCommands: Commands {
       .keyboardShortcut("b", modifiers: [.option, .command])
       .disabled(model == nil || navigation == nil)
 
+      Button("Autosquash Fixup Commits…") {
+        navigation?.present(.autosquash)
+      }
+      .disabled(repositoryMutationUnavailable || model?.currentBranch == nil)
+
       Button("Sparse Checkout…") {
         navigation?.present(.sparseCheckout)
       }

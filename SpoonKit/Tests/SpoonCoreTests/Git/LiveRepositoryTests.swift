@@ -541,6 +541,34 @@ struct LiveRepositoryTests {
     #expect(quiet.first?.deletionCount == 0)
   }
 
+  @Test func fixupCommitsAreFoldedByAutosquash() async throws {
+    let root = try await LiveRepoFixture.makeTemporaryRepo(
+      commits: [.init(file: "base.txt", content: "base\n", message: "base")],
+      runner: runner
+    )
+    defer { try? FileManager.default.removeItem(at: root) }
+    try await LiveRepoFixture.commitFile(
+      "a.txt", content: "a\n", message: "Add a", in: root, runner: runner)
+    try await LiveRepoFixture.commitFile(
+      "b.txt", content: "b\n", message: "Add b", in: root, runner: runner)
+    let client = makeClient(root)
+    let before = try await client.log(LogQuery(maxCount: 3)).commits
+    let (addA, base) = (before[1], before[2])
+
+    try Data("a fixed\n".utf8).write(to: root.appending(path: "a.txt"))
+    try await client.stage(paths: ["a.txt"])
+    try await client.commitFixup(for: addA.oid)
+    #expect(try await client.log(LogQuery(maxCount: 1)).commits.first?.subject == "fixup! Add a")
+
+    try await client.autosquash(onto: base.oid)
+
+    let after = try await client.log(LogQuery(maxCount: 3)).commits
+    #expect(after.map(\.subject) == ["Add b", "Add a", "base"])
+    let detail = try await client.commitDetail(after[1].oid)
+    #expect(detail.diffs.first?.hunks.first?.lines.map(\.text) == ["a fixed"])
+    #expect(try await client.sequencerState() == nil)
+  }
+
   @Test func cloneCreatesAWorkingLocalCopy() async throws {
     let source = try await LiveRepoFixture.makeTemporaryRepo(
       commits: [.init(file: "base.txt", content: "base\n", message: "base")],
