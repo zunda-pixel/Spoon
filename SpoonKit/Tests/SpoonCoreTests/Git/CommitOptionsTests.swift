@@ -37,7 +37,7 @@ struct CommitOptionsTests {
       runner: runner)
     runner.stub(
       arguments: prefix + [
-        "config", "--get-regexp", #"^(commit\.gpgsign|gpg\.format|user\.signingkey)$"#,
+        "config", "--get-regexp", #"^(commit\.gpgsign|tag\.gpgsign|gpg\.format|user\.signingkey)$"#,
       ],
       stdout: "user.signingkey ~/.ssh/id_ed25519.pub\ngpg.format ssh\ncommit.gpgsign true\n"
     )
@@ -55,6 +55,8 @@ struct CommitOptionsTests {
     #expect(CommitSigningConfiguration.parse("commit.gpgsign\n").signsByDefault)
     #expect(!CommitSigningConfiguration.parse("commit.gpgsign true\ncommit.gpgsign off").signsByDefault)
     #expect(CommitSigningConfiguration.parse("gpg.format X509").format == .x509)
+    #expect(CommitSigningConfiguration.parse("tag.gpgsign yes").signsTagsByDefault)
+    #expect(!CommitSigningConfiguration.parse("tag.gpgsign yes").signsByDefault)
     #expect(CommitSigningConfiguration().canSign)
     #expect(!CommitSigningConfiguration(format: .ssh).canSign)
   }

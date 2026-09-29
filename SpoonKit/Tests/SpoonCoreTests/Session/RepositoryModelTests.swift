@@ -1573,8 +1573,10 @@ private actor FakeRepositoryGitClient: GitClient {
     mutationCalls.append("pull:\(options.strategy.rawValue):\(options.autostash)")
   }
   func push(force: Bool) async throws { throw Failure.unimplemented }
-  func createTag(name: String, at target: ObjectID?, message: String?) async throws {
-    throw Failure.unimplemented
+  func createTag(
+    name: String, at target: ObjectID?, message: String?, signing: TagSigning
+  ) async throws {
+    mutationCalls.append("tag:\(name):\(message ?? ""):\(signing)")
   }
   func deleteTag(name: String) async throws { throw Failure.unimplemented }
   func pushTag(name: String, to remoteName: String) async throws { throw Failure.unimplemented }

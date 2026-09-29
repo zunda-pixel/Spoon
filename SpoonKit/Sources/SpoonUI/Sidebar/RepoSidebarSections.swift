@@ -161,6 +161,12 @@ private struct TagSidebarRow: View {
           .lineLimit(1)
           .truncationMode(.middle)
         Spacer(minLength: 4)
+        if tag.isSigned {
+          Image(systemName: "checkmark.seal")
+            .foregroundStyle(.secondary)
+            .imageScale(.small)
+            .accessibilityHidden(true)
+        }
         Text(tag.target.shortened)
           .font(.caption.monospaced())
           .foregroundStyle(.secondary)
@@ -168,16 +174,15 @@ private struct TagSidebarRow: View {
     } icon: {
       Image(systemName: "tag")
     }
-    .help(
-      tag.isAnnotated
-        ? "Annotated tag at \(tag.target.shortened)" : "Tag at \(tag.target.shortened)"
-    )
+    .help("\(kind) at \(tag.target.shortened)")
     .accessibilityElement(children: .ignore)
     .accessibilityLabel(tag.name)
-    .accessibilityValue(
-      "\(tag.isAnnotated ? "Annotated tag" : "Tag") at commit \(tag.target.shortened)"
-    )
+    .accessibilityValue("\(kind) at commit \(tag.target.shortened)")
     .accessibilityHint("Open the context menu for tag actions")
+  }
+
+  private var kind: String {
+    tag.isSigned ? "Signed tag" : tag.isAnnotated ? "Annotated tag" : "Tag"
   }
 }
 

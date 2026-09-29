@@ -49,6 +49,18 @@ struct LiveGitTests {
     let raw = try await client.run(["cat-file", "commit", "HEAD"]).standardOutputText
     #expect(raw.contains("gpgsig -----BEGIN SSH SIGNATURE-----"))
     #expect(raw.contains("Signed-off-by: Spoon Tests <test@example.com>"))
+
+    // Tags: signed on request, and left unsigned despite tag.gpgSign.
+    try await runGit(["config", "tag.gpgsign", "true"], in: root)
+    #expect(try await client.commitSigningConfiguration().signsTagsByDefault)
+    try await client.createTag(name: "v1", at: nil, message: "release", signing: .sign)
+    try await client.createTag(name: "v2", at: nil, message: "plain", signing: .doNotSign)
+    try await client.createTag(name: "v3", at: nil, message: "configured", signing: .configured)
+    let tags = Dictionary(uniqueKeysWithValues: try await client.tags().map { ($0.name, $0) })
+    #expect(tags["v1"]?.isSigned == true)
+    #expect(tags["v2"]?.isSigned == false)
+    #expect(tags["v2"]?.isAnnotated == true)
+    #expect(tags["v3"]?.isSigned == true)
   }
 
   @Test func codeSearchFindsLinesInTheWorkingTreeAndAtARevision() async throws {

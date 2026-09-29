@@ -23,6 +23,15 @@ struct GitTagParserTests {
     #expect(!tags[1].isAnnotated)
   }
 
+  @Test func signatureFieldMarksSignedTags() throws {
+    let signed = try GitTagParser.parse(
+      Data(
+        "v2\u{0}\(String(repeating: "b", count: 40))\u{0}\(String(repeating: "c", count: 40))\u{0}1720000000\u{0}1\nv1\u{0}\(String(repeating: "d", count: 40))\u{0}\u{0}1710000000\u{0}\n"
+          .utf8))
+    #expect(signed.map(\.isSigned) == [true, false])
+    #expect(signed.map(\.isAnnotated) == [true, false])
+  }
+
   @Test func malformedRecordThrows() {
     #expect(throws: GitTagParser.ParseError.self) {
       try GitTagParser.parse(Data("only-two-fields\u{0}aaaa1111\n".utf8))

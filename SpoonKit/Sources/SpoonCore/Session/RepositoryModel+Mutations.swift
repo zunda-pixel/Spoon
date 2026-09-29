@@ -134,11 +134,12 @@ extension RepositoryModel {
     name: String,
     at target: ObjectID?,
     message: String?,
+    signing: TagSigning = .configured,
     pushToRemotes: Bool = false
   ) async {
     let remoteNames = pushToRemotes ? remotes.map(\.name) : []
     await perform {
-      try await $0.createTag(name: name, at: target, message: message)
+      try await $0.createTag(name: name, at: target, message: message, signing: signing)
       for remoteName in remoteNames {
         try await $0.pushTag(name: name, to: remoteName)
       }

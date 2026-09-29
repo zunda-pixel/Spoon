@@ -163,7 +163,11 @@ public protocol GitRemoteClient: Sendable {
 /// Tag queries and mutations.
 public protocol GitTagClient: Sendable {
   func tags() async throws -> [Tag]
-  func createTag(name: String, at target: ObjectID?, message: String?) async throws
+  /// Creates a lightweight tag, or an annotated one when `message` is set.
+  /// A signed tag is always annotated; it uses `name` as the message when
+  /// `message` is `nil`.
+  func createTag(name: String, at target: ObjectID?, message: String?, signing: TagSigning)
+    async throws
   func deleteTag(name: String) async throws
   func pushTag(name: String, to remoteName: String) async throws
   func pushAllTags(to remoteName: String) async throws
@@ -347,6 +351,12 @@ extension GitWorkingTreeClient {
 
   public func diffWorkingTree(path: String?, staged: Bool) async throws -> [FileDiff] {
     try await diffWorkingTree(path: path, staged: staged, options: .standard)
+  }
+}
+
+extension GitTagClient {
+  public func createTag(name: String, at target: ObjectID?, message: String?) async throws {
+    try await createTag(name: name, at: target, message: message, signing: .configured)
   }
 }
 

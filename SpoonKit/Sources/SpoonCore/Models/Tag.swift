@@ -9,6 +9,8 @@ public struct Tag: Sendable, Hashable, Identifiable {
   /// The tagged commit (peeled for annotated tags).
   public var target: ObjectID
   public var isAnnotated: Bool
+  /// An annotated tag carrying a GPG, SSH, or X.509 signature (not verified).
+  public var isSigned: Bool = false
   public var createdAt: Date?
 
   public var id: String { name }
