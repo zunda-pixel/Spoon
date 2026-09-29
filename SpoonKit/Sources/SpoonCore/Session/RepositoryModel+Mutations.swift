@@ -410,8 +410,11 @@ extension RepositoryModel {
     await perform { try await $0.dropLargeBlobs(largerThan: byteLimit) }
   }
 
-  public func pull() async {
-    await perform { try await $0.pull() }
+  /// Pulls the current branch. The strategy defaults to the repository's
+  /// config; `--autostash` follows the app-wide preference.
+  public func pull(_ strategy: PullOptions.Strategy = .configured) async {
+    let options = PullOptions(strategy: strategy, autostash: pullAutostash)
+    await perform { try await $0.pull(options) }
   }
 
   public func push(force: Bool = false) async {

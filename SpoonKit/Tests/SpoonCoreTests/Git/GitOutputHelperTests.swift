@@ -172,6 +172,15 @@ struct GitOutputHelperTests {
     #expect(BisectState(remainingCount: 1).estimatedStepsLeft == 0)
   }
 
+  @Test func pullOptionsBuildArguments() {
+    #expect(PullOptions().arguments.isEmpty)
+    #expect(
+      PullOptions(strategy: .rebase, autostash: true).arguments == ["--rebase", "--autostash"]
+    )
+    #expect(PullOptions(strategy: .merge).arguments == ["--no-rebase"])
+    #expect(PullOptions(strategy: .fastForwardOnly).arguments == ["--ff-only"])
+  }
+
   @Test func untrackedDiffBuilderCreatesTextPatch() {
     let diff = UntrackedDiffBuilder.make(path: "notes.txt", data: Data("first\nsecond".utf8))
 

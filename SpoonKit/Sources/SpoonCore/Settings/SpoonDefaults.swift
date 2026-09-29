@@ -18,4 +18,7 @@ extension Defaults.Keys {
     "historyHiddenReferenceIDs",
     default: [:]
   )
+
+  /// Stash local changes around every pull (`git pull --autostash`).
+  public static let pullAutostash = Key<Bool>("pullAutostash", default: false)
 }

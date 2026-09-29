@@ -45,6 +45,13 @@ public struct SpoonCommands: Commands {
       .keyboardShortcut("l", modifiers: [.shift, .command])
       .disabled(repositoryMutationUnavailable)
 
+      if let model {
+        Menu("Pull Using") {
+          PullMenuItems(model: model)
+        }
+        .disabled(repositoryMutationUnavailable)
+      }
+
       if model?.gitCapabilities.supportsBackfill == true {
         Button("Backfill Missing Objects…") {
           navigation?.present(.backfill)

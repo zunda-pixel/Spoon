@@ -1313,7 +1313,9 @@ private actor FakeRepositoryGitClient: GitClient {
   func dropLargeBlobs(largerThan byteLimit: Int) async throws {
     mutationCalls.append("drop-blobs:\(byteLimit)")
   }
-  func pull() async throws { throw Failure.unimplemented }
+  func pull(_ options: PullOptions) async throws {
+    mutationCalls.append("pull:\(options.strategy.rawValue):\(options.autostash)")
+  }
   func push(force: Bool) async throws { throw Failure.unimplemented }
   func createTag(name: String, at target: ObjectID?, message: String?) async throws {
     throw Failure.unimplemented
