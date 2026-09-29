@@ -91,6 +91,19 @@ struct GitOutputHelperTests {
     #expect(updates.first?.oldOID.rawValue == old)
   }
 
+  @Test func signatureParserMapsVerificationLetters() {
+    let good = GitSignatureParser.parse(
+      "G\u{1f}Jane <jane@example.com>\u{1f}ABCD\u{1f}SHA256:xyz\n"
+    )
+    #expect(
+      good == CommitSignature(status: .good, signer: "Jane <jane@example.com>", key: "SHA256:xyz")
+    )
+    #expect(GitSignatureParser.parse("E\u{1f}\u{1f}ABCD\u{1f}\n")?.key == "ABCD")
+    #expect(GitSignatureParser.parse("B\u{1f}\u{1f}\u{1f}")?.status.isValid == false)
+    #expect(GitSignatureParser.parse("N\u{1f}\u{1f}\u{1f}\n") == nil)
+    #expect(GitSignatureParser.parse("") == nil)
+  }
+
   @Test func untrackedDiffBuilderCreatesTextPatch() {
     let diff = UntrackedDiffBuilder.make(path: "notes.txt", data: Data("first\nsecond".utf8))
 

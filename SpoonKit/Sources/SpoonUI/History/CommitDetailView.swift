@@ -95,6 +95,9 @@ struct CommitDetailView: View {
         if detail.commit.isMerge {
           Label("Merge", systemImage: "arrow.triangle.merge")
         }
+        if let signature = detail.signature {
+          SignatureBadge(signature: signature)
+        }
       }
       .font(.caption)
       .foregroundStyle(.secondary)
