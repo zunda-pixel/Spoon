@@ -190,6 +190,11 @@ public protocol GitSequencerClient: Sendable {
   func cherryPick(_ oid: ObjectID) async throws
   /// Adds one inverse commit with git's default revert message.
   func revert(_ oid: ObjectID) async throws
+  /// Applies several commits onto HEAD in the given order (`git cherry-pick
+  /// A B C`). May pause on a conflict, like a single pick.
+  func cherryPick(_ oids: [ObjectID]) async throws
+  /// Adds one revert commit per commit, in the given order.
+  func revert(_ oids: [ObjectID]) async throws
   /// Removes one non-merge, non-root commit and replays its descendants onto
   /// its parent, updating every descendant local branch (`git history drop`,
   /// requires `GitCapabilities.supportsHistoryDrop`). Aborts without

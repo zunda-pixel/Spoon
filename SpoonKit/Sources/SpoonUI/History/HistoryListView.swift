@@ -57,7 +57,7 @@ struct HistoryListView: View {
             )
           }
         } else {
-          List(selection: $navigation.selectedCommitID) {
+          List(selection: $navigation.selectedCommitIDs) {
             ForEach(model.historyRows) { row in
               CommitGraphRowView(
                 model: model,
@@ -71,7 +71,12 @@ struct HistoryListView: View {
               .id(row.id)
               .listRowSeparator(.hidden)
               .contextMenu {
-                commitMenu(row.commit)
+                let selected = selectedCommits
+                if selected.count > 1, selected.contains(where: { $0.oid == row.commit.oid }) {
+                  multipleCommitsMenu(selected)
+                } else {
+                  commitMenu(row.commit)
+                }
               }
               .onAppear {
                 if row.id == model.historyRows.last?.id, model.hasMoreHistory {
@@ -144,6 +149,32 @@ struct HistoryListView: View {
       }
     }
     return !Task.isCancelled
+  }
+
+  /// The selected commits in history order (newest first).
+  private var selectedCommits: [Commit] {
+    let ids = navigation.selectedCommitIDs
+    guard ids.count > 1 else { return [] }
+    return model.historyRows.map(\.commit).filter { ids.contains($0.id) }
+  }
+
+  @ViewBuilder
+  private func multipleCommitsMenu(_ commits: [Commit]) -> some View {
+    let containsMerge = commits.contains(where: \.isMerge)
+    Button("Cherry-Pick \(commits.count) Commits onto \(model.currentBranch?.name ?? "HEAD")") {
+      Task { await model.cherryPick(commits) }
+    }
+    .disabled(containsMerge || model.isBusy || model.isSequencing)
+    Button("Revert \(commits.count) Commits") {
+      Task { await model.revert(commits) }
+    }
+    .disabled(
+      containsMerge || model.isBusy || model.isSequencing
+        || !commits.allSatisfy { model.canRevert($0.oid) }
+    )
+    if containsMerge {
+      Text("Merge commits can’t be picked or reverted together")
+    }
   }
 
   @ViewBuilder

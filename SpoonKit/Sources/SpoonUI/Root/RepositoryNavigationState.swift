@@ -173,7 +173,27 @@ final class RepositoryNavigationState {
 
   private var primarySidebarSelection: SidebarItem? = .changes
   private var storedSidebarSelections: Set<SidebarItem> = [.changes]
-  var selectedCommitID: String?
+  /// The history commit whose details are shown.
+  var selectedCommitID: String? {
+    get { primaryCommitID }
+    set {
+      primaryCommitID = newValue
+      storedCommitIDs = newValue.map { [$0] } ?? []
+    }
+  }
+
+  /// Every selected history commit; more than one after ⌘- or ⇧-clicking.
+  var selectedCommitIDs: Set<String> {
+    get { storedCommitIDs }
+    set {
+      storedCommitIDs = newValue
+      if let primary = primaryCommitID, newValue.contains(primary) { return }
+      primaryCommitID = newValue.min()
+    }
+  }
+
+  private var primaryCommitID: String?
+  private var storedCommitIDs: Set<String> = []
   var selectedReflogSelector: String?
   var selectedReflogOID: ObjectID?
   var fileSelections: Set<RepositoryModel.FileSelection> = []
