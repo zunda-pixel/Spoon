@@ -66,6 +66,9 @@ public protocol GitBranchClient: Sendable {
   func deleteMergedBranches(branches: [String], dryRun: Bool) async throws -> [String]
   func renameBranch(from oldName: String, to newName: String) async throws
   func setUpstream(of branch: String, to upstream: String) async throws
+  /// Names of local branches whose configured upstream is `upstream`, a
+  /// full ref such as `refs/remotes/origin/main` or `refs/heads/main`.
+  func branchNames(forkedFrom upstream: String) async throws -> [String]
   func defaultBranch() async throws -> String
 }
 

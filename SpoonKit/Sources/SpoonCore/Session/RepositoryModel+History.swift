@@ -1,4 +1,5 @@
 import Defaults
+import Foundation
 
 extension RepositoryModel {
   public var historyRows: [GraphRow] { historyStore.historyRows }
@@ -30,6 +31,24 @@ extension RepositoryModel {
       focusedHistoryReferenceIDs.insert(id)
       hiddenHistoryReferenceIDs.remove(id)
     }
+    persistHistoryReferenceFilters()
+    await reloadHistory()
+  }
+
+  /// Focuses the history on `base` and every local branch whose configured
+  /// upstream is `base` (`git branch --forked`).
+  public func focusHistoryOnBranches(forkedFrom base: HistoryReferenceFilterID) async {
+    let names: [String]
+    do {
+      names = try await gitClient.branchNames(forkedFrom: base.gitReference)
+    } catch {
+      lastErrorMessage = error.localizedDescription
+      lastErrorIsFromBackgroundRead = false
+      return
+    }
+    let ids = Set([base.id] + names.map { HistoryReferenceFilterID.localBranch($0).id })
+    focusedHistoryReferenceIDs = ids
+    hiddenHistoryReferenceIDs.subtract(ids)
     persistHistoryReferenceFilters()
     await reloadHistory()
   }

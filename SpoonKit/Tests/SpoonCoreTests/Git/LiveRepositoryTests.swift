@@ -41,6 +41,24 @@ struct LiveRepositoryTests {
     )
   }
 
+  @Test func forkedBranchesMatchTheirConfiguredUpstream() async throws {
+    let root = try await LiveRepoFixture.makeTemporaryRepo(
+      commits: [.init(file: "base.txt", content: "base\n", message: "base")],
+      runner: runner
+    )
+    defer { try? FileManager.default.removeItem(at: root) }
+    for arguments in [
+      ["branch", "--track", "forked", "main"],
+      ["branch", "unrelated"],
+    ] {
+      try await LiveRepoFixture.run(arguments, in: root, runner: runner)
+    }
+
+    let names = try await makeClient(root).branchNames(forkedFrom: "refs/heads/main")
+
+    #expect(names == ["forked"])
+  }
+
   @Test func cloneCreatesAWorkingLocalCopy() async throws {
     let source = try await LiveRepoFixture.makeTemporaryRepo(
       commits: [.init(file: "base.txt", content: "base\n", message: "base")],
