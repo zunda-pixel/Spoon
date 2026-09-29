@@ -285,6 +285,25 @@ struct LiveRepositoryTests {
     #expect(stagedStash.map(\.path) == ["b.txt"])
   }
 
+  @Test func blameAttributesCommittedAndUncommittedLines() async throws {
+    let root = try await LiveRepoFixture.makeTemporaryRepo(
+      commits: [.init(file: "f.txt", content: "one\n", message: "first")],
+      runner: runner
+    )
+    defer { try? FileManager.default.removeItem(at: root) }
+    try await LiveRepoFixture.commitFile(
+      "f.txt", content: "one\ntwo\n", message: "second", in: root, runner: runner
+    )
+    try Data("one\ntwo\nthree\n".utf8).write(to: root.appending(path: "f.txt"))
+
+    let lines = try await makeClient(root).blame(path: "f.txt", at: nil)
+
+    #expect(lines.map(\.text) == ["one", "two", "three"])
+    #expect(lines.map(\.commit.summary).prefix(2) == ["first", "second"])
+    #expect(lines.map(\.commit.isUncommitted) == [false, false, true])
+    #expect(lines[0].commit.authorName == "Spoon Tests")
+  }
+
   @Test func cloneCreatesAWorkingLocalCopy() async throws {
     let source = try await LiveRepoFixture.makeTemporaryRepo(
       commits: [.init(file: "base.txt", content: "base\n", message: "base")],

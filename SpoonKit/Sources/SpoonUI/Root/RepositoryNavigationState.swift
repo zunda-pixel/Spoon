@@ -30,6 +30,7 @@ final class RepositoryNavigationState {
     case dropLargeBlobs
     case backfill
     case fileHistory(path: String)
+    case blame(path: String)
     case addRemote
     case addWorktree(Branch)
     case addRemoteWorktree(RemoteBranchSelection)
@@ -63,6 +64,8 @@ final class RepositoryNavigationState {
         "backfill"
       case .fileHistory(let path):
         "file-history:\(path)"
+      case .blame(let path):
+        "blame:\(path)"
       case .addRemote:
         "add-remote"
       case .addWorktree(let branch):

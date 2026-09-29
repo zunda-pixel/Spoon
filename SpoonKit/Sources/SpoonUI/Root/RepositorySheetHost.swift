@@ -26,6 +26,8 @@ struct RepositorySheetHost: ViewModifier {
         BackfillSheet(model: model)
       case .fileHistory(let path):
         FileHistorySheet(model: model, path: path)
+      case .blame(let path):
+        BlameSheet(model: model, path: path, navigation: navigation)
       case .addRemote:
         AddRemoteSheet(model: model)
       case .addWorktree(let branch):

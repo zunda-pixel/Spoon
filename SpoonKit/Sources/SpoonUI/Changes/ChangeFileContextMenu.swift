@@ -82,6 +82,11 @@ struct ChangeFileContextMenu: View {
       Button("Show File History…") {
         navigation.present(.fileHistory(path: entry.path))
       }
+      if FileManager.default.fileExists(atPath: fileURL.path) {
+        Button("Blame…") {
+          navigation.present(.blame(path: entry.path))
+        }
+      }
     }
     if FileManager.default.fileExists(atPath: fileURL.path) {
       Divider()

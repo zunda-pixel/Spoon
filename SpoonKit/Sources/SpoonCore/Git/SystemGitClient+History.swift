@@ -56,6 +56,16 @@ extension SystemGitClient {
     return try GitReflogParser.parse(result.standardOutput)
   }
 
+  public func blame(path: String, at revision: ObjectID?) async throws -> [BlameLine] {
+    var arguments = ["blame", "--porcelain"]
+    if let revision {
+      arguments.append(revision.rawValue)
+    }
+    arguments.append(contentsOf: ["--", path])
+    let result = try await run(arguments, timeout: .seconds(120))
+    return GitBlameParser.parse(result.standardOutput)
+  }
+
   public func commitDetail(_ oid: ObjectID) async throws -> CommitDetail {
     let metadata = try await run([
       "log", "-1", "-z", "--format=\(GitLogParser.logFormat)", oid.rawValue, "--",
