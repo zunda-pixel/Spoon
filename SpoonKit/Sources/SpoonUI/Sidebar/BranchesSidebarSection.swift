@@ -163,6 +163,10 @@ struct BranchContextMenu: View {
       }
       .disabled(model.isBusy)
     }
+    Button("Compare Versions…") {
+      navigation.present(.compareBranchVersions(branch))
+    }
+    .help("Compare this branch with its previous position or its upstream, commit by commit")
     Button("Show Only Branches Forked from Here") {
       navigation.select(.history)
       Task { await model.focusHistoryOnBranches(forkedFrom: .localBranch(branch.name)) }

@@ -1042,6 +1042,34 @@ struct RepositoryModelTests {
     #expect(model.bisectResult == nil)
   }
 
+  @Test func branchVersionComparisonUsesReflogAndMergeBases() async {
+    let client = FakeRepositoryGitClient()
+    let head = makeOID("aaaa1111")
+    let previous = makeOID("bbbb2222")
+    let base = makeOID("cccc3333")
+    let topic = makeBranch("topic", oid: head, isCurrent: true)
+    await client.configure(
+      status: makeStatus(oid: head, branch: "topic"),
+      branches: [topic],
+      mergeBases: ["main...\(previous.rawValue)": base, "main...\(head.rawValue)": base]
+    )
+    let model = makeModel(client)
+    await model.refresh()
+
+    await #expect(throws: BranchVersionComparisonError.noPreviousPosition(branch: "topic")) {
+      try await model.compareBranchVersions(topic, with: .previousPosition)
+    }
+    await #expect(throws: BranchVersionComparisonError.noUpstream(branch: "topic")) {
+      try await model.compareBranchVersions(topic, with: .upstream)
+    }
+
+    await client.setPreviousTip(previous, of: "refs/heads/topic")
+    _ = try? await model.compareBranchVersions(topic, with: .previousPosition)
+    #expect(
+      await client.mutationCalls == ["range-diff:cccc3333..bbbb2222:cccc3333..aaaa1111"]
+    )
+  }
+
   @Test func refreshErrorClearsOnceRefreshRecovers() async {
     let client = FakeRepositoryGitClient()
     let oid = makeOID("99999999")
@@ -1129,6 +1157,8 @@ private actor FakeRepositoryGitClient: GitClient {
   private var currentStatus = WorkingTreeStatus()
   private var currentCapabilities = GitCapabilities()
   private var currentBisectState: BisectState?
+  private var previousTips: [String: ObjectID] = [:]
+  func setPreviousTip(_ oid: ObjectID, of reference: String) { previousTips[reference] = oid }
   private var nextBisectProgress = BisectProgress.testing(nil)
   private var currentPartialCloneRemote: String?
   private var currentMissingObjects: [ObjectID] = []
@@ -1388,6 +1418,14 @@ private actor FakeRepositoryGitClient: GitClient {
   func diff(from: String, to: String) async throws -> [FileDiff] { [] }
   func diffText(from: String, to: String) async throws -> String { "" }
   func stagedDiffText() async throws -> String { "" }
+  func rangeDiff(
+    oldBase: ObjectID, oldTip: ObjectID, newBase: ObjectID, newTip: ObjectID
+  ) async throws -> [RangeDiffEntry] {
+    mutationCalls.append(
+      "range-diff:\(oldBase.rawValue)..\(oldTip.rawValue):\(newBase.rawValue)..\(newTip.rawValue)")
+    return []
+  }
+  func previousTip(of reference: String) async throws -> ObjectID? { previousTips[reference] }
   func saveStash(_ options: StashSaveOptions) async throws {
     throw Failure.unimplemented
   }

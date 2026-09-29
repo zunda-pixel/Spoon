@@ -181,6 +181,28 @@ struct GitOutputHelperTests {
     #expect(PullOptions(strategy: .fastForwardOnly).arguments == ["--ff-only"])
   }
 
+  @Test func rangeDiffParserReadsPairingsAndPatchChanges() {
+    let output = """
+      1:  4901b4d = 1:  916899b add one
+      2:  8e3c00b ! 2:  6058041 add two: with = and ! in it
+          @@ Metadata
+            ## two ##
+          -2
+          +22
+
+      3:  04d7a9e < -:  ------- add three
+      -:  ------- > 3:  0d95c2f add four
+      """
+
+    let entries = GitRangeDiffParser.parse(output)
+
+    #expect(entries.map(\.relation) == [.unchanged, .changed, .removed, .added])
+    #expect(entries[1].subject == "add two: with = and ! in it")
+    #expect(entries[1].patchDiff == ["@@ Metadata", "  ## two ##", "-2", "+22"])
+    #expect(entries[2].newOID == nil && entries[2].newPosition == nil)
+    #expect(entries[3].oldOID == nil && entries[3].newPosition == 3)
+  }
+
   @Test func untrackedDiffBuilderCreatesTextPatch() {
     let diff = UntrackedDiffBuilder.make(path: "notes.txt", data: Data("first\nsecond".utf8))
 
