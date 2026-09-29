@@ -1496,6 +1496,16 @@ private actor FakeRepositoryGitClient: GitClient {
     if shouldFailWorktreeMutations { throw Failure.unimplemented }
     mutationCalls.append("remove-worktree:\(path.path):\(force)")
   }
+  func pruneWorktrees() async throws { mutationCalls.append("worktree-prune") }
+  func lockWorktree(path: URL, reason: String?) async throws {
+    mutationCalls.append("worktree-lock:\(path.lastPathComponent):\(reason ?? "")")
+  }
+  func unlockWorktree(path: URL) async throws {
+    mutationCalls.append("worktree-unlock:\(path.lastPathComponent)")
+  }
+  func moveWorktree(path: URL, to destination: URL) async throws {
+    mutationCalls.append("worktree-move:\(path.lastPathComponent)>\(destination.lastPathComponent)")
+  }
   func sparseCheckoutPaths() async throws -> [String]? { nil }
   func setSparseCheckout(paths: [String]) async throws { throw Failure.unimplemented }
   func disableSparseCheckout() async throws { throw Failure.unimplemented }

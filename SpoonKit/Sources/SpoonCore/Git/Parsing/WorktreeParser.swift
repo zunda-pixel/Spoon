@@ -9,16 +9,22 @@ public enum WorktreeParser {
     var path: URL?
     var head: ObjectID?
     var branch: String?
+    var lockReason: String?
+    var prunableReason: String?
 
     func flush() {
       if let root = path {
         worktrees.append(
-          Worktree(path: root, branch: branch, headOID: head, isMain: worktrees.isEmpty)
+          Worktree(
+            path: root, branch: branch, headOID: head, isMain: worktrees.isEmpty,
+            lockReason: lockReason, prunableReason: prunableReason)
         )
       }
       path = nil
       head = nil
       branch = nil
+      lockReason = nil
+      prunableReason = nil
     }
 
     for line in text.split(separator: "\n", omittingEmptySubsequences: false) {
@@ -31,8 +37,13 @@ public enum WorktreeParser {
       } else if line.hasPrefix("branch ") {
         let ref = line.dropFirst("branch ".count)
         branch = String(ref.hasPrefix("refs/heads/") ? ref.dropFirst("refs/heads/".count) : ref)
+      } else if line == "locked" || line.hasPrefix("locked ") {
+        lockReason = String(line.dropFirst("locked".count)).trimmingCharacters(in: .whitespaces)
+      } else if line == "prunable" || line.hasPrefix("prunable ") {
+        prunableReason = String(line.dropFirst("prunable".count))
+          .trimmingCharacters(in: .whitespaces)
       }
-      // "detached", "bare", "locked", "prunable …" carry no fields we model.
+      // "detached" and "bare" carry no fields we model.
     }
     flush()
     return worktrees

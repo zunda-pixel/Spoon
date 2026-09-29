@@ -227,11 +227,13 @@ struct BranchContextMenu: View {
       Button("Open in Finder") {
         NSWorkspace.shared.open(worktree.path)
       }
+      WorktreeMaintenanceMenuItems(model: model, navigation: navigation, worktree: worktree)
       if !worktree.isMain {
         Button("Delete Worktree…", role: .destructive) {
           navigation.present(.deleteWorktree(worktree))
         }
-          .disabled(model.isBusy)
+        .disabled(model.isBusy || worktree.isLocked)
+        .help(worktree.isLocked ? "Unlock the worktree to delete it" : "")
       }
     } else if !branch.isCurrent {
       Button("Create Worktree…") { navigation.present(.addWorktree(branch)) }

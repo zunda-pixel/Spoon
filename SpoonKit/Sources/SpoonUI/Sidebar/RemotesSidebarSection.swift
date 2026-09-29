@@ -230,11 +230,12 @@ private struct RemoteBranchTreeNodeView: View {
       Button("Open in Finder") {
         NSWorkspace.shared.open(worktree.path)
       }
+      WorktreeMaintenanceMenuItems(model: model, navigation: navigation, worktree: worktree)
       if !worktree.isMain {
         Button("Delete Worktree…", role: .destructive) {
           removingWorktree = worktree
         }
-        .disabled(model.isBusy)
+        .disabled(model.isBusy || worktree.isLocked)
       }
     } else if let localBranch {
       Button("Create Worktree…") {

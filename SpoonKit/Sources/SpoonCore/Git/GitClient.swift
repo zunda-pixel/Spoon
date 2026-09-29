@@ -167,6 +167,13 @@ public protocol GitWorktreeClient: Sendable {
   func addWorktree(path: URL, remoteBranch: String, localBranch: String) async throws
   /// Removes a linked worktree (`--force` discards its local changes).
   func removeWorktree(path: URL, force: Bool) async throws
+  /// Forgets worktrees whose folders no longer exist (`git worktree prune`).
+  func pruneWorktrees() async throws
+  /// Protects a linked worktree from being pruned, moved, or removed.
+  func lockWorktree(path: URL, reason: String?) async throws
+  func unlockWorktree(path: URL) async throws
+  /// Moves a linked worktree's folder and updates git's records of it.
+  func moveWorktree(path: URL, to destination: URL) async throws
 }
 
 /// Sparse-checkout configuration.
