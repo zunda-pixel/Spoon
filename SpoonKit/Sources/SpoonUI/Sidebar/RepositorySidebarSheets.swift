@@ -21,7 +21,7 @@ struct RenameBranchSheet: View {
         .textFieldStyle(.roundedBorder)
         .frame(width: 280)
         .onSubmit(rename)
-      if let upstream = branch.upstream {
+      if let upstream = model.existingRemoteUpstream(of: branch) {
         Toggle("Also rename remote branch “\(upstream)”", isOn: $renameRemoteBranch)
         Text("This runs multiple Git operations and cannot be completed atomically.")
           .font(.caption)
@@ -45,7 +45,7 @@ struct RenameBranchSheet: View {
     guard isValidName else { return }
     let newName = name.trimmingCharacters(in: .whitespaces)
     dismiss()
-    let upstream = renameRemoteBranch ? branch.upstream : nil
+    let upstream = renameRemoteBranch ? model.existingRemoteUpstream(of: branch) : nil
     Task {
       await model.renameBranch(
         from: branch.name,
@@ -74,7 +74,7 @@ struct DeleteBranchSheet: View {
       if requiresForce == true {
         Toggle("Force delete, discarding those commits", isOn: $forceDelete)
       }
-      if let upstream = branch.upstream {
+      if let upstream = model.existingRemoteUpstream(of: branch) {
         Toggle("Also delete remote branch “\(upstream)”", isOn: $deleteRemoteBranch)
         Text("This runs multiple Git operations and cannot be completed atomically.")
           .font(.caption)
@@ -100,7 +100,7 @@ struct DeleteBranchSheet: View {
   }
 
   private func delete(force: Bool) {
-    let upstream = deleteRemoteBranch ? branch.upstream : nil
+    let upstream = deleteRemoteBranch ? model.existingRemoteUpstream(of: branch) : nil
     dismiss()
     Task {
       await model.deleteBranch(
@@ -131,7 +131,7 @@ struct DeleteWorktreeSheet: View {
 
       if let branch {
         Toggle("Also delete branch “\(branch.name)”", isOn: $deleteBranch)
-        if deleteBranch, let upstream = branch.upstream {
+        if deleteBranch, let upstream = model.existingRemoteUpstream(of: branch) {
           Toggle(
             "Also delete remote branch “\(upstream)”",
             isOn: $deleteRemoteBranch
@@ -174,7 +174,8 @@ struct DeleteWorktreeSheet: View {
 
   private func remove() {
     let branchName = deleteBranch ? branch?.name : nil
-    let upstream = deleteBranch && deleteRemoteBranch ? branch?.upstream : nil
+    let upstream =
+      deleteBranch && deleteRemoteBranch ? branch.flatMap(model.existingRemoteUpstream) : nil
     let shouldForceRemove = forceRemove
     let shouldForceDeleteBranch = forceDeleteBranch
     dismiss()

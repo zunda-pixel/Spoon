@@ -192,6 +192,31 @@ struct RepositoryModelTests {
     )
   }
 
+  @Test func onlyExistingRemoteUpstreamsAreOfferedForRenameOrDelete() async {
+    let client = FakeRepositoryGitClient()
+    let oid = makeOID("27272727")
+    let live = makeBranch("live", oid: oid, isCurrent: false, upstream: "origin/live")
+    var gone = makeBranch("gone", oid: oid, isCurrent: false, upstream: "origin/gone")
+    gone.upstreamGone = true
+    let pruned = makeBranch("pruned", oid: oid, isCurrent: false, upstream: "origin/pruned")
+    let local = makeBranch("stacked", oid: oid, isCurrent: false, upstream: "main")
+    let untracked = makeBranch("untracked", oid: oid, isCurrent: false)
+    await client.configure(
+      status: makeStatus(oid: oid, branch: "main"),
+      branches: [live, gone, pruned, local, untracked],
+      remotes: [Remote(name: "origin", fetchURL: "https://example.com/r.git", pushURL: nil)],
+      remoteBranchesByRemote: ["origin": [makeBranch("origin/live", oid: oid, isCurrent: false)]]
+    )
+    let model = makeModel(client)
+    await model.refresh()
+
+    #expect(model.existingRemoteUpstream(of: live) == "origin/live")
+    #expect(model.existingRemoteUpstream(of: gone) == nil)
+    #expect(model.existingRemoteUpstream(of: pruned) == nil)
+    #expect(model.existingRemoteUpstream(of: local) == nil)
+    #expect(model.existingRemoteUpstream(of: untracked) == nil)
+  }
+
   @Test func pullRequestPublishesBranchesWithoutLiveUpstream() async {
     let client = FakeRepositoryGitClient()
     let oid = makeOID("26262627")

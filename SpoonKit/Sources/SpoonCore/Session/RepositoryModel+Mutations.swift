@@ -163,6 +163,19 @@ extension RepositoryModel {
     await perform { try await $0.switchToRemoteBranch(remoteBranch) }
   }
 
+  /// The branch's upstream when it is a remote-tracking branch that still
+  /// exists. `nil` for no upstream, a local upstream, or one that is gone
+  /// (deleted on the remote and pruned by fetch), so the rename/delete
+  /// sheets only offer to change remote branches that are actually there.
+  public func existingRemoteUpstream(of branch: Branch) -> String? {
+    guard
+      let upstream = branch.upstream, !branch.upstreamGone,
+      let remoteName = branch.upstreamRemoteName,
+      remoteBranchesByRemote[remoteName]?.contains(where: { $0.name == upstream }) == true
+    else { return nil }
+    return upstream
+  }
+
   /// Whether `git branch -d` would refuse to delete `branch`: git allows a
   /// plain delete when the tip is reachable from HEAD or from the branch's
   /// own upstream; anything else discards commits and needs `-D`.
