@@ -163,6 +163,19 @@ extension RepositoryModel {
     }
   }
 
+  /// Local branches `git branch --delete-merged` would remove because their
+  /// work already landed on the upstream they track.
+  public func mergedBranchesToDelete() async throws -> [String] {
+    try await gitClient.deleteMergedBranches(branches: [], dryRun: true)
+  }
+
+  /// Deletes the merged branches previewed by `mergedBranchesToDelete`.
+  /// git re-checks each one, so a branch that changed since the preview is kept.
+  public func deleteMergedBranches(_ names: [String]) async {
+    guard !names.isEmpty else { return }
+    await perform { try await $0.deleteMergedBranches(branches: names, dryRun: false) }
+  }
+
   public func renameBranch(
     from oldName: String,
     to newName: String,

@@ -43,6 +43,18 @@ extension SystemGitClient {
     try await runVoid(["branch", force ? "-D" : "-d", name])
   }
 
+  @discardableResult
+  public func deleteMergedBranches(branches: [String], dryRun: Bool) async throws -> [String] {
+    // `**` matches every upstream, including names with slashes.
+    var arguments = ["branch", "--delete-merged", "**"]
+    if dryRun {
+      arguments.append("--dry-run")
+    }
+    arguments.append(contentsOf: branches)
+    let result = try await run(arguments)
+    return GitRefParser.parseDeletedBranchNames(result.standardOutputText)
+  }
+
   public func renameBranch(from oldName: String, to newName: String) async throws {
     try await runVoid(["branch", "-m", oldName, newName])
   }
