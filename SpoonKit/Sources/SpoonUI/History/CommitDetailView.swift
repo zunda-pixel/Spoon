@@ -14,6 +14,8 @@ struct CommitDetailView: View {
   @State private var pendingRestore: FileRestoreRequest?
   /// Tags around the commit, loaded after the detail since it is optional.
   @State private var description: (oid: ObjectID, value: CommitDescription)?
+  /// Signed tags on the commit, with their verification.
+  @State private var tagSignatures: (oid: ObjectID, values: [(tag: Tag, signature: CommitSignature)])?
 
   init(model: RepositoryModel, oid: ObjectID) {
     self.model = model
@@ -78,6 +80,10 @@ struct CommitDetailView: View {
         detail = loaded
         if let value = await model.describe(oid), !Task.isCancelled {
           description = (oid, value)
+        }
+        let signatures = await model.verifiedTags(at: oid)
+        if !Task.isCancelled {
+          tagSignatures = (oid, signatures)
         }
       } catch {
         guard !Task.isCancelled else { return }
@@ -165,6 +171,11 @@ struct CommitDetailView: View {
         }
         if let description, description.oid == detail.commit.oid {
           TagPositionLabels(description: description.value)
+        }
+        if let tagSignatures, tagSignatures.oid == detail.commit.oid {
+          ForEach(tagSignatures.values, id: \.tag.name) { entry in
+            SignatureBadge(signature: entry.signature, subject: "Tag \(entry.tag.name)")
+          }
         }
       }
       .font(.caption)

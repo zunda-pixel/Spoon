@@ -35,6 +35,19 @@ extension SystemGitClient {
     try await runVoid(arguments)
   }
 
+  public func verifyTag(name: String) async throws -> CommitSignature? {
+    let command = GitCommand.make(
+      git: git,
+      repository: repositoryRoot,
+      arguments: ["verify-tag", "--raw", "refs/tags/\(name)"],
+      timeout: .seconds(30)
+    )
+    // Failing verification exits non-zero; the output still says why.
+    let result = try await runner.run(command)
+    let output = result.standardOutputText + "\n" + result.standardErrorText
+    return TagVerificationParser.parse(output, exitCode: result.exitCode)
+  }
+
   public func deleteTag(name: String) async throws {
     try await runVoid(["tag", "-d", name])
   }

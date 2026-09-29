@@ -181,6 +181,8 @@ public protocol GitTagClient: Sendable {
   func createTag(name: String, at target: ObjectID?, message: String?, signing: TagSigning)
     async throws
   func deleteTag(name: String) async throws
+  /// Checks a tag's signature (`git verify-tag`); `nil` when it has none.
+  func verifyTag(name: String) async throws -> CommitSignature?
   func pushTag(name: String, to remoteName: String) async throws
   func pushAllTags(to remoteName: String) async throws
   func deleteRemoteTag(name: String, from remoteName: String) async throws

@@ -61,6 +61,18 @@ struct LiveGitTests {
     #expect(tags["v2"]?.isSigned == false)
     #expect(tags["v2"]?.isAnnotated == true)
     #expect(tags["v3"]?.isSigned == true)
+
+    // Verification: SSH needs gpg.ssh.allowedSignersFile to check at all.
+    #expect(try await client.verifyTag(name: "v2") == nil)
+    let unconfigured = try await client.verifyTag(name: "v1")
+    #expect(unconfigured?.status == .unverifiable)
+    let publicKey = try String(contentsOf: URL(filePath: key.path + ".pub"), encoding: .utf8)
+    let allowed = keyDirectory.appending(path: "allowed_signers")
+    try Data("test@example.com \(publicKey)".utf8).write(to: allowed)
+    try await runGit(["config", "gpg.ssh.allowedSignersFile", allowed.path], in: root)
+    let verified = try await client.verifyTag(name: "v1")
+    #expect(verified?.status == .good)
+    #expect(verified?.signer == "test@example.com")
   }
 
   @Test func codeSearchFindsLinesInTheWorkingTreeAndAtARevision() async throws {
