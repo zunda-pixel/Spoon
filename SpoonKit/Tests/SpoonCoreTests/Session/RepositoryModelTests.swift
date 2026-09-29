@@ -1347,6 +1347,9 @@ private actor FakeRepositoryGitClient: GitClient {
   ) async throws {
     mutationCalls.append("take:\(path):\(side.rawValue):\(sideHasFile)")
   }
+  func restoreConflictMarkers(path: String) async throws {
+    mutationCalls.append("remerge:\(path)")
+  }
   func stage(paths: [String]) async throws {
     stageCallCount += 1
     currentStatus.entries = currentStatus.entries.map { entry in

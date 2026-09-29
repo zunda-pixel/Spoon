@@ -25,6 +25,9 @@ public protocol GitWorkingTreeClient: Sendable {
   /// the path when `side` has no version (`sideHasFile == false`).
   func resolveConflict(path: String, using side: FileStatusEntry.ConflictSide, sideHasFile: Bool)
     async throws
+  /// Rewrites a conflicted path with fresh conflict markers, undoing any
+  /// edits made while resolving it (`git checkout --merge`).
+  func restoreConflictMarkers(path: String) async throws
   /// Removes paths from the index, keeping working-tree contents.
   func unstage(paths: [String]) async throws
   /// Applies a patch (from `DiffPatchBuilder`). `toIndex` targets the index
