@@ -64,14 +64,14 @@ struct DeleteBranchSheet: View {
   @State private var deleteRemoteBranch = false
   @State private var forceDelete = false
   /// nil while the merge check runs; the force checkbox only appears once
-  /// the branch is known to have commits a plain delete would refuse to drop.
-  @State private var requiresForce: Bool?
+  /// the branch is known to have commits that exist nowhere else.
+  @State private var safety: RepositoryModel.BranchDeletionSafety?
 
   var body: some View {
     SheetFormLayout(title: "Delete Branch “\(branch.name)”") {
       Text(explanation)
         .frame(width: 380, alignment: .leading)
-      if requiresForce == true {
+      if safety == .unmerged {
         Toggle("Force delete, discarding those commits", isOn: $forceDelete)
       }
       if let upstream = model.existingRemoteUpstream(of: branch) {
@@ -82,19 +82,24 @@ struct DeleteBranchSheet: View {
       }
     } actions: {
       Button("Cancel", role: .cancel) { dismiss() }
-      Button("Delete", role: .destructive) { delete(force: forceDelete) }
-        .keyboardShortcut(.defaultAction)
-        .disabled(requiresForce == true && !forceDelete)
+      Button("Delete", role: .destructive) {
+        delete(force: safety?.requiresForce == true)
+      }
+      .keyboardShortcut(.defaultAction)
+      .disabled(safety == nil || (safety == .unmerged && !forceDelete))
     }
     .task {
-      requiresForce = await model.requiresForceDelete(branch)
+      safety = await model.deletionSafety(of: branch)
     }
   }
 
   private var explanation: String {
-    if requiresForce == true {
+    switch safety {
+    case .unmerged:
       "This branch has commits that are merged into neither HEAD nor its upstream."
-    } else {
+    case .contentMerged(let target):
+      "Its changes are already in \(target) (merged with squash or rebase), so nothing is lost."
+    case .merged, nil:
       "The local branch will be deleted."
     }
   }
@@ -121,7 +126,7 @@ struct DeleteWorktreeSheet: View {
   @State private var deleteBranch = false
   @State private var deleteRemoteBranch = false
   @State private var forceDeleteBranch = false
-  @State private var branchRequiresForce: Bool?
+  @State private var branchSafety: RepositoryModel.BranchDeletionSafety?
 
   var body: some View {
     SheetFormLayout(title: "Delete Worktree “\(worktree.name)”") {
@@ -137,7 +142,7 @@ struct DeleteWorktreeSheet: View {
             isOn: $deleteRemoteBranch
           )
         }
-        if deleteBranch, branchRequiresForce == true {
+        if deleteBranch, branchSafety == .unmerged {
           Text("This branch has commits that are merged into neither HEAD nor its upstream.")
             .frame(width: 420, alignment: .leading)
           Toggle(
@@ -157,13 +162,12 @@ struct DeleteWorktreeSheet: View {
         .keyboardShortcut(.defaultAction)
         .disabled(
           deleteBranch
-            && (branchRequiresForce == nil
-              || (branchRequiresForce == true && !forceDeleteBranch))
+            && (branchSafety == nil || (branchSafety == .unmerged && !forceDeleteBranch))
         )
     }
     .task {
       guard let branch else { return }
-      branchRequiresForce = await model.requiresForceDelete(branch)
+      branchSafety = await model.deletionSafety(of: branch)
     }
   }
 
@@ -177,7 +181,7 @@ struct DeleteWorktreeSheet: View {
     let upstream =
       deleteBranch && deleteRemoteBranch ? branch.flatMap(model.existingRemoteUpstream) : nil
     let shouldForceRemove = forceRemove
-    let shouldForceDeleteBranch = forceDeleteBranch
+    let shouldForceDeleteBranch = branchSafety?.requiresForce == true
     dismiss()
     Task {
       await model.removeWorktree(

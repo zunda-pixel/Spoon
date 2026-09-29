@@ -80,6 +80,42 @@ extension SystemGitClient {
     return GitRefParser.parseDeletedBranchNames(result.standardOutputText)
   }
 
+  public func isContentMerged(branch: String, into target: String) async throws -> Bool {
+    // Rebase merge: each commit has a patch-identical twin in `target`.
+    let perCommit = try await run(["cherry", target, branch], timeout: .seconds(60))
+    if Self.allCherryPicked(perCommit.standardOutputText) {
+      return true
+    }
+    // Squash merge: the branch's whole change, as one commit on the merge
+    // base, has a patch-identical twin in `target`. `commit-tree` only
+    // writes an unreferenced object; no ref or the index changes.
+    let base = try await run(["merge-base", target, branch])
+      .standardOutputText.trimmingCharacters(in: .whitespacesAndNewlines)
+    let tree = try await run(["rev-parse", "\(branch)^{tree}"])
+      .standardOutputText.trimmingCharacters(in: .whitespacesAndNewlines)
+    let squash = GitCommand.make(
+      git: git,
+      repository: repositoryRoot,
+      arguments: ["commit-tree", tree, "-p", base, "-m", "Spoon squash-merge check"],
+      // A fixed identity: the check must work without user.name configured.
+      extraEnvironment: [
+        "GIT_AUTHOR_NAME": "Spoon", "GIT_AUTHOR_EMAIL": "spoon@localhost",
+        "GIT_COMMITTER_NAME": "Spoon", "GIT_COMMITTER_EMAIL": "spoon@localhost",
+      ],
+      timeout: .seconds(30)
+    )
+    let squashed = try await runner.run(squash).checkSuccess(of: squash)
+      .standardOutputText.trimmingCharacters(in: .whitespacesAndNewlines)
+    let squashCherry = try await run(["cherry", target, squashed], timeout: .seconds(60))
+    return Self.allCherryPicked(squashCherry.standardOutputText)
+  }
+
+  /// `git cherry` prints `- <oid>` for commits already upstream and
+  /// `+ <oid>` otherwise; nothing means `branch` is already reachable.
+  static func allCherryPicked(_ output: String) -> Bool {
+    output.split(whereSeparator: \.isNewline).allSatisfy { $0.hasPrefix("-") }
+  }
+
   public func renameBranch(from oldName: String, to newName: String) async throws {
     try await runVoid(["branch", "-m", oldName, newName])
   }
