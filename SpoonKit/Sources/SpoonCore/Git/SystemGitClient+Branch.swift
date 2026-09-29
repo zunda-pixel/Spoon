@@ -59,6 +59,18 @@ extension SystemGitClient {
     try await runVoid(["branch", "-m", oldName, newName])
   }
 
+  public func moveBranch(name: String, to target: ObjectID, expectedTip: ObjectID) async throws {
+    let message = "spoon: move \(name) to \(target.shortened)"
+    let reference = "refs/heads/\(name)"
+    let command =
+      if await capabilities().supportsRefsWriteCommands {
+        ["refs", "update", "--message=\(message)"]
+      } else {
+        ["update-ref", "-m", message]
+      }
+    try await runVoid(command + [reference, target.rawValue, expectedTip.rawValue])
+  }
+
   public func setUpstream(of branch: String, to upstream: String) async throws {
     try await runVoid(["branch", "--set-upstream-to", upstream, branch])
   }

@@ -810,6 +810,38 @@ struct RepositoryModelTests {
     )
   }
 
+  @Test func onlyBranchesThatAreNotCheckedOutCanMove() async {
+    let client = FakeRepositoryGitClient()
+    let head = makeOID("aaaa1111")
+    let other = makeOID("bbbb2222")
+    let target = makeOID("cccc3333")
+    await client.configure(
+      status: makeStatus(oid: head, branch: "main"),
+      branches: [
+        makeBranch("main", oid: head, isCurrent: true),
+        makeBranch("topic", oid: other, isCurrent: false),
+        makeBranch("in-worktree", oid: other, isCurrent: false),
+        makeBranch("already-there", oid: target, isCurrent: false),
+      ],
+      worktrees: [
+        Worktree(
+          path: URL(filePath: "/tmp/in-worktree"),
+          branch: "in-worktree",
+          headOID: other,
+          isMain: false
+        )
+      ]
+    )
+    let model = makeModel(client)
+    await model.refresh()
+
+    let movable = model.branchesMovable(to: target)
+    #expect(movable.map(\.name) == ["topic"])
+
+    await model.moveBranch(movable[0], to: target)
+    #expect(await client.mutationCalls == ["move:topic:bbbb2222->cccc3333"])
+  }
+
   @Test func refreshErrorClearsOnceRefreshRecovers() async {
     let client = FakeRepositoryGitClient()
     let oid = makeOID("99999999")
@@ -1007,6 +1039,9 @@ private actor FakeRepositoryGitClient: GitClient {
   func deleteMergedBranches(branches: [String], dryRun: Bool) async throws -> [String] {
     mutationCalls.append("delete-merged:\(branches.joined(separator: ",")):\(dryRun)")
     return dryRun ? ["merged"] : branches
+  }
+  func moveBranch(name: String, to target: ObjectID, expectedTip: ObjectID) async throws {
+    mutationCalls.append("move:\(name):\(expectedTip.rawValue)->\(target.rawValue)")
   }
   func renameBranch(from oldName: String, to newName: String) async throws {
     mutationCalls.append("rename-local:\(oldName):\(newName)")

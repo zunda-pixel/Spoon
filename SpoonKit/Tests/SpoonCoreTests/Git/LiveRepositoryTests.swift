@@ -59,6 +59,29 @@ struct LiveRepositoryTests {
     #expect(names == ["forked"])
   }
 
+  @Test func moveBranchRefusesAStaleExpectedTip() async throws {
+    let root = try await LiveRepoFixture.makeTemporaryRepo(
+      commits: [
+        .init(file: "a.txt", content: "a\n", message: "first"),
+        .init(file: "b.txt", content: "b\n", message: "second"),
+      ],
+      runner: runner
+    )
+    defer { try? FileManager.default.removeItem(at: root) }
+    try await LiveRepoFixture.run(["branch", "topic"], in: root, runner: runner)
+    let client = makeClient(root)
+    let commits = try await client.log(LogQuery(reference: "main", maxCount: 2)).commits
+    let (second, first) = (commits[0].oid, commits[1].oid)
+
+    await #expect(throws: CommandError.self) {
+      try await client.moveBranch(name: "topic", to: first, expectedTip: first)
+    }
+    try await client.moveBranch(name: "topic", to: first, expectedTip: second)
+
+    let topic = try await client.branches().first { $0.name == "topic" }
+    #expect(topic?.tip == first)
+  }
+
   @Test func cloneCreatesAWorkingLocalCopy() async throws {
     let source = try await LiveRepoFixture.makeTemporaryRepo(
       commits: [.init(file: "base.txt", content: "base\n", message: "base")],

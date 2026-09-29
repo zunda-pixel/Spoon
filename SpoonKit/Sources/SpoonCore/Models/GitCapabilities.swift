@@ -38,6 +38,9 @@ public struct GitCapabilities: Sendable, Hashable {
   /// `git branch --forked` (2.56+).
   public var supportsForkedBranchFilter: Bool { supports(GitVersion(2, 56)) }
 
+  /// `git refs create/update/delete/rename` (2.56+).
+  public var supportsRefsWriteCommands: Bool { supports(GitVersion(2, 56)) }
+
   /// `git history drop` (2.56+).
   public var supportsHistoryDrop: Bool { supports(GitVersion(2, 56)) }
 

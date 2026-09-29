@@ -48,6 +48,8 @@ struct RepositorySheetHost: ViewModifier {
         MergeSheet(model: model, branch: branch)
       case .rebase(let commit):
         RebaseSheet(model: model, fromCommit: commit)
+      case .moveBranch(let branch, let commit):
+        MoveBranchSheet(model: model, branch: branch, commit: commit)
       case .dropCommit(let commit):
         DropCommitSheet(model: model, commit: commit)
       case .tag(let commit):
