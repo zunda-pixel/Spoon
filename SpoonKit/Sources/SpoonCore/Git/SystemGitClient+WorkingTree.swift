@@ -141,13 +141,30 @@ extension SystemGitClient {
     )
   }
 
-  public func commit(message: String, amend: Bool) async throws {
-    var arguments = ["commit", "-F", "-"]
-    if amend {
-      arguments.append("--amend")
-    }
-    // Generous timeout: user hooks may run.
-    try await runVoid(arguments, standardInput: Data(message.utf8), timeout: .seconds(120))
+  public func commit(message: String, options: CommitOptions) async throws {
+    // Generous timeout: user hooks may run, and a signing agent may ask
+    // for a passphrase.
+    try await runVoid(
+      ["commit", "-F", "-"] + options.arguments,
+      standardInput: Data(message.utf8),
+      timeout: .seconds(120)
+    )
+  }
+
+  public func commitSigningConfiguration() async throws -> CommitSigningConfiguration {
+    let command = GitCommand.make(
+      git: git,
+      repository: repositoryRoot,
+      arguments: [
+        "config", "--get-regexp", #"^(commit\.gpgsign|gpg\.format|user\.signingkey)$"#,
+      ],
+      timeout: .seconds(10)
+    )
+    let result = try await runner.run(command)
+    // `git config --get-regexp` exits 1 when nothing matches.
+    if result.exitCode == 1 { return CommitSigningConfiguration() }
+    return CommitSigningConfiguration.parse(
+      try result.checkSuccess(of: command).standardOutputText)
   }
 
   public func reset(to target: ObjectID, mode: ResetMode) async throws {

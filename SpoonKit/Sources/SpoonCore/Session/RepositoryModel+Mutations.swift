@@ -80,7 +80,16 @@ extension RepositoryModel {
   }
 
   public func commit(message: String, amend: Bool = false) async -> Bool {
-    await perform { try await $0.commit(message: message, amend: amend) }
+    await commit(message: message, options: CommitOptions(amend: amend, signOff: commitSignsOff))
+  }
+
+  public func commit(message: String, options: CommitOptions) async -> Bool {
+    await perform { try await $0.commit(message: message, options: options) }
+  }
+
+  /// The repository's signing settings; `nil` when git config can't be read.
+  public func commitSigningConfiguration() async -> CommitSigningConfiguration? {
+    try? await gitClient.commitSigningConfiguration()
   }
 
   public func reset(to target: ObjectID, mode: ResetMode) async {

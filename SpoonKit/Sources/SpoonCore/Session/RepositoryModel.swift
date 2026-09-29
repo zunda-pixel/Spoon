@@ -42,6 +42,14 @@ public final class RepositoryModel {
   public var pullAutostash = Defaults[.pullAutostash] {
     didSet { Defaults[.pullAutostash] = pullAutostash }
   }
+  /// Add a `Signed-off-by:` trailer to commits, remembered per repository.
+  public var commitSignsOff = false {
+    didSet {
+      var ids = Set(Defaults[.commitSignOffRepositoryIDs])
+      if commitSignsOff { ids.insert(repository.id) } else { ids.remove(repository.id) }
+      Defaults[.commitSignOffRepositoryIDs] = ids.sorted()
+    }
+  }
   public internal(set) var focusedHistoryReferenceIDs: Set<String> = []
   public internal(set) var hiddenHistoryReferenceIDs: Set<String> = []
   /// Whether `lastErrorMessage` came from a background read (git refresh or
@@ -74,6 +82,7 @@ public final class RepositoryModel {
     self.hiddenHistoryReferenceIDs = Set(
       Defaults[.historyHiddenReferenceIDs][repository.id] ?? []
     )
+    self.commitSignsOff = Defaults[.commitSignOffRepositoryIDs].contains(repository.id)
   }
 
   isolated deinit {

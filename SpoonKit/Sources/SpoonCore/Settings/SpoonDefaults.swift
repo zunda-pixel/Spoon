@@ -19,6 +19,12 @@ extension Defaults.Keys {
     default: [:]
   )
 
+  /// Repositories whose commits get a `Signed-off-by:` trailer, by ID.
+  public static let commitSignOffRepositoryIDs = Key<[String]>(
+    "commitSignOffRepositoryIDs",
+    default: []
+  )
+
   /// Stash local changes around every pull (`git pull --autostash`).
   public static let pullAutostash = Key<Bool>("pullAutostash", default: false)
 
