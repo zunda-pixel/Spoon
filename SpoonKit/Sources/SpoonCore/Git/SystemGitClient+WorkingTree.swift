@@ -80,6 +80,10 @@ extension SystemGitClient {
     }
   }
 
+  public func restoreFile(path: String, from revision: ObjectID) async throws {
+    try await runVoid(["restore", "--source=\(revision.rawValue)", "--worktree", "--", path])
+  }
+
   public func unstage(paths: [String]) async throws {
     guard !paths.isEmpty else { return }
     do {

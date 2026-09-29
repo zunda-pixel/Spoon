@@ -29,17 +29,21 @@ struct FileDiffListView: View {
   var hunkAction: HunkAction?
   var lineSelection: Binding<DiffLineSelection?>?
   var onDiscardHunk: ((FileDiff, Hunk) -> Void)?
+  /// Extra per-file actions, offered from the file header's menu.
+  var fileActions: ((FileDiff) -> [FileDiffAction])?
 
   init(
     diffs: [FileDiff],
     hunkAction: HunkAction? = nil,
     lineSelection: Binding<DiffLineSelection?>? = nil,
-    onDiscardHunk: ((FileDiff, Hunk) -> Void)? = nil
+    onDiscardHunk: ((FileDiff, Hunk) -> Void)? = nil,
+    fileActions: ((FileDiff) -> [FileDiffAction])? = nil
   ) {
     self.diffs = diffs
     self.hunkAction = hunkAction
     self.lineSelection = lineSelection
     self.onDiscardHunk = onDiscardHunk
+    self.fileActions = fileActions
   }
 
   /// Files larger than this start with collapsed hunks.
@@ -52,7 +56,7 @@ struct FileDiffListView: View {
           Section {
             fileBody(diff)
           } header: {
-            FileDiffHeaderView(diff: diff)
+            FileDiffHeaderView(diff: diff, actions: fileActions?(diff) ?? [])
           }
         }
       }
@@ -115,6 +119,7 @@ struct FileDiffListView: View {
 @MainActor
 struct FileDiffHeaderView: View {
   let diff: FileDiff
+  var actions: [FileDiffAction] = []
 
   var body: some View {
     HStack(spacing: 8) {
@@ -142,6 +147,22 @@ struct FileDiffHeaderView: View {
         Text("−\(diff.deletionCount)")
           .foregroundStyle(.red)
       }
+      if !actions.isEmpty {
+        Menu {
+          actionButtons
+        } label: {
+          Label("File Actions", systemImage: "ellipsis.circle")
+            .labelStyle(.iconOnly)
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .help("Actions for \(diff.path)")
+        .accessibilityLabel("Actions for \(diff.path)")
+      }
+    }
+    .contextMenu {
+      actionButtons
     }
     .font(.callout.monospacedDigit())
     .padding(.horizontal, 12)
@@ -402,6 +423,26 @@ struct DiffLineRow: View {
     case .addition: .green.opacity(0.12)
     case .deletion: .red.opacity(0.12)
     case .context, .noNewlineMarker: .clear
+    }
+  }
+}
+
+/// A command offered for one file of a diff, such as restoring its content.
+struct FileDiffAction: Identifiable {
+  let title: String
+  var role: ButtonRole?
+  var isEnabled = true
+  let perform: () -> Void
+
+  var id: String { title }
+}
+
+extension FileDiffHeaderView {
+  @ViewBuilder
+  fileprivate var actionButtons: some View {
+    ForEach(actions) { action in
+      Button(action.title, role: action.role, action: action.perform)
+        .disabled(!action.isEnabled)
     }
   }
 }

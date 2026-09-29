@@ -35,6 +35,11 @@ extension RepositoryModel {
     await perform { try await $0.unstage(paths: paths) }
   }
 
+  /// Puts `path` in the working tree back to how it was at `revision`.
+  public func restoreFile(path: String, from revision: ObjectID) async {
+    await perform { try await $0.restoreFile(path: path, from: revision) }
+  }
+
   public func discardWorkingTree(paths: [String]) async {
     await perform { try await $0.discardWorkingTree(paths: paths) }
   }

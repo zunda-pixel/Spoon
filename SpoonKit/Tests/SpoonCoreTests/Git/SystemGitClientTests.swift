@@ -415,6 +415,20 @@ struct SystemGitClientTests {
     #expect(preview.map(\.branchName) == ["main"])
   }
 
+  @Test func restoreFileSendsExactArgv() async throws {
+    let runner = FakeCommandRunner()
+    let oid = try #require(ObjectID(rawValue: String(repeating: "a", count: 40)))
+    runner.stub(
+      arguments: baseFlags + [
+        "restore", "--source=\(oid.rawValue)", "--worktree", "--", "-odd.txt",
+      ]
+    )
+
+    try await makeClient(runner).restoreFile(path: "-odd.txt", from: oid)
+
+    #expect(runner.invocations.count == 1)
+  }
+
   @Test func failedVersionProbeIsRetried() async {
     let runner = FakeCommandRunner()
     runner.stub(arguments: baseFlags + ["version"], stdout: "not a version\n")
