@@ -569,6 +569,36 @@ struct LiveRepositoryTests {
     #expect(try await client.sequencerState() == nil)
   }
 
+  @Test func severalCommitsArePickedAndRevertedInOrder() async throws {
+    let root = try await LiveRepoFixture.makeTemporaryRepo(
+      commits: [.init(file: "log.txt", content: "0\n", message: "base")],
+      runner: runner
+    )
+    defer { try? FileManager.default.removeItem(at: root) }
+    func git(_ arguments: [String]) async throws {
+      try await LiveRepoFixture.run(arguments, in: root, runner: runner)
+    }
+    try await git(["switch", "-c", "topic"])
+    for step in 1...3 {
+      let lines = (0...step).map(String.init).joined(separator: "\n") + "\n"
+      try await LiveRepoFixture.commitFile(
+        "log.txt", content: lines, message: "step \(step)", in: root, runner: runner)
+    }
+    try await git(["switch", "main"])
+    let client = makeClient(root)
+    let topic = try await client.log(LogQuery(reference: "topic", maxCount: 3)).commits
+
+    // Each step builds on the previous one, so only oldest-first applies.
+    try await client.cherryPick(topic.reversed().map(\.oid))
+    let subjects = try await client.log(LogQuery(maxCount: 4)).commits.map(\.subject)
+    #expect(subjects == ["step 3", "step 2", "step 1", "base"])
+
+    let picked = try await client.log(LogQuery(maxCount: 2)).commits
+    try await client.revert(picked.map(\.oid))
+    let file = try String(contentsOf: root.appending(path: "log.txt"), encoding: .utf8)
+    #expect(file == "0\n1\n")
+  }
+
   @Test func cloneCreatesAWorkingLocalCopy() async throws {
     let source = try await LiveRepoFixture.makeTemporaryRepo(
       commits: [.init(file: "base.txt", content: "base\n", message: "base")],

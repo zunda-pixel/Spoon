@@ -142,6 +142,27 @@ extension RepositoryModel {
     await perform { try await $0.autosquash(onto: plan.base) }
   }
 
+  /// Cherry-picks `commits` onto HEAD oldest first, whatever order they
+  /// were selected in, so each applies on top of the one it followed.
+  public func cherryPick(_ commits: [Commit]) async {
+    let oids = historyOrder(commits).reversed().map(\.oid)
+    await perform { try await $0.cherryPick(Array(oids)) }
+  }
+
+  /// Reverts `commits` newest first, so later changes are undone before the
+  /// ones they build on.
+  public func revert(_ commits: [Commit]) async {
+    let oids = historyOrder(commits).map(\.oid)
+    await perform { try await $0.revert(oids) }
+  }
+
+  /// `commits` in the history list's newest-first order.
+  private func historyOrder(_ commits: [Commit]) -> [Commit] {
+    let position = Dictionary(
+      historyRows.enumerated().map { ($1.commit.oid, $0) }, uniquingKeysWith: { first, _ in first })
+    return commits.sorted { (position[$0.oid] ?? .max) < (position[$1.oid] ?? .max) }
+  }
+
   public func continueSequencer() async {
     guard let kind = sequencerState?.kind else { return }
     await perform { try await $0.continueSequencer(kind) }

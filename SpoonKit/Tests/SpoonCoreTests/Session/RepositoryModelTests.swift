@@ -1148,6 +1148,32 @@ struct RepositoryModelTests {
     #expect(await client.mutationCalls == ["autosquash:dddd4444"])
   }
 
+  @Test func multiCommitPicksRunOldestFirstAndRevertsNewestFirst() async {
+    let client = FakeRepositoryGitClient()
+    let head = makeOID("aaaa1111")
+    let commits = ["cccc3333", "bbbb2222", "dddd4444"].map { makeCommit($0, subject: $0) }
+    await client.configure(
+      status: makeStatus(oid: head, branch: "main"),
+      branches: [makeBranch("main", oid: head, isCurrent: true)],
+      logPages: [0: LogPage(commits: commits, hasMore: false)]
+    )
+    let model = makeModel(client)
+    await model.refresh()
+    await model.loadHistoryIfNeeded()
+
+    // Selection order is arbitrary; history order decides.
+    let selection = [commits[2], commits[0], commits[1]]
+    await model.cherryPick(selection)
+    await model.revert(selection)
+
+    #expect(
+      await client.mutationCalls == [
+        "cherry-pick:dddd4444,bbbb2222,cccc3333",
+        "revert:cccc3333,bbbb2222,dddd4444",
+      ]
+    )
+  }
+
   @Test func refreshErrorClearsOnceRefreshRecovers() async {
     let client = FakeRepositoryGitClient()
     let oid = makeOID("99999999")
@@ -1476,6 +1502,12 @@ private actor FakeRepositoryGitClient: GitClient {
   func interactiveRebase(_ plan: RebasePlan) async throws { throw Failure.unimplemented }
   func cherryPick(_ oid: ObjectID) async throws { throw Failure.unimplemented }
   func revert(_ oid: ObjectID) async throws { throw Failure.unimplemented }
+  func cherryPick(_ oids: [ObjectID]) async throws {
+    mutationCalls.append("cherry-pick:" + oids.map(\.rawValue).joined(separator: ","))
+  }
+  func revert(_ oids: [ObjectID]) async throws {
+    mutationCalls.append("revert:" + oids.map(\.rawValue).joined(separator: ","))
+  }
   func replayBranch(_ branch: String, onto newBase: ObjectID, linearize: Bool) async throws {
     mutationCalls.append("replay:\(branch):\(newBase.rawValue):\(linearize)")
   }

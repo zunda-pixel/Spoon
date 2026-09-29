@@ -52,11 +52,21 @@ extension SystemGitClient {
   }
 
   public func cherryPick(_ oid: ObjectID) async throws {
-    try await runVoid(["cherry-pick", oid.rawValue], timeout: .seconds(120))
+    try await cherryPick([oid])
   }
 
   public func revert(_ oid: ObjectID) async throws {
-    try await runVoid(["revert", "--no-edit", oid.rawValue], timeout: .seconds(120))
+    try await revert([oid])
+  }
+
+  public func cherryPick(_ oids: [ObjectID]) async throws {
+    guard !oids.isEmpty else { return }
+    try await runVoid(["cherry-pick"] + oids.map(\.rawValue), timeout: .seconds(300))
+  }
+
+  public func revert(_ oids: [ObjectID]) async throws {
+    guard !oids.isEmpty else { return }
+    try await runVoid(["revert", "--no-edit"] + oids.map(\.rawValue), timeout: .seconds(300))
   }
 
   @discardableResult
