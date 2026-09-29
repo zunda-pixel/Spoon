@@ -11,6 +11,8 @@ struct HistoryListView: View {
   @State private var searchText = ""
   @State private var searchField = HistorySearch.Field.message
   @State private var activeSearch: HistorySearch?
+  /// Commits to revert, including a merge, awaiting confirmation.
+  @State private var revertingWithMerge: [Commit]?
 
   var body: some View {
     VStack(spacing: 0) {
@@ -30,6 +32,22 @@ struct HistoryListView: View {
       if searchText.trimmingCharacters(in: .whitespaces).isEmpty {
         activeSearch = nil
       }
+    }
+    .confirmationDialog(
+      revertingWithMerge?.count == 1 ? "Revert this merge?" : "Revert these commits, including a merge?",
+      isPresented: .init(
+        get: { revertingWithMerge != nil },
+        set: { if !$0 { revertingWithMerge = nil } }
+      )
+    ) {
+      Button("Revert") {
+        guard let commits = revertingWithMerge else { return }
+        Task { await model.revert(commits) }
+      }
+    } message: {
+      Text(
+        "A new commit undoes the changes the merge brought into its first parent. git will then consider that branch already merged: merging it again won’t bring those changes back until this revert is itself reverted."
+      )
     }
   }
 
@@ -164,17 +182,18 @@ struct HistoryListView: View {
     Button("Cherry-Pick \(commits.count) Commits onto \(model.currentBranch?.name ?? "HEAD")") {
       Task { await model.cherryPick(commits) }
     }
-    .disabled(containsMerge || model.isBusy || model.isSequencing)
-    Button("Revert \(commits.count) Commits") {
-      Task { await model.revert(commits) }
+    .disabled(model.isBusy || model.isSequencing)
+    .help(containsMerge ? mergeHelp : "")
+    Button("Revert \(commits.count) Commits\(containsMerge ? "…" : "")") {
+      if containsMerge {
+        revertingWithMerge = commits
+      } else {
+        Task { await model.revert(commits) }
+      }
     }
     .disabled(
-      containsMerge || model.isBusy || model.isSequencing
-        || !commits.allSatisfy { model.canRevert($0.oid) }
+      model.isBusy || model.isSequencing || !commits.allSatisfy { model.canRevert($0.oid) }
     )
-    if containsMerge {
-      Text("Merge commits can’t be picked or reverted together")
-    }
   }
 
   @ViewBuilder
@@ -292,16 +311,27 @@ struct HistoryListView: View {
       .help("Find which later commit introduced a problem, treating this commit as good")
     }
     Divider()
-    Button("Cherry-Pick onto \(model.currentBranch?.name ?? "HEAD")") {
-      Task { await model.cherryPick(commit.oid) }
+    Button(
+      "Cherry-Pick \(commit.isMerge ? "Merge " : "")onto \(model.currentBranch?.name ?? "HEAD")"
+    ) {
+      Task { await model.cherryPick([commit]) }
     }
     .disabled(model.isBusy || model.isSequencing)
-    if !commit.isMerge, model.canRevert(commit.oid) {
-      Button("Revert Commit") {
-        Task { await model.revert(commit.oid) }
+    .help(commit.isMerge ? mergeHelp : "")
+    if model.canRevert(commit.oid) {
+      Button(commit.isMerge ? "Revert Merge…" : "Revert Commit") {
+        if commit.isMerge {
+          revertingWithMerge = [commit]
+        } else {
+          Task { await model.revert([commit]) }
+        }
       }
       .disabled(model.isBusy || model.isSequencing)
     }
+  }
+
+  private var mergeHelp: String {
+    "A merge commit applies the changes it brought into its first parent"
   }
 
   private func localBranches(on commit: Commit) -> [Branch] {

@@ -222,9 +222,9 @@ public protocol GitSequencerClient: Sendable {
   func revert(_ oid: ObjectID) async throws
   /// Applies several commits onto HEAD in the given order (`git cherry-pick
   /// A B C`). May pause on a conflict, like a single pick.
-  func cherryPick(_ oids: [ObjectID]) async throws
+  func cherryPick(_ oids: [ObjectID], options: CherryPickOptions) async throws
   /// Adds one revert commit per commit, in the given order.
-  func revert(_ oids: [ObjectID]) async throws
+  func revert(_ oids: [ObjectID], options: RevertOptions) async throws
   /// Removes one non-merge, non-root commit and replays its descendants onto
   /// its parent, updating every descendant local branch (`git history drop`,
   /// requires `GitCapabilities.supportsHistoryDrop`). Aborts without
@@ -329,6 +329,16 @@ extension GitWorkingTreeClient {
 
   public func diffWorkingTree(path: String?, staged: Bool) async throws -> [FileDiff] {
     try await diffWorkingTree(path: path, staged: staged, options: .standard)
+  }
+}
+
+extension GitSequencerClient {
+  public func cherryPick(_ oids: [ObjectID]) async throws {
+    try await cherryPick(oids, options: CherryPickOptions())
+  }
+
+  public func revert(_ oids: [ObjectID]) async throws {
+    try await revert(oids, options: RevertOptions())
   }
 }
 
