@@ -172,6 +172,12 @@ struct BranchContextMenu: View {
       navigation.present(.mergeBranch(branch))
     }
     .disabled(branch.isCurrent || model.isBusy || model.isSequencing)
+    if model.canReplayBranchOntoHead(branch) {
+      Button("Rebase onto \(model.currentBranch?.name ?? "HEAD")…") {
+        navigation.present(.replayBranch(branch))
+      }
+      .disabled(model.isBusy || model.isSequencing)
+    }
     Button("Reset Current Branch to \(branch.name)…", role: .destructive) {
       navigation.present(ResetBranchTarget(branch: branch).resetSheet)
     }

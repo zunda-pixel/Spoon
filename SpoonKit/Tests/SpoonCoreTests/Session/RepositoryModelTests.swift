@@ -842,6 +842,33 @@ struct RepositoryModelTests {
     #expect(await client.mutationCalls == ["move:topic:bbbb2222->cccc3333"])
   }
 
+  @Test func replayRequiresGit256AndABranchThatIsNotCheckedOut() async {
+    let client = FakeRepositoryGitClient()
+    let head = makeOID("aaaa1111")
+    let topic = makeBranch("topic", oid: makeOID("bbbb2222"), isCurrent: false)
+    let main = makeBranch("main", oid: head, isCurrent: true)
+    await client.configure(
+      status: makeStatus(oid: head, branch: "main"),
+      branches: [main, topic],
+      gitVersion: GitVersion(2, 55, 0)
+    )
+    let model = makeModel(client)
+    await model.refresh()
+    #expect(!model.canReplayBranchOntoHead(topic))
+
+    await client.configure(
+      status: makeStatus(oid: head, branch: "main"),
+      branches: [main, topic],
+      gitVersion: GitVersion(2, 56, 0)
+    )
+    await model.refresh()
+    #expect(model.canReplayBranchOntoHead(topic))
+    #expect(!model.canReplayBranchOntoHead(main))
+
+    #expect(await model.replayBranchOntoHead(topic, linearize: true))
+    #expect(await client.mutationCalls == ["replay:topic:aaaa1111:true"])
+  }
+
   @Test func refreshErrorClearsOnceRefreshRecovers() async {
     let client = FakeRepositoryGitClient()
     let oid = makeOID("99999999")
@@ -1112,6 +1139,9 @@ private actor FakeRepositoryGitClient: GitClient {
   func interactiveRebase(_ plan: RebasePlan) async throws { throw Failure.unimplemented }
   func cherryPick(_ oid: ObjectID) async throws { throw Failure.unimplemented }
   func revert(_ oid: ObjectID) async throws { throw Failure.unimplemented }
+  func replayBranch(_ branch: String, onto newBase: ObjectID, linearize: Bool) async throws {
+    mutationCalls.append("replay:\(branch):\(newBase.rawValue):\(linearize)")
+  }
   func dropCommit(_ oid: ObjectID, dryRun: Bool) async throws -> [RefUpdate] {
     mutationCalls.append("drop:\(oid.rawValue):\(dryRun)")
     return []

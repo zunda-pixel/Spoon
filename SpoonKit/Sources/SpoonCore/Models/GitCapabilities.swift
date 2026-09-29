@@ -38,6 +38,9 @@ public struct GitCapabilities: Sendable, Hashable {
   /// `git branch --forked` (2.56+).
   public var supportsForkedBranchFilter: Bool { supports(GitVersion(2, 56)) }
 
+  /// `git replay --linearize` with atomic `--ref-action=update` (2.56+).
+  public var supportsReplayLinearize: Bool { supports(GitVersion(2, 56)) }
+
   /// `git refs create/update/delete/rename` (2.56+).
   public var supportsRefsWriteCommands: Bool { supports(GitVersion(2, 56)) }
 

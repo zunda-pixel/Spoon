@@ -50,6 +50,32 @@ extension RepositoryModel {
     await perform { try await $0.dropCommit(oid, dryRun: false) }
   }
 
+  /// Whether `branch` can be rebased onto the checked-out commit with
+  /// `git replay`: it must not be checked out anywhere, since replay never
+  /// updates a worktree.
+  public func canReplayBranchOntoHead(_ branch: Branch) -> Bool {
+    gitCapabilities.supportsReplayLinearize
+      && status?.headOID != nil
+      && !branch.isCurrent
+      && worktree(for: branch) == nil
+  }
+
+  /// Commits of `branch` that replaying onto HEAD would rewrite, newest first.
+  public func commitsToReplay(_ branch: Branch) async throws -> LogPage {
+    guard let head = status?.headOID else { return LogPage(commits: [], hasMore: false) }
+    return try await gitClient.log(
+      LogQuery(reference: "\(head.rawValue)..refs/heads/\(branch.name)", maxCount: 1000)
+    )
+  }
+
+  @discardableResult
+  public func replayBranchOntoHead(_ branch: Branch, linearize: Bool) async -> Bool {
+    guard let head = status?.headOID else { return false }
+    return await perform {
+      try await $0.replayBranch(branch.name, onto: head, linearize: linearize)
+    }
+  }
+
   public func continueSequencer() async {
     guard let kind = sequencerState?.kind else { return }
     await perform { try await $0.continueSequencer(kind) }

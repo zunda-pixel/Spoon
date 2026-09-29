@@ -60,6 +60,17 @@ extension SystemGitClient {
     return RefUpdateParser.parse(result.standardOutputText)
   }
 
+  public func replayBranch(_ branch: String, onto newBase: ObjectID, linearize: Bool) async throws {
+    // Explicit update mode: a user's replay.refAction=print would otherwise
+    // make this print commands and leave the branch where it was.
+    var arguments = ["replay", "--onto=\(newBase.rawValue)", "--ref-action=update"]
+    if linearize {
+      arguments.append("--linearize")
+    }
+    arguments.append("\(newBase.rawValue)..refs/heads/\(branch)")
+    try await runVoid(arguments, timeout: .seconds(300))
+  }
+
   public func sequencerState() async throws -> SequencerState? {
     let result = try await run(
       [

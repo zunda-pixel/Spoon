@@ -46,6 +46,8 @@ struct RepositorySheetHost: ViewModifier {
         RenameRemoteBranchSheet(model: model, selection: selection)
       case .mergeBranch(let branch):
         MergeSheet(model: model, branch: branch)
+      case .replayBranch(let branch):
+        ReplayBranchSheet(model: model, branch: branch)
       case .rebase(let commit):
         RebaseSheet(model: model, fromCommit: commit)
       case .moveBranch(let branch, let commit):
