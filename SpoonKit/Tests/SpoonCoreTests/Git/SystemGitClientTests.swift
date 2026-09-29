@@ -344,6 +344,33 @@ struct SystemGitClientTests {
     )
   }
 
+  @Test func mergePreviewReadsConflictedPathsFromMergeTree() async throws {
+    let arguments =
+      baseFlags + [
+        "merge-tree", "--write-tree", "--name-only", "--no-messages", "-z", "HEAD", "topic",
+      ]
+    let tree = String(repeating: "a", count: 40)
+    let clean = FakeCommandRunner()
+    clean.stub(arguments: arguments, stdout: "\(tree)\u{0}")
+    let conflicted = FakeCommandRunner()
+    conflicted.stub(
+      arguments: arguments,
+      stdout: "\(tree)\u{0}README.md\u{0}Sources/My File.swift\u{0}",
+      exitCode: 1
+    )
+    let failing = FakeCommandRunner()
+    failing.stub(arguments: arguments, stderr: "fatal: refusing to merge\n", exitCode: 128)
+
+    #expect(try await makeClient(clean).mergePreview(branch: "topic").isClean)
+    #expect(
+      try await makeClient(conflicted).mergePreview(branch: "topic").conflictedPaths
+        == ["README.md", "Sources/My File.swift"]
+    )
+    await #expect(throws: CommandError.self) {
+      try await makeClient(failing).mergePreview(branch: "topic")
+    }
+  }
+
   @Test func failedVersionProbeIsRetried() async {
     let runner = FakeCommandRunner()
     runner.stub(arguments: baseFlags + ["version"], stdout: "not a version\n")

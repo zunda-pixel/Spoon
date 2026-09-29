@@ -82,6 +82,10 @@ extension RepositoryModel {
     await perform { try await $0.switchToRevision(oid) }
   }
 
+  public func mergePreview(branch: String) async throws -> MergePreview {
+    try await gitClient.mergePreview(branch: branch)
+  }
+
   public func merge(branch: String, options: MergeOptions = .standard) async {
     await perform { try await $0.merge(branch: branch, options: options) }
   }

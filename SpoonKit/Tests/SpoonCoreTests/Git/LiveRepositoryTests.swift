@@ -111,6 +111,36 @@ struct LiveRepositoryTests {
     #expect(followed.commits.map(\.subject) == ["rename", "add old"])
   }
 
+  @Test func mergePreviewFindsConflictsWithoutTouchingTheWorktree() async throws {
+    let root = try await LiveRepoFixture.makeTemporaryRepo(
+      commits: [.init(file: "shared.txt", content: "base\n", message: "base")],
+      runner: runner
+    )
+    defer { try? FileManager.default.removeItem(at: root) }
+    try await LiveRepoFixture.run(["branch", "topic"], in: root, runner: runner)
+    try await LiveRepoFixture.run(["branch", "clean"], in: root, runner: runner)
+    try await LiveRepoFixture.commitFile(
+      "shared.txt", content: "main\n", message: "main edit", in: root, runner: runner
+    )
+    try await LiveRepoFixture.run(["switch", "topic"], in: root, runner: runner)
+    try await LiveRepoFixture.commitFile(
+      "shared.txt", content: "topic\n", message: "topic edit", in: root, runner: runner
+    )
+    try await LiveRepoFixture.run(["switch", "clean"], in: root, runner: runner)
+    try await LiveRepoFixture.commitFile(
+      "other.txt", content: "other\n", message: "other", in: root, runner: runner
+    )
+    try await LiveRepoFixture.run(["switch", "main"], in: root, runner: runner)
+    let client = makeClient(root)
+
+    let conflicted = try await client.mergePreview(branch: "topic")
+    let clean = try await client.mergePreview(branch: "clean")
+
+    #expect(conflicted.conflictedPaths == ["shared.txt"])
+    #expect(clean.isClean)
+    #expect(try await client.status().entries.isEmpty)
+  }
+
   @Test func cloneCreatesAWorkingLocalCopy() async throws {
     let source = try await LiveRepoFixture.makeTemporaryRepo(
       commits: [.init(file: "base.txt", content: "base\n", message: "base")],

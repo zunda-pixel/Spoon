@@ -7,6 +7,7 @@ struct MergeSheet: View {
   let branch: Branch
   @Environment(\.dismiss) private var dismiss
   @State private var options = MergeOptions.standard
+  @State private var preview: AsyncLoadState<MergePreview> = .loading
 
   var body: some View {
     VStack(alignment: .leading, spacing: 12) {
@@ -51,6 +52,9 @@ struct MergeSheet: View {
         .foregroundStyle(.secondary)
         .frame(width: 420, alignment: .leading)
 
+      previewView
+        .frame(width: 420, alignment: .leading)
+
       HStack {
         Spacer()
         Button("Cancel", role: .cancel) {
@@ -66,6 +70,46 @@ struct MergeSheet: View {
       }
     }
     .padding(20)
+    .task {
+      do {
+        preview = .loaded(try await model.mergePreview(branch: branch.name))
+      } catch {
+        preview = .failed(error.localizedDescription)
+      }
+    }
+  }
+
+  @ViewBuilder
+  private var previewView: some View {
+    switch preview {
+    case .loading:
+      ProgressView("Checking for conflicts…")
+        .controlSize(.small)
+    case .failed(let message):
+      Label("Could not check for conflicts: \(message)", systemImage: "questionmark.circle")
+        .foregroundStyle(.secondary)
+    case .loaded(let preview) where preview.isClean:
+      Label("Merges cleanly with Git’s default strategy.", systemImage: "checkmark.circle")
+    case .loaded(let preview):
+      VStack(alignment: .leading, spacing: 6) {
+        Label(
+          preview.conflictedPaths.count == 1
+            ? "1 file will conflict:" : "\(preview.conflictedPaths.count) files will conflict:",
+          systemImage: "exclamationmark.triangle"
+        )
+        List(preview.conflictedPaths, id: \.self) { path in
+          Text(path)
+            .font(.callout.monospaced())
+            .lineLimit(1)
+            .truncationMode(.middle)
+        }
+        .frame(height: min(CGFloat(preview.conflictedPaths.count) * 22 + 12, 132))
+        .accessibilityLabel("Files that will conflict")
+        Text("Checked with Git’s default strategy; the options above can change the result.")
+          .font(.caption)
+          .foregroundStyle(.secondary)
+      }
+    }
   }
 
   private var optionDescription: String {
