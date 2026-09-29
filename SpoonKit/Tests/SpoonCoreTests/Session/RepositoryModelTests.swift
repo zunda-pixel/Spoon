@@ -730,6 +730,18 @@ struct RepositoryModelTests {
     #expect(await client.mutationCalls == ["stash-branch:stash@{1}:rescued"])
   }
 
+  @Test func savingRepositoryConfigWritesEachChangeInOrder() async {
+    let client = FakeRepositoryGitClient()
+    let model = makeModel(client)
+
+    #expect(
+      await model.saveRepositoryConfig([.userName: "Ada", .pullRebase: nil, .fetchPrune: "true"]))
+    #expect(
+      await client.mutationCalls == [
+        "config:fetch.prune=true", "config:pull.rebase=<unset>", "config:user.name=Ada",
+      ])
+  }
+
   @Test func failedMutationErrorSurvivesTheFollowUpRefresh() async {
     let client = FakeRepositoryGitClient()
     let oid = makeOID("88888888")
@@ -1477,6 +1489,12 @@ private actor FakeRepositoryGitClient: GitClient {
   }
   func commitSigningConfiguration() async throws -> CommitSigningConfiguration {
     CommitSigningConfiguration()
+  }
+  private var currentConfig = RepositoryConfig()
+  func setConfig(_ config: RepositoryConfig) { currentConfig = config }
+  func repositoryConfig() async throws -> RepositoryConfig { currentConfig }
+  func setRepositoryConfig(_ setting: RepositorySetting, to value: String?) async throws {
+    mutationCalls.append("config:\(setting.rawValue)=\(value ?? "<unset>")")
   }
   func commitFixup(for oid: ObjectID) async throws {
     mutationCalls.append("fixup-commit:\(oid.rawValue)")

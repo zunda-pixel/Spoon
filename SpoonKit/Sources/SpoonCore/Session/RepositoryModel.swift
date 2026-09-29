@@ -51,6 +51,8 @@ public final class RepositoryModel {
       Defaults[.commitSignOffRepositoryIDs] = ids.sorted()
     }
   }
+  /// Bumped after Spoon writes `git config`, so views that read it reload.
+  public internal(set) var configGeneration = 0
   public internal(set) var focusedHistoryReferenceIDs: Set<String> = []
   public internal(set) var hiddenHistoryReferenceIDs: Set<String> = []
   /// Whether `lastErrorMessage` came from a background read (git refresh or

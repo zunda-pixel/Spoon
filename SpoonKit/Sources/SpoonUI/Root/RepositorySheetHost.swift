@@ -32,6 +32,8 @@ struct RepositorySheetHost: ViewModifier {
         BlameSheet(model: model, path: path, navigation: navigation)
       case .lineHistory(let path, let lines):
         LineHistorySheet(model: model, path: path, lines: lines, navigation: navigation)
+      case .repositorySettings:
+        RepositorySettingsSheet(model: model)
       case .codeSearch:
         CodeSearchSheet(model: model, navigation: navigation)
       case .addRemote:

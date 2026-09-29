@@ -48,7 +48,7 @@ struct CommitComposerView: View {
       }
     }
     .padding(10)
-    .task {
+    .task(id: model.configGeneration) {
       signing = await model.commitSigningConfiguration()
       sign = signing?.signsByDefault ?? false
     }

@@ -119,6 +119,26 @@ struct LiveGitTests {
     #expect(try await client.lineHistory(path: "notes.txt", lines: 3...3, limit: 1).count == 1)
   }
 
+  @Test func repositoryConfigSetsAndUnsetsLocalValues() async throws {
+    let root = try await makeTemporaryRepo()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let client = SystemGitClient(repositoryRoot: root, git: git, runner: runner)
+
+    try await client.setRepositoryConfig(.pullRebase, to: "true")
+    try await client.setRepositoryConfig(.blameIgnoreRevsFile, to: ".git-blame-ignore-revs")
+    var config = try await client.repositoryConfig()
+    #expect(config.localValue(.pullRebase) == "true")
+    #expect(config.localValue(.blameIgnoreRevsFile) == ".git-blame-ignore-revs")
+    // The fixture sets user.name locally.
+    #expect(config.localValue(.userName) == "Spoon Tests")
+
+    try await client.setRepositoryConfig(.pullRebase, to: nil)
+    // Removing a value that isn't set is not an error.
+    try await client.setRepositoryConfig(.fetchPrune, to: nil)
+    config = try await client.repositoryConfig()
+    #expect(config.localValue(.pullRebase) == nil)
+  }
+
   @Test func statusAndBranchesOnRealRepo() async throws {
     let root = try await makeTemporaryRepo()
     defer { try? FileManager.default.removeItem(at: root) }
