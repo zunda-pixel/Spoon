@@ -136,8 +136,30 @@ struct SystemGitClientTests {
     runner.stub(arguments: baseFlags + ["backfill"])
     let client = makeClient(runner)
 
-    #expect(await client.supportsBackfill())
+    #expect(await client.capabilities().supportsBackfill)
     try await client.backfill()
+
+    #expect(runner.invocations.count == 2)
+  }
+
+  @Test func capabilitiesRunGitVersionOnce() async {
+    let runner = FakeCommandRunner()
+    runner.stub(arguments: baseFlags + ["version"], stdout: "git version 2.56.0\n")
+    let client = makeClient(runner)
+
+    #expect(await client.capabilities().version == GitVersion(2, 56, 0))
+    #expect(await client.capabilities().version == GitVersion(2, 56, 0))
+
+    #expect(runner.invocations.count == 1)
+  }
+
+  @Test func failedVersionProbeIsRetried() async {
+    let runner = FakeCommandRunner()
+    runner.stub(arguments: baseFlags + ["version"], stdout: "not a version\n")
+    let client = makeClient(runner)
+
+    #expect(await client.capabilities().version == nil)
+    #expect(await client.capabilities().version == nil)
 
     #expect(runner.invocations.count == 2)
   }

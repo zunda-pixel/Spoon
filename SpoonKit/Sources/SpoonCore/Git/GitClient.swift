@@ -29,6 +29,13 @@ public protocol GitWorkingTreeClient: Sendable {
   func reset(to target: ObjectID, mode: ResetMode) async throws
 }
 
+/// Installed-git feature detection.
+public protocol GitCapabilityClient: Sendable {
+  /// Optional features of the installed git. Implementations may cache the
+  /// result; an unknown version reports every gated feature as unavailable.
+  func capabilities() async -> GitCapabilities
+}
+
 /// Commit history and reflog queries.
 public protocol GitHistoryClient: Sendable {
   func log(_ query: LogQuery) async throws -> LogPage
@@ -69,9 +76,8 @@ public protocol GitRemoteClient: Sendable {
   /// Pushes local `branch` to the same name on `remoteName` and sets it as upstream.
   func publishBranch(_ branch: String, to remoteName: String) async throws
   func fetch() async throws
-  /// Whether the installed git provides `git backfill` (2.49+).
-  func supportsBackfill() async -> Bool
-  /// Downloads blobs omitted by a partial clone.
+  /// Downloads blobs omitted by a partial clone (requires
+  /// `GitCapabilities.supportsBackfill`).
   func backfill() async throws
   func pull() async throws
   /// Pushes the current branch; sets upstream on first push.
@@ -148,6 +154,7 @@ public protocol GitStashClient: Sendable {
 
 /// Backward-compatible aggregate used by existing UI, services, and fakes.
 public protocol GitClient:
+  GitCapabilityClient,
   GitWorkingTreeClient,
   GitHistoryClient,
   GitBranchClient,

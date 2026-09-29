@@ -16,7 +16,8 @@ public final class RepositoryModel {
   public internal(set) var stashes: [Stash] = []
   public internal(set) var tags: [Tag] = []
   public internal(set) var worktrees: [Worktree] = []
-  public internal(set) var supportsBackfill = false
+  /// Optional features of the installed git, used to hide unsupported actions.
+  public internal(set) var gitCapabilities = GitCapabilities()
   /// An in-progress rebase / cherry-pick / revert (conflict or edit pause).
   public internal(set) var sequencerState: SequencerState?
   public internal(set) var isRefreshing = false

@@ -44,7 +44,7 @@ public struct SpoonCommands: Commands {
       .keyboardShortcut("l", modifiers: [.shift, .command])
       .disabled(repositoryMutationUnavailable)
 
-      if model?.supportsBackfill == true {
+      if model?.gitCapabilities.supportsBackfill == true {
         Button("Backfill Missing Objects") {
           run { await $0.backfill() }
         }

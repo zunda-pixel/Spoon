@@ -870,7 +870,7 @@ private actor FakeRepositoryGitClient: GitClient {
   func tags() async throws -> [SpoonCore.Tag] { [] }
   func worktrees() async throws -> [Worktree] { currentWorktrees }
   func sequencerState() async throws -> SequencerState? { nil }
-  func supportsBackfill() async -> Bool { false }
+  func capabilities() async -> GitCapabilities { GitCapabilities() }
 
   func stage(paths: [String]) async throws {
     stageCallCount += 1

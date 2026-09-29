@@ -42,14 +42,27 @@ struct GitOutputHelperTests {
 
   @Test(
     arguments: [
-      ("git version 2.48.1", false),
-      ("git version 2.49.0", true),
-      ("git version 3.0.0", true),
-      ("unexpected output", false),
+      ("git version 2.48.1", GitVersion(2, 48, 1)),
+      ("git version 2.39.5 (Apple Git-154)", GitVersion(2, 39, 5)),
+      ("git version 2.56.0.rc2", GitVersion(2, 56, 0)),
+      ("git version 3.0", GitVersion(3, 0, 0)),
+      ("unexpected output", nil),
     ]
   )
-  func versionParserDetectsBackfill(output: String, expected: Bool) {
-    #expect(GitVersionParser.supportsBackfill(output) == expected)
+  func versionParserReadsReleaseNumbers(output: String, expected: GitVersion?) {
+    #expect(GitVersionParser.parse(output) == expected)
+  }
+
+  @Test(
+    arguments: [
+      (GitVersion(2, 48, 1), false),
+      (GitVersion(2, 49, 0), true),
+      (GitVersion(3, 0, 0), true),
+      (nil, false),
+    ] as [(GitVersion?, Bool)]
+  )
+  func capabilitiesGateBackfillOnVersion(version: GitVersion?, expected: Bool) {
+    #expect(GitCapabilities(version: version).supportsBackfill == expected)
   }
 
   @Test func untrackedDiffBuilderCreatesTextPatch() {
