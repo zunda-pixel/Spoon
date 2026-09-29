@@ -117,14 +117,17 @@ struct RepositorySplitView: View {
         navigation: navigation,
         openWorktree: { switchToWorktree(at: $0.path) }
       )
-        .navigationSplitViewColumnWidth(min: 300, ideal: 380)
+      // Inset the column itself: split view columns extend under the
+      // toolbar and the floating sidebar, so a window-level inset overlapped
+      // the sidebar and the toolbar area.
+      .safeAreaInset(edge: .top, spacing: 0) {
+        if let state = model.sequencerState {
+          SequencerBannerView(model: model, state: state)
+        }
+      }
+      .navigationSplitViewColumnWidth(min: 300, ideal: 380)
     } detail: {
       RepositoryDetailColumn(model: model, navigation: navigation)
-    }
-    .safeAreaInset(edge: .top, spacing: 0) {
-      if let state = model.sequencerState {
-        SequencerBannerView(model: model, state: state)
-      }
     }
     .navigationTitle(model.commonWorktreeName)
     .navigationSubtitle(model.repository.rootURL.path(percentEncoded: false))
