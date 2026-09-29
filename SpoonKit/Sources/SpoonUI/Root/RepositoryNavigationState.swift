@@ -50,6 +50,7 @@ final class RepositoryNavigationState {
     case blame(path: String)
     case codeSearch
     case addRemote
+    case addSubmodule
     case addWorktree(Branch)
     case addRemoteWorktree(RemoteBranchSelection)
     case renameBranch(Branch)
@@ -103,6 +104,8 @@ final class RepositoryNavigationState {
         "delete-merged-branches"
       case .codeSearch:
         "code-search"
+      case .addSubmodule:
+        "add-submodule"
       case .deleteWorktree(let worktree):
         "delete-worktree:\(worktree.id)"
       case .lockWorktree(let worktree):

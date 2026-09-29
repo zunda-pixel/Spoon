@@ -32,6 +32,8 @@ struct RepositorySheetHost: ViewModifier {
         CodeSearchSheet(model: model, navigation: navigation)
       case .addRemote:
         AddRemoteSheet(model: model)
+      case .addSubmodule:
+        AddSubmoduleSheet(model: model)
       case .addWorktree(let branch):
         AddWorktreeSheet(
           model: model,

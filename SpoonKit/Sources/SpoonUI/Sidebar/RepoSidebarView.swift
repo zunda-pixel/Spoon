@@ -30,6 +30,11 @@ struct RepoSidebarView: View {
         searchText: searchText,
         openWorktree: openWorktree
       )
+      SubmodulesSidebarSection(
+        model: model,
+        navigation: navigation,
+        searchText: searchText
+      )
       TagsSidebarSection(
         model: model,
         navigation: navigation,

@@ -9,6 +9,7 @@ public struct RepositoryGitSnapshot: Sendable, Hashable {
   public var stashes: [Stash]
   public var tags: [Tag]
   public var worktrees: [Worktree]
+  public var submodules: [Submodule]
   public var sequencerState: SequencerState?
   public var bisectState: BisectState?
   public var capabilities: GitCapabilities
@@ -23,6 +24,7 @@ public struct RepositoryGitSnapshot: Sendable, Hashable {
     stashes: [Stash],
     tags: [Tag],
     worktrees: [Worktree],
+    submodules: [Submodule] = [],
     sequencerState: SequencerState?,
     bisectState: BisectState? = nil,
     capabilities: GitCapabilities,
@@ -35,6 +37,7 @@ public struct RepositoryGitSnapshot: Sendable, Hashable {
     self.stashes = stashes
     self.tags = tags
     self.worktrees = worktrees
+    self.submodules = submodules
     self.sequencerState = sequencerState
     self.bisectState = bisectState
     self.capabilities = capabilities
@@ -49,6 +52,8 @@ public struct RepositoryGitSnapshot: Sendable, Hashable {
     async let tags = gitClient.tags()
     async let worktrees = gitClient.worktrees()
     async let sequencerState = gitClient.sequencerState()
+    // Optional metadata: a broken submodule must not fail the refresh.
+    async let submodules = try? gitClient.submodules()
     // Optional metadata: a failed probe must not fail the whole refresh.
     async let bisectState = try? gitClient.bisectState()
     async let capabilities = gitClient.capabilities()
@@ -69,6 +74,7 @@ public struct RepositoryGitSnapshot: Sendable, Hashable {
       stashes: stashes,
       tags: tags,
       worktrees: worktrees,
+      submodules: submodules ?? [],
       sequencerState: sequencerState,
       bisectState: bisectState ?? nil,
       capabilities: capabilities,
@@ -152,6 +158,7 @@ extension RepositoryModel {
     stashes = snapshot.stashes
     tags = snapshot.tags
     worktrees = snapshot.worktrees
+    submodules = snapshot.submodules
     sequencerState = snapshot.sequencerState
     bisectState = snapshot.bisectState
     gitCapabilities = snapshot.capabilities

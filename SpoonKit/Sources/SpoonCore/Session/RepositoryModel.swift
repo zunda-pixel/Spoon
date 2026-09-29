@@ -16,6 +16,7 @@ public final class RepositoryModel {
   public internal(set) var stashes: [Stash] = []
   public internal(set) var tags: [Tag] = []
   public internal(set) var worktrees: [Worktree] = []
+  public internal(set) var submodules: [Submodule] = []
   /// Optional features of the installed git, used to hide unsupported actions.
   public internal(set) var gitCapabilities = GitCapabilities()
   /// Promisor remote of a partial clone; `nil` for a full clone.
