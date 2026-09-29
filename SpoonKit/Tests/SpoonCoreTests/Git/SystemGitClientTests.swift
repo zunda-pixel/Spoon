@@ -256,6 +256,25 @@ struct SystemGitClientTests {
     #expect(names == ["feature/a"])
   }
 
+  @Test(arguments: [("2.56.0", true), ("2.55.0", false)])
+  func moveBranchVerifiesTheExpectedTip(version: String, usesRefsCommand: Bool) async throws {
+    let runner = FakeCommandRunner()
+    let target = try #require(ObjectID(rawValue: String(repeating: "a", count: 40)))
+    let tip = try #require(ObjectID(rawValue: String(repeating: "b", count: 40)))
+    let message = "spoon: move topic to aaaaaaa"
+    runner.stub(arguments: baseFlags + ["version"], stdout: "git version \(version)\n")
+    runner.stub(
+      arguments: baseFlags
+        + (usesRefsCommand
+          ? ["refs", "update", "--message=\(message)"] : ["update-ref", "-m", message])
+        + ["refs/heads/topic", target.rawValue, tip.rawValue]
+    )
+
+    try await makeClient(runner).moveBranch(name: "topic", to: target, expectedTip: tip)
+
+    #expect(runner.invocations.count == 2)
+  }
+
   @Test func failedVersionProbeIsRetried() async {
     let runner = FakeCommandRunner()
     runner.stub(arguments: baseFlags + ["version"], stdout: "not a version\n")

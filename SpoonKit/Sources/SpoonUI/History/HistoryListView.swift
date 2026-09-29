@@ -160,6 +160,17 @@ struct HistoryListView: View {
       navigation.present(.tag(commit))
     }
     .disabled(model.isBusy)
+    let movableBranches = model.branchesMovable(to: commit.oid)
+    if !movableBranches.isEmpty {
+      Menu("Move Branch Here") {
+        ForEach(movableBranches) { branch in
+          Button("\(branch.name)…") {
+            navigation.present(.moveBranch(branch, to: commit))
+          }
+        }
+      }
+      .disabled(model.isBusy)
+    }
     Divider()
     Button("Interactive Rebase from Here…") {
       navigation.present(.rebase(commit))

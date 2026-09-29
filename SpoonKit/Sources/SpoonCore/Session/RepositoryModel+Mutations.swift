@@ -196,6 +196,21 @@ extension RepositoryModel {
     }
   }
 
+  /// Local branches that "Move Branch Here" can repoint at `commit`. The
+  /// current branch and branches checked out in a worktree are excluded:
+  /// moving them would leave that worktree's files and index behind.
+  public func branchesMovable(to commit: ObjectID) -> [Branch] {
+    branches.filter { branch in
+      !branch.isCurrent && branch.tip != commit && worktree(for: branch) == nil
+    }
+  }
+
+  public func moveBranch(_ branch: Branch, to target: ObjectID) async {
+    await perform {
+      try await $0.moveBranch(name: branch.name, to: target, expectedTip: branch.tip)
+    }
+  }
+
   public func renameRemoteBranch(
     remoteName: String,
     from oldName: String,

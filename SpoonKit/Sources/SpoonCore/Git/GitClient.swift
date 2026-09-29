@@ -65,6 +65,10 @@ public protocol GitBranchClient: Sendable {
   @discardableResult
   func deleteMergedBranches(branches: [String], dryRun: Bool) async throws -> [String]
   func renameBranch(from oldName: String, to newName: String) async throws
+  /// Points a local branch at `target` without touching any worktree, only
+  /// if it still points at `expectedTip` (`git refs update`, or
+  /// `git update-ref` before git 2.56). The previous tip stays in the reflog.
+  func moveBranch(name: String, to target: ObjectID, expectedTip: ObjectID) async throws
   func setUpstream(of branch: String, to upstream: String) async throws
   /// Names of local branches whose configured upstream is `upstream`, a
   /// full ref such as `refs/remotes/origin/main` or `refs/heads/main`.
