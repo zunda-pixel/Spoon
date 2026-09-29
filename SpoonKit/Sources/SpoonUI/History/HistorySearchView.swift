@@ -16,10 +16,13 @@ struct HistorySearchBar: View {
         Text("Message").tag(HistorySearch.Field.message)
         Text("Author").tag(HistorySearch.Field.author)
         Text("Code").tag(HistorySearch.Field.code)
+        Text("Changed Lines (Regex)").tag(HistorySearch.Field.changedLines)
       }
       .labelsHidden()
       .fixedSize()
-      .help("Search commit messages, authors, or commits that add or remove the text")
+      .help(
+        "Search commit messages, authors, commits that add or remove the text, or commits whose changed lines match a regular expression"
+      )
       TextField("Search history", text: $text, prompt: Text(prompt))
         .textFieldStyle(.roundedBorder)
         .onSubmit(submit)
@@ -48,6 +51,7 @@ struct HistorySearchBar: View {
     case .message: "Search commit messages"
     case .author: "Search authors"
     case .code: "Search added or removed code"
+    case .changedLines: "Regular expression, e.g. func [a-z]+Search"
     }
   }
 }

@@ -139,6 +139,32 @@ struct LiveGitTests {
     #expect(config.localValue(.pullRebase) == nil)
   }
 
+  @Test func changedLinesSearchMatchesARegexWherePickaxeDoesNot() async throws {
+    let root = try await makeTemporaryRepo()
+    defer { try? FileManager.default.removeItem(at: root) }
+    func commit(_ content: String, _ message: String) async throws {
+      try await LiveRepoFixture.commitFile(
+        "f.swift", content: content, message: message, in: root, runner: runner)
+    }
+    try await commit("let count = 1\n", "add count")
+    try await commit("let count = 1\nfunc runSearch() {}\n", "add search")
+    // Changes the line around the match without changing how often it occurs.
+    try await commit("let count = 2\nfunc runSearch() {}\n", "bump count")
+    let client = SystemGitClient(repositoryRoot: root, git: git, runner: runner)
+    func subjects(_ search: HistorySearch) async throws -> [String] {
+      try await client.log(LogQuery(allReferences: true, search: search)).commits.map(\.subject)
+    }
+
+    #expect(
+      try await subjects(HistorySearch(text: "FUNC [a-z]+search", field: .changedLines))
+        == ["add search"])
+    #expect(
+      try await subjects(HistorySearch(text: "count = [0-9]+", field: .changedLines))
+        == ["bump count", "add count"])
+    // The pickaxe only sees commits that change how often the text occurs.
+    #expect(try await subjects(HistorySearch(text: "count", field: .code)) == ["add count"])
+  }
+
   @Test func statusAndBranchesOnRealRepo() async throws {
     let root = try await makeTemporaryRepo()
     defer { try? FileManager.default.removeItem(at: root) }
