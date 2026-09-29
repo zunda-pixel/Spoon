@@ -8,6 +8,7 @@ struct SubmodulesSidebarSection: View {
   let navigation: RepositoryNavigationState
   let searchText: String
   @State private var isExpanded = true
+  @State private var pending: PendingSubmoduleAction?
 
   var body: some View {
     if !model.submodules.isEmpty {
@@ -19,7 +20,12 @@ struct SubmodulesSidebarSection: View {
         ForEach(filteredSubmodules) { submodule in
           SubmoduleRow(submodule: submodule)
             .contextMenu {
-              SubmoduleContextMenu(model: model, navigation: navigation, submodule: submodule)
+              SubmoduleContextMenu(
+                model: model,
+                navigation: navigation,
+                submodule: submodule,
+                confirm: { pending = $0 }
+              )
             }
         }
       } header: {
@@ -29,6 +35,30 @@ struct SubmodulesSidebarSection: View {
         if searchText.hasSidebarSearchQuery {
           isExpanded = true
         }
+      }
+      .confirmationDialog(
+        pending?.title ?? "",
+        isPresented: .init(get: { pending != nil }, set: { if !$0 { pending = nil } })
+      ) {
+        if let pending {
+          Button(pending.actionTitle, role: .destructive) { run(pending, discardingChanges: false) }
+          Button("\(pending.actionTitle) and Discard Local Changes", role: .destructive) {
+            run(pending, discardingChanges: true)
+          }
+        }
+      } message: {
+        Text(pending?.message ?? "")
+      }
+    }
+  }
+
+  private func run(_ action: PendingSubmoduleAction, discardingChanges: Bool) {
+    Task {
+      switch action {
+      case .deinitialize(let submodule):
+        await model.deinitializeSubmodule(submodule, discardingChanges: discardingChanges)
+      case .remove(let submodule):
+        await model.removeSubmodule(submodule, discardingChanges: discardingChanges)
       }
     }
   }
@@ -103,11 +133,41 @@ private struct SubmoduleRow: View {
   }
 }
 
+/// A destructive submodule action awaiting confirmation.
+enum PendingSubmoduleAction {
+  case deinitialize(Submodule)
+  case remove(Submodule)
+
+  var title: String {
+    switch self {
+    case .deinitialize(let submodule): "Deinitialize “\(submodule.path)”?"
+    case .remove(let submodule): "Remove the submodule “\(submodule.path)”?"
+    }
+  }
+
+  var actionTitle: String {
+    switch self {
+    case .deinitialize: "Deinitialize"
+    case .remove: "Remove Submodule"
+    }
+  }
+
+  var message: String {
+    switch self {
+    case .deinitialize:
+      "Its folder is emptied and its local settings are forgotten. The submodule stays in the repository; Initialize and Update checks it out again. git refuses if the checkout has local changes, unless you discard them."
+    case .remove:
+      "Its folder, its .gitmodules entry, and its recorded commit are removed and the removal is staged; commit to finish. The cloned data stays in .git/modules. git refuses if the checkout has local changes, unless you discard them."
+    }
+  }
+}
+
 @MainActor
 struct SubmoduleContextMenu: View {
   let model: RepositoryModel
   let navigation: RepositoryNavigationState
   let submodule: Submodule
+  let confirm: (PendingSubmoduleAction) -> Void
   @Environment(\.openWindow) private var openWindow
 
   var body: some View {
@@ -137,6 +197,14 @@ struct SubmoduleContextMenu: View {
         NSPasteboard.general.setString(url, forType: .string)
       }
     }
+    Divider()
+    if submodule.state != .notInitialized {
+      Button("Deinitialize…", role: .destructive) { confirm(.deinitialize(submodule)) }
+        .disabled(model.isBusy)
+        .help("Empty the checkout but keep the submodule in the repository")
+    }
+    Button("Remove Submodule…", role: .destructive) { confirm(.remove(submodule)) }
+      .disabled(model.isBusy)
   }
 }
 

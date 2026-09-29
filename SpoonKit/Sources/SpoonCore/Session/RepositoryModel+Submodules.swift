@@ -11,6 +11,18 @@ extension RepositoryModel {
     await perform { try await $0.syncSubmodules(paths: submodules.map(\.path)) }
   }
 
+  /// Empties the submodule's checkout; Initialize and Update brings it back.
+  public func deinitializeSubmodule(_ submodule: Submodule, discardingChanges: Bool) async {
+    await perform {
+      try await $0.deinitializeSubmodule(path: submodule.path, force: discardingChanges)
+    }
+  }
+
+  /// Removes the submodule from the repository, staged for the next commit.
+  public func removeSubmodule(_ submodule: Submodule, discardingChanges: Bool) async {
+    await perform { try await $0.removeSubmodule(path: submodule.path, force: discardingChanges) }
+  }
+
   @discardableResult
   public func addSubmodule(url: String, path: String) async -> Bool {
     await perform { try await $0.addSubmodule(url: url, path: path) }

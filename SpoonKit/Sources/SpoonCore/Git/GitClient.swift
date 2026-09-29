@@ -202,6 +202,14 @@ public protocol GitSubmoduleClient: Sendable {
   func syncSubmodules(paths: [String]) async throws
   /// Clones `url` into `path` and stages it as a new submodule.
   func addSubmodule(url: String, path: String) async throws
+  /// Empties the checkout at `path` and forgets its local configuration,
+  /// keeping the submodule itself (`git submodule deinit`). git refuses a
+  /// checkout with local changes unless `force`.
+  func deinitializeSubmodule(path: String, force: Bool) async throws
+  /// Removes the submodule at `path` from the repository: its checkout,
+  /// its `.gitmodules` entry, and its gitlink, staged for the next commit
+  /// (`git rm`). git refuses a checkout with local changes unless `force`.
+  func removeSubmodule(path: String, force: Bool) async throws
 }
 
 /// Sparse-checkout configuration.

@@ -710,10 +710,13 @@ struct RepositoryModelTests {
     await model.updateSubmodules()
     await model.syncSubmodules([lib])
     #expect(await model.addSubmodule(url: "https://example.com/kit.git", path: "Kit"))
+    await model.deinitializeSubmodule(lib, discardingChanges: false)
+    await model.removeSubmodule(lib, discardingChanges: true)
     #expect(
       await client.mutationCalls == [
         "submodule-update:Vendor/Lib", "submodule-update:", "submodule-sync:Vendor/Lib",
-        "submodule-add:https://example.com/kit.git:Kit",
+        "submodule-add:https://example.com/kit.git:Kit", "submodule-deinit:Vendor/Lib:false",
+        "submodule-remove:Vendor/Lib:true",
       ])
   }
 
@@ -1608,6 +1611,12 @@ private actor FakeRepositoryGitClient: GitClient {
   }
   func addSubmodule(url: String, path: String) async throws {
     mutationCalls.append("submodule-add:\(url):\(path)")
+  }
+  func deinitializeSubmodule(path: String, force: Bool) async throws {
+    mutationCalls.append("submodule-deinit:\(path):\(force)")
+  }
+  func removeSubmodule(path: String, force: Bool) async throws {
+    mutationCalls.append("submodule-remove:\(path):\(force)")
   }
   func sparseCheckoutPaths() async throws -> [String]? { nil }
   func setSparseCheckout(paths: [String]) async throws { throw Failure.unimplemented }

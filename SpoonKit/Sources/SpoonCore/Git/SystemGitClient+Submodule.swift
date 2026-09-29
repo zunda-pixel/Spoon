@@ -33,4 +33,12 @@ extension SystemGitClient {
   public func addSubmodule(url: String, path: String) async throws {
     try await runVoid(["submodule", "add", "--", url, path], timeout: .seconds(600))
   }
+
+  public func deinitializeSubmodule(path: String, force: Bool) async throws {
+    try await runVoid(["submodule", "deinit"] + (force ? ["--force"] : []) + ["--", path])
+  }
+
+  public func removeSubmodule(path: String, force: Bool) async throws {
+    try await runVoid(["rm", "--quiet"] + (force ? ["--force"] : []) + ["--", path])
+  }
 }
