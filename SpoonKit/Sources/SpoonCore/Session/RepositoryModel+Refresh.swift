@@ -10,6 +10,7 @@ public struct RepositoryGitSnapshot: Sendable, Hashable {
   public var tags: [Tag]
   public var worktrees: [Worktree]
   public var sequencerState: SequencerState?
+  public var bisectState: BisectState?
   public var capabilities: GitCapabilities
   /// Promisor remote of a partial clone; `nil` for a full clone.
   public var partialCloneRemote: String?
@@ -23,6 +24,7 @@ public struct RepositoryGitSnapshot: Sendable, Hashable {
     tags: [Tag],
     worktrees: [Worktree],
     sequencerState: SequencerState?,
+    bisectState: BisectState? = nil,
     capabilities: GitCapabilities,
     partialCloneRemote: String? = nil
   ) {
@@ -34,6 +36,7 @@ public struct RepositoryGitSnapshot: Sendable, Hashable {
     self.tags = tags
     self.worktrees = worktrees
     self.sequencerState = sequencerState
+    self.bisectState = bisectState
     self.capabilities = capabilities
     self.partialCloneRemote = partialCloneRemote
   }
@@ -46,6 +49,8 @@ public struct RepositoryGitSnapshot: Sendable, Hashable {
     async let tags = gitClient.tags()
     async let worktrees = gitClient.worktrees()
     async let sequencerState = gitClient.sequencerState()
+    // Optional metadata: a failed probe must not fail the whole refresh.
+    async let bisectState = try? gitClient.bisectState()
     async let capabilities = gitClient.capabilities()
     // Optional metadata: an unreadable config must not fail the refresh.
     async let partialCloneRemote = try? gitClient.partialCloneRemote()
@@ -65,6 +70,7 @@ public struct RepositoryGitSnapshot: Sendable, Hashable {
       tags: tags,
       worktrees: worktrees,
       sequencerState: sequencerState,
+      bisectState: bisectState ?? nil,
       capabilities: capabilities,
       partialCloneRemote: partialCloneRemote ?? nil
     )
@@ -147,6 +153,7 @@ extension RepositoryModel {
     tags = snapshot.tags
     worktrees = snapshot.worktrees
     sequencerState = snapshot.sequencerState
+    bisectState = snapshot.bisectState
     gitCapabilities = snapshot.capabilities
     partialCloneRemote = snapshot.partialCloneRemote
   }

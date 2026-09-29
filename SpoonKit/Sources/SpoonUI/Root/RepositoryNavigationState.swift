@@ -42,6 +42,7 @@ final class RepositoryNavigationState {
     case mergeBranch(Branch)
     case replayBranch(Branch)
     case rebase(Commit)
+    case startBisect(Commit)
     case dropCommit(Commit)
     case fixupCommit(Commit)
     case rewordCommit(Commit)
@@ -88,6 +89,8 @@ final class RepositoryNavigationState {
         "replay-branch:\(branch.id)"
       case .rebase(let commit):
         "rebase:\(commit.id)"
+      case .startBisect(let commit):
+        "start-bisect:\(commit.id)"
       case .moveBranch(let branch, let commit):
         "move-branch:\(branch.id):\(commit.id)"
       case .dropCommit(let commit):

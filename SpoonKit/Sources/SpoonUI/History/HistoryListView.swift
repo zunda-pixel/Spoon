@@ -195,6 +195,23 @@ struct HistoryListView: View {
       .disabled(model.isBusy || model.isSequencing)
     }
     Divider()
+    if model.isBisecting, model.bisectResult == nil {
+      Button("Mark as Good for Bisect") {
+        Task { await model.markBisect(.good, revision: commit.oid) }
+      }
+      .disabled(model.isBusy)
+      Button("Mark as Bad for Bisect") {
+        Task { await model.markBisect(.bad, revision: commit.oid) }
+      }
+      .disabled(model.isBusy)
+    } else if model.canStartBisect(from: commit) {
+      Button("Bisect from Here…") {
+        navigation.present(.startBisect(commit))
+      }
+      .disabled(model.isBusy)
+      .help("Find which later commit introduced a problem, treating this commit as good")
+    }
+    Divider()
     Button("Cherry-Pick onto \(model.currentBranch?.name ?? "HEAD")") {
       Task { await model.cherryPick(commit.oid) }
     }

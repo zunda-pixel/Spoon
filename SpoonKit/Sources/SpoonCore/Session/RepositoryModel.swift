@@ -22,6 +22,10 @@ public final class RepositoryModel {
   public internal(set) var partialCloneRemote: String?
   /// An in-progress rebase / cherry-pick / revert (conflict or edit pause).
   public internal(set) var sequencerState: SequencerState?
+  /// An in-progress `git bisect`.
+  public internal(set) var bisectState: BisectState?
+  /// The first bad commit of the last bisect, until dismissed.
+  public internal(set) var bisectResult: ObjectID?
   public internal(set) var isRefreshing = false
   /// A long-running mutation (fetch/pull/push/commit/…) is in flight.
   public internal(set) var isBusy = false
