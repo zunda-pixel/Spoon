@@ -45,8 +45,8 @@ public struct SpoonCommands: Commands {
       .disabled(repositoryMutationUnavailable)
 
       if model?.gitCapabilities.supportsBackfill == true {
-        Button("Backfill Missing Objects") {
-          run { await $0.backfill() }
+        Button("Backfill Missing Objects…") {
+          navigation?.present(.backfill)
         }
         .disabled(repositoryMutationUnavailable)
       }

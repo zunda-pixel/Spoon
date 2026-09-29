@@ -27,6 +27,7 @@ final class RepositoryNavigationState {
     case newBranch(startPoint: String?)
     case sparseCheckout
     case dropLargeBlobs
+    case backfill
     case fileHistory(path: String)
     case addRemote
     case addWorktree(Branch)
@@ -53,6 +54,8 @@ final class RepositoryNavigationState {
         "sparse-checkout"
       case .dropLargeBlobs:
         "drop-large-blobs"
+      case .backfill:
+        "backfill"
       case .fileHistory(let path):
         "file-history:\(path)"
       case .addRemote:

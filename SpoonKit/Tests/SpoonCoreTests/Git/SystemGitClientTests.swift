@@ -317,6 +317,33 @@ struct SystemGitClientTests {
     #expect(command.timeout == .seconds(3600))
   }
 
+  @Test func missingObjectsAndRemoteSizesSendExactArgvAndStdin() async throws {
+    let runner = FakeCommandRunner()
+    let first = String(repeating: "a", count: 40)
+    let second = String(repeating: "b", count: 40)
+    runner.stub(
+      arguments: baseFlags + [
+        "rev-list", "--objects", "--missing=print", "--missing-only", "HEAD",
+      ],
+      stdout: "\(first)\n\(second)\n"
+    )
+    runner.stub(
+      arguments: baseFlags + ["cat-file", "--batch-command=%(objectname) %(objectsize)"],
+      stdout: "\(first) 120\n\(second) 3000\n"
+    )
+    let client = makeClient(runner)
+
+    let missing = try await client.missingObjectIDs()
+    let sizes = try await client.remoteObjectSizes(of: missing, from: "origin")
+
+    #expect(missing.map(\.rawValue) == [first, second])
+    #expect(sizes.values.reduce(0, +) == 3120)
+    let command = try #require(runner.invocations.last)
+    #expect(
+      command.standardInput == Data("remote-object-info origin \(first) \(second)\n".utf8)
+    )
+  }
+
   @Test func failedVersionProbeIsRetried() async {
     let runner = FakeCommandRunner()
     runner.stub(arguments: baseFlags + ["version"], stdout: "not a version\n")
