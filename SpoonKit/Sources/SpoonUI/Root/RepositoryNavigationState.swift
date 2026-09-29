@@ -48,6 +48,7 @@ final class RepositoryNavigationState {
     case backfill
     case fileHistory(path: String)
     case blame(path: String)
+    case lineHistory(path: String, lines: ClosedRange<Int>)
     case codeSearch
     case addRemote
     case addSubmodule
@@ -104,6 +105,8 @@ final class RepositoryNavigationState {
         "delete-merged-branches"
       case .codeSearch:
         "code-search"
+      case .lineHistory(let path, let lines):
+        "line-history:\(path):\(lines.lowerBound)-\(lines.upperBound)"
       case .addSubmodule:
         "add-submodule"
       case .deleteWorktree(let worktree):

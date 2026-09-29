@@ -2,6 +2,19 @@ import Defaults
 import Foundation
 
 extension RepositoryModel {
+  /// The commits that changed `lines` of `path` at HEAD, newest first.
+  public func lineHistory(path: String, lines: ClosedRange<Int>, limit: Int = 200) async throws
+    -> [LineHistoryEntry]
+  {
+    try await gitClient.lineHistory(path: path, lines: lines, limit: limit)
+  }
+
+  /// Whether `path` differs from HEAD, so its working-tree line numbers
+  /// may not match the ones `lineHistory` reads.
+  public func hasUncommittedChanges(at path: String) -> Bool {
+    status?.entries.contains { $0.path == path && !$0.isIgnored } ?? false
+  }
+
   /// Lines matching `query` in the working tree or a revision.
   public func searchCode(_ query: CodeSearchQuery, limit: Int = 2_000) async throws
     -> CodeSearchResult

@@ -85,6 +85,28 @@ struct LiveGitTests {
     }
   }
 
+  @Test func lineHistoryFollowsARangeThroughTheCommitsThatChangedIt() async throws {
+    let root = try await makeTemporaryRepo()
+    defer { try? FileManager.default.removeItem(at: root) }
+    func commit(_ content: String, _ message: String) async throws {
+      try await LiveRepoFixture.commitFile(
+        "notes.txt", content: content, message: message, in: root, runner: runner)
+    }
+    try await commit("one\ntwo\nthree\n", "add notes")
+    try await commit("one\nTWO\nthree\n", "shout two")
+    try await commit("zero\none\nTWO\nthree\n", "prepend zero")
+    try await commit("zero\none\nTWO\nthree\nfour\n", "append four")
+    let client = SystemGitClient(repositoryRoot: root, git: git, runner: runner)
+
+    // Line 3 is "TWO" now; it was line 2 before "prepend zero" moved it.
+    let history = try await client.lineHistory(path: "notes.txt", lines: 3...3, limit: 50)
+
+    #expect(history.map(\.commit.subject) == ["shout two", "add notes"])
+    let added = history[0].diffs.first?.hunks.first?.lines.filter { $0.kind == .addition }
+    #expect(added?.map(\.text) == ["TWO"])
+    #expect(try await client.lineHistory(path: "notes.txt", lines: 3...3, limit: 1).count == 1)
+  }
+
   @Test func statusAndBranchesOnRealRepo() async throws {
     let root = try await makeTemporaryRepo()
     defer { try? FileManager.default.removeItem(at: root) }

@@ -70,6 +70,19 @@ extension SystemGitClient {
     return GitBlameParser.parse(result.standardOutput)
   }
 
+  public func lineHistory(path: String, lines: ClosedRange<Int>, limit: Int) async throws
+    -> [LineHistoryEntry]
+  {
+    let result = try await run(
+      [
+        "log", "-L", "\(lines.lowerBound),\(lines.upperBound):\(path)",
+        "--format=\(LineHistoryParser.format)", "--max-count=\(limit)", "HEAD",
+      ],
+      timeout: .seconds(120)
+    )
+    return try LineHistoryParser.parse(result.standardOutput)
+  }
+
   public func searchCode(_ query: CodeSearchQuery, limit: Int) async throws -> CodeSearchResult {
     let command = GitCommand.make(
       git: git,

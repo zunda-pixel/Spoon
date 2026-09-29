@@ -69,6 +69,11 @@ public protocol GitHistoryClient: Sendable {
   /// `revision` is `nil` (uncommitted lines use the zero OID), else the
   /// file at that revision.
   func blame(path: String, at revision: ObjectID?) async throws -> [BlameLine]
+  /// The commits, newest first, that changed `lines` (1-based, inclusive)
+  /// of `path` as it is at HEAD, each with the diff of just those lines,
+  /// following them as they move (`git log -L`). At most `limit` commits.
+  func lineHistory(path: String, lines: ClosedRange<Int>, limit: Int) async throws
+    -> [LineHistoryEntry]
   /// Lines matching `query` (`git grep`), at most `limit` of them.
   func searchCode(_ query: CodeSearchQuery, limit: Int) async throws -> CodeSearchResult
 }
