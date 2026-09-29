@@ -13,6 +13,23 @@ enum SidebarItem: Hashable {
   case stash(Int)
 }
 
+extension SidebarItem {
+  /// A stable order for picking a primary row out of a multi-selection.
+  fileprivate var sortKey: String {
+    switch self {
+    case .changes: "0"
+    case .history: "1"
+    case .reflog: "2"
+    case .branch(let name): "3" + name
+    case .remoteBranch(let remote, let branch): "4" + remote + "/" + branch
+    case .tag(let name): "5" + name
+    case .pullRequests: "6"
+    case .remote(let name): "7" + name
+    case .stash(let index): "8" + String(index)
+    }
+  }
+}
+
 struct HistoryFocus: Hashable {
   let tip: ObjectID
   let reference: HistoryReferenceIdentity
@@ -50,6 +67,7 @@ final class RepositoryNavigationState {
     case tag(Commit)
     case reset(target: ObjectID, description: String)
     case review(ReviewReport)
+    case deleteBranches([Branch])
 
     var id: String {
       switch self {
@@ -105,6 +123,8 @@ final class RepositoryNavigationState {
         "reset:\(target.rawValue)"
       case .review(let report):
         "review:\(report.hashValue)"
+      case .deleteBranches(let branches):
+        "delete-branches:\(branches.map(\.id).joined(separator: "\u{0}"))"
       }
     }
   }
@@ -116,7 +136,37 @@ final class RepositoryNavigationState {
     var id: Self { self }
   }
 
-  var sidebarSelection: SidebarItem? = .changes
+  /// The sidebar row whose content the window shows.
+  var sidebarSelection: SidebarItem? {
+    get { primarySidebarSelection }
+    set {
+      primarySidebarSelection = newValue
+      storedSidebarSelections = newValue.map { [$0] } ?? []
+    }
+  }
+
+  /// Every selected sidebar row; more than one after ⌘- or ⇧-clicking.
+  /// The content column keeps showing the primary selection.
+  var sidebarSelections: Set<SidebarItem> {
+    get { storedSidebarSelections }
+    set {
+      storedSidebarSelections = newValue
+      if let primary = primarySidebarSelection, newValue.contains(primary) { return }
+      primarySidebarSelection = newValue.min { $0.sortKey < $1.sortKey }
+    }
+  }
+
+  /// Names of the local branches in the sidebar selection.
+  var selectedBranchNames: Set<String> {
+    var names: Set<String> = []
+    for case .branch(let name) in storedSidebarSelections {
+      names.insert(name)
+    }
+    return names
+  }
+
+  private var primarySidebarSelection: SidebarItem? = .changes
+  private var storedSidebarSelections: Set<SidebarItem> = [.changes]
   var selectedCommitID: String?
   var selectedReflogSelector: String?
   var selectedReflogOID: ObjectID?
