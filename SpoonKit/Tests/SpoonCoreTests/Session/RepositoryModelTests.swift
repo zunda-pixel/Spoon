@@ -1114,6 +1114,40 @@ struct RepositoryModelTests {
     #expect(RepositoryModel.BranchDeletionSafety.contentMerged(into: "main").requiresForce)
   }
 
+  @Test func autosquashPlanListsFixupsSinceTheBranchLeftMain() async {
+    let client = FakeRepositoryGitClient()
+    let head = makeOID("aaaa1111")
+    let base = makeOID("dddd4444")
+    func commit(_ oid: String, _ subject: String) -> Commit {
+      var commit = makeCommit(oid, subject: subject)
+      commit.parents = [base]
+      return commit
+    }
+    await client.configure(
+      status: makeStatus(oid: head, branch: "topic"),
+      branches: [makeBranch("topic", oid: head, isCurrent: true)],
+      logPages: [
+        0: LogPage(
+          commits: [
+            commit("aaaa1111", "fixup! Add a"), commit("bbbb2222", "Add b"),
+            commit("cccc3333", "squash! Add b"), commit("eeee5555", "Add a"),
+          ],
+          hasMore: false
+        )
+      ],
+      mergeBases: ["main...aaaa1111": base]
+    )
+    let model = makeModel(client)
+    await model.refresh()
+
+    let plan = try? await model.autosquashPlan()
+
+    #expect(plan?.base == base)
+    #expect(plan?.fixups.map(\.subject) == ["fixup! Add a", "squash! Add b"])
+    if let plan { await model.autosquash(plan) }
+    #expect(await client.mutationCalls == ["autosquash:dddd4444"])
+  }
+
   @Test func refreshErrorClearsOnceRefreshRecovers() async {
     let client = FakeRepositoryGitClient()
     let oid = makeOID("99999999")
@@ -1320,6 +1354,12 @@ private actor FakeRepositoryGitClient: GitClient {
   }
   func deleteUntracked(paths: [String]) async throws { throw Failure.unimplemented }
   func commit(message: String, amend: Bool) async throws { throw Failure.unimplemented }
+  func commitFixup(for oid: ObjectID) async throws {
+    mutationCalls.append("fixup-commit:\(oid.rawValue)")
+  }
+  func autosquash(onto base: ObjectID) async throws {
+    mutationCalls.append("autosquash:\(base.rawValue)")
+  }
   func reset(to target: ObjectID, mode: ResetMode) async throws { throw Failure.unimplemented }
   func commitDetail(_ oid: ObjectID, options: DiffOptions) async throws -> CommitDetail {
     throw Failure.unimplemented

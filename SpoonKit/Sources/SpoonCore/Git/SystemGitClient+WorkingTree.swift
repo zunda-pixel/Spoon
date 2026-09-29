@@ -129,6 +129,14 @@ extension SystemGitClient {
     try await runVoid(["clean", "-f", "--"] + paths)
   }
 
+  public func commitFixup(for oid: ObjectID) async throws {
+    try await runVoid(
+      ["commit", "--fixup=\(oid.rawValue)"],
+      extraEnvironment: ["GIT_EDITOR": "true"],
+      timeout: .seconds(120)
+    )
+  }
+
   public func commit(message: String, amend: Bool) async throws {
     var arguments = ["commit", "-F", "-"]
     if amend {

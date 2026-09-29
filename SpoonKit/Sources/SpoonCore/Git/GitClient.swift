@@ -41,6 +41,9 @@ public protocol GitWorkingTreeClient: Sendable {
   func deleteUntracked(paths: [String]) async throws
   /// Commits staged changes; message may be multi-line.
   func commit(message: String, amend: Bool) async throws
+  /// Commits the staged changes as `fixup! <subject of oid>`, to be folded
+  /// into that commit later by `autosquash(onto:)`.
+  func commitFixup(for oid: ObjectID) async throws
   func reset(to target: ObjectID, mode: ResetMode) async throws
 }
 
@@ -179,6 +182,10 @@ public protocol GitSequencerClient: Sendable {
   /// Runs a headless `rebase -i` driven by `plan`'s todo list. May return
   /// with the rebase paused (edit step or conflict) — check `sequencerState()`.
   func interactiveRebase(_ plan: RebasePlan) async throws
+  /// Rebases the commits after `base` so each `fixup!`, `squash!`, and
+  /// `amend!` commit is folded into its target (`rebase -i --autosquash`,
+  /// accepting git's generated todo list). May pause on conflicts.
+  func autosquash(onto base: ObjectID) async throws
   /// Applies one commit onto HEAD, keeping its original message.
   func cherryPick(_ oid: ObjectID) async throws
   /// Adds one inverse commit with git's default revert message.

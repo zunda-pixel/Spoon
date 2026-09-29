@@ -103,6 +103,45 @@ extension RepositoryModel {
     }
   }
 
+  /// Whether the staged changes can be recorded as a fixup for `commit`.
+  public func canCommitFixup(for commit: Commit) -> Bool {
+    !commit.isMerge && !isSequencing && status?.stagedEntries.isEmpty == false
+      && canRevert(commit.oid)
+  }
+
+  @discardableResult
+  public func commitFixup(for commit: Commit) async -> Bool {
+    await perform { try await $0.commitFixup(for: commit.oid) }
+  }
+
+  /// The fixup commits on the current branch that autosquash would fold,
+  /// and the commit it would rebase onto: where the branch forked from its
+  /// upstream, else from the default branch.
+  public func autosquashPlan() async throws -> AutosquashPlan {
+    guard let head = status?.headOID, let branch = currentBranch else {
+      throw RebaseSetupError.detachedHead
+    }
+    let baseReference: String
+    if let upstream = existingRemoteUpstream(of: branch) {
+      baseReference = upstream
+    } else {
+      baseReference = try await gitClient.defaultBranch()
+    }
+    let base = try await gitClient.mergeBase(baseReference, head.rawValue)
+    let page = try await gitClient.log(
+      LogQuery(reference: "\(base.rawValue)..\(head.rawValue)", maxCount: 1000))
+    return AutosquashPlan(
+      base: base,
+      baseReference: baseReference,
+      fixups: page.commits.filter(AutosquashPlan.isFixup)
+    )
+  }
+
+  @discardableResult
+  public func autosquash(_ plan: AutosquashPlan) async -> Bool {
+    await perform { try await $0.autosquash(onto: plan.base) }
+  }
+
   public func continueSequencer() async {
     guard let kind = sequencerState?.kind else { return }
     await perform { try await $0.continueSequencer(kind) }
