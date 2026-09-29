@@ -402,6 +402,9 @@ struct TagCommitSheet: View {
   @State private var name = ""
   @State private var message = ""
   @State private var pushToRemotes = false
+  @State private var sign = false
+  /// `nil` until loaded, or when git config can't be read.
+  @State private var signing: CommitSigningConfiguration?
 
   init(model: RepositoryModel, commit: Commit) {
     self.model = model
@@ -417,7 +420,12 @@ struct TagCommitSheet: View {
       Form {
         TextField("Tag name", text: $name, prompt: Text("v1.0.0"))
           .onSubmit(create)
-        TextField("Message (optional; makes the tag annotated)", text: $message)
+        TextField(
+          "Message", text: $message,
+          prompt: Text(sign ? "Optional; the tag name if empty" : "Optional; makes it annotated"))
+        Toggle("Sign tag", isOn: $sign)
+          .disabled(signing?.canSign == false && !sign)
+          .help(signingHelp)
         Toggle("Push to all remotes", isOn: $pushToRemotes)
           .disabled(model.remotes.isEmpty)
       }
@@ -434,6 +442,26 @@ struct TagCommitSheet: View {
       }
     }
     .padding(20)
+    .task {
+      signing = await model.commitSigningConfiguration()
+      sign = signing?.signsTagsByDefault ?? false
+    }
+  }
+
+  private var signingHelp: String {
+    guard let signing else { return "Sign the tag with your configured key" }
+    guard signing.canSign else {
+      return "Set user.signingKey to sign tags with \(signing.format.displayName)"
+    }
+    let key = signing.key.map { " \($0)" } ?? ""
+    let prefix = signing.signsTagsByDefault ? "Signed by default (tag.gpgSign). " : ""
+    return "\(prefix)Sign the tag with your \(signing.format.displayName) key\(key); signed tags are annotated"
+  }
+
+  /// Passes the choice to git only where it differs from `tag.gpgSign`.
+  private var tagSigning: TagSigning {
+    let signsByDefault = signing?.signsTagsByDefault ?? false
+    return sign == signsByDefault ? .configured : sign ? .sign : .doNotSign
   }
 
   private var isValid: Bool {
@@ -446,12 +474,14 @@ struct TagCommitSheet: View {
     guard isValid else { return }
     let tagName = name.trimmingCharacters(in: .whitespaces)
     let trimmedMessage = message.trimmingCharacters(in: .whitespacesAndNewlines)
+    let signing = tagSigning
     dismiss()
     Task {
       await model.createTag(
         name: tagName,
         at: commit.oid,
         message: trimmedMessage.isEmpty ? nil : trimmedMessage,
+        signing: signing,
         pushToRemotes: pushToRemotes
       )
     }

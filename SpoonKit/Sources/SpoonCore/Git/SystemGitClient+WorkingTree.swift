@@ -156,7 +156,7 @@ extension SystemGitClient {
       git: git,
       repository: repositoryRoot,
       arguments: [
-        "config", "--get-regexp", #"^(commit\.gpgsign|gpg\.format|user\.signingkey)$"#,
+        "config", "--get-regexp", #"^(commit\.gpgsign|tag\.gpgsign|gpg\.format|user\.signingkey)$"#,
       ],
       timeout: .seconds(10)
     )

@@ -13,10 +13,20 @@ extension SystemGitClient {
     return try GitTagParser.parse(result.standardOutput)
   }
 
-  public func createTag(name: String, at target: ObjectID?, message: String?) async throws {
+  public func createTag(
+    name: String, at target: ObjectID?, message: String?, signing: TagSigning
+  ) async throws {
     var arguments = ["tag"]
-    if let message, !message.isEmpty {
+    let message = message.flatMap { $0.isEmpty ? nil : $0 }
+    switch (signing, message) {
+    case (.sign, _):
+      arguments.append(contentsOf: ["--sign", "-m", message ?? name])
+    case (.doNotSign, let message?):
+      arguments.append(contentsOf: ["--no-sign", "-a", "-m", message])
+    case (_, let message?):
       arguments.append(contentsOf: ["-a", "-m", message])
+    case (_, nil):
+      break
     }
     arguments.append(name)
     if let target {

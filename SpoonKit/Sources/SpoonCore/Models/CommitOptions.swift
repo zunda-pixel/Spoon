@@ -52,12 +52,18 @@ public struct CommitSigningConfiguration: Sendable, Hashable {
 
   /// `commit.gpgSign`: whether git signs every commit unless told not to.
   public var signsByDefault: Bool
+  /// `tag.gpgSign`: whether git signs every annotated tag unless told not to.
+  public var signsTagsByDefault: Bool
   public var format: Format
   /// `user.signingKey`; `nil` lets GPG pick a key from the committer email.
   public var key: String?
 
-  public init(signsByDefault: Bool = false, format: Format = .openPGP, key: String? = nil) {
+  public init(
+    signsByDefault: Bool = false, signsTagsByDefault: Bool = false, format: Format = .openPGP,
+    key: String? = nil
+  ) {
     self.signsByDefault = signsByDefault
+    self.signsTagsByDefault = signsTagsByDefault
     self.format = format
     self.key = key
   }
@@ -77,8 +83,9 @@ public struct CommitSigningConfiguration: Sendable, Hashable {
       let value = parts.count > 1 ? String(parts[1]) : ""
       switch name.lowercased() {
       case "commit.gpgsign":
-        // A bare `key` line means true, as in git.
-        configuration.signsByDefault = ["", "true", "yes", "on", "1"].contains(value.lowercased())
+        configuration.signsByDefault = isTrue(value)
+      case "tag.gpgsign":
+        configuration.signsTagsByDefault = isTrue(value)
       case "gpg.format":
         configuration.format = Format(rawValue: value.lowercased()) ?? .openPGP
       case "user.signingkey":
@@ -89,4 +96,19 @@ public struct CommitSigningConfiguration: Sendable, Hashable {
     }
     return configuration
   }
+
+  /// git's boolean spellings; a bare `key` line means true.
+  private static func isTrue(_ value: String) -> Bool {
+    ["", "true", "yes", "on", "1"].contains(value.lowercased())
+  }
+}
+
+/// Whether `git tag` signs an annotated tag.
+public enum TagSigning: Sendable, Hashable {
+  /// Follow `tag.gpgSign`.
+  case configured
+  /// Sign with the configured key (`--sign`).
+  case sign
+  /// Leave it unsigned even if `tag.gpgSign` is set (`--no-sign`).
+  case doNotSign
 }

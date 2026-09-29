@@ -793,6 +793,23 @@ struct SystemGitClientTests {
     #expect(runner.invocations.count == 4)
   }
 
+  @Test func tagSigningChoosesSignNoSignOrTheConfig() async throws {
+    let runner = FakeCommandRunner()
+    runner.stub(arguments: baseFlags + ["tag", "--sign", "-m", "v3", "v3"])
+    runner.stub(arguments: baseFlags + ["tag", "--sign", "-m", "notes", "v4", "aaaa1111"])
+    runner.stub(arguments: baseFlags + ["tag", "--no-sign", "-a", "-m", "plain", "v5"])
+    runner.stub(arguments: baseFlags + ["tag", "v6"])
+    let client = makeClient(runner)
+
+    try await client.createTag(name: "v3", at: nil, message: nil, signing: .sign)
+    try await client.createTag(
+      name: "v4", at: ObjectID(rawValue: "aaaa1111"), message: "notes", signing: .sign)
+    try await client.createTag(name: "v5", at: nil, message: "plain", signing: .doNotSign)
+    // A lightweight tag has nothing to sign or leave unsigned.
+    try await client.createTag(name: "v6", at: nil, message: "", signing: .doNotSign)
+    #expect(runner.invocations.count == 4)
+  }
+
   @Test func remoteTagOperationsSendExactArgv() async throws {
     let runner = FakeCommandRunner()
     runner.stub(arguments: baseFlags + ["push", "origin", "refs/tags/v1"])
