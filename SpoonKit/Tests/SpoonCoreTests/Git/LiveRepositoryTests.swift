@@ -523,6 +523,24 @@ struct LiveRepositoryTests {
     }
   }
 
+  @Test func ignoringWhitespaceHidesWhitespaceOnlyChanges() async throws {
+    let root = try await LiveRepoFixture.makeTemporaryRepo(
+      commits: [.init(file: "f.swift", content: "func a() {\n  x()\n}\n", message: "base")],
+      runner: runner
+    )
+    defer { try? FileManager.default.removeItem(at: root) }
+    try Data("func a() {\n    x()\n}\nlet b = 1\n".utf8).write(to: root.appending(path: "f.swift"))
+    let client = makeClient(root)
+
+    let full = try await client.diffWorkingTree(path: "f.swift", staged: false)
+    let quiet = try await client.diffWorkingTree(
+      path: "f.swift", staged: false, options: DiffOptions(ignoresWhitespace: true))
+
+    #expect(full.first?.additionCount == 2)
+    #expect(quiet.first?.additionCount == 1)
+    #expect(quiet.first?.deletionCount == 0)
+  }
+
   @Test func cloneCreatesAWorkingLocalCopy() async throws {
     let source = try await LiveRepoFixture.makeTemporaryRepo(
       commits: [.init(file: "base.txt", content: "base\n", message: "base")],

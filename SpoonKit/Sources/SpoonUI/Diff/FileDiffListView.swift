@@ -31,14 +31,18 @@ struct FileDiffListView: View {
   var onDiscardHunk: ((FileDiff, Hunk) -> Void)?
   /// Extra per-file actions, offered from the file header's menu.
   var fileActions: ((FileDiff) -> [FileDiffAction])?
+  /// Highlight the changed words within modified lines.
+  var highlightsWordChanges: Bool
 
   init(
     diffs: [FileDiff],
     hunkAction: HunkAction? = nil,
     lineSelection: Binding<DiffLineSelection?>? = nil,
     onDiscardHunk: ((FileDiff, Hunk) -> Void)? = nil,
-    fileActions: ((FileDiff) -> [FileDiffAction])? = nil
+    fileActions: ((FileDiff) -> [FileDiffAction])? = nil,
+    highlightsWordChanges: Bool = false
   ) {
+    self.highlightsWordChanges = highlightsWordChanges
     self.diffs = diffs
     self.hunkAction = hunkAction
     self.lineSelection = lineSelection
@@ -82,6 +86,7 @@ struct FileDiffListView: View {
           diff: diff,
           hunk: hunk,
           initiallyExpanded: !collapsed,
+          highlightsWordChanges: highlightsWordChanges,
           action: hunkAction.flatMap { action in
             action.isEnabled(diff)
               ? (action.title, action.systemImage, { action.handler(diff, hunk) })
@@ -219,12 +224,14 @@ struct HunkView: View {
   let action: (title: String, systemImage: String, handler: () -> Void)?
   let lineSelection: Binding<DiffLineSelection?>?
   let onDiscardHunk: (() -> Void)?
+  let highlightsWordChanges: Bool
   @State private var isExpanded: Bool
 
   init(
     diff: FileDiff,
     hunk: Hunk,
     initiallyExpanded: Bool = true,
+    highlightsWordChanges: Bool = false,
     action: (title: String, systemImage: String, handler: () -> Void)? = nil,
     lineSelection: Binding<DiffLineSelection?>? = nil,
     onDiscardHunk: (() -> Void)? = nil
@@ -234,6 +241,7 @@ struct HunkView: View {
     self.action = action
     self.lineSelection = lineSelection
     self.onDiscardHunk = onDiscardHunk
+    self.highlightsWordChanges = highlightsWordChanges
     self._isExpanded = State(initialValue: initiallyExpanded)
   }
 
@@ -283,9 +291,11 @@ struct HunkView: View {
       .background(.quaternary.opacity(0.5))
 
       if isExpanded {
+        let wordChanges = highlightsWordChanges ? InlineChanges.ranges(in: hunk) : [:]
         ForEach(Array(hunk.lines.enumerated()), id: \.offset) { offset, line in
           DiffLineRow(
             line: line,
+            changedRanges: wordChanges[offset] ?? [],
             isSelectable: lineSelection != nil && line.kind != .context,
             isSelected: isSelected(offset),
             onSelect: lineSelection != nil && line.kind != .context
@@ -339,6 +349,8 @@ struct HunkView: View {
 @MainActor
 struct DiffLineRow: View {
   let line: DiffLine
+  /// Character ranges of `line.text` that changed against the paired line.
+  var changedRanges: [Range<Int>] = []
   var isSelectable = false
   var isSelected = false
   var onSelect: (() -> Void)?
@@ -366,7 +378,7 @@ struct DiffLineRow: View {
       lineNumber(line.newLine)
       Text(marker)
         .frame(width: 16)
-      Text(line.text.isEmpty ? " " : line.text)
+      Text(highlightedText)
         .frame(maxWidth: .infinity, alignment: .leading)
         .foregroundStyle(
           line.kind == .noNewlineMarker ? AnyShapeStyle(.secondary) : AnyShapeStyle(.primary))
@@ -387,6 +399,20 @@ struct DiffLineRow: View {
       .frame(width: Self.numberWidth, alignment: .trailing)
       .foregroundStyle(.tertiary)
       .padding(.trailing, 6)
+  }
+
+  private var highlightedText: AttributedString {
+    var text = AttributedString(line.text.isEmpty ? " " : line.text)
+    guard !changedRanges.isEmpty else { return text }
+    let tint: Color = line.kind == .deletion ? .red : .green
+    for range in changedRanges {
+      let characters = text.characters
+      guard range.upperBound <= characters.count else { continue }
+      let lower = characters.index(characters.startIndex, offsetBy: range.lowerBound)
+      let upper = characters.index(characters.startIndex, offsetBy: range.upperBound)
+      text[lower..<upper].backgroundColor = tint.opacity(0.35)
+    }
+    return text
   }
 
   private var marker: String {

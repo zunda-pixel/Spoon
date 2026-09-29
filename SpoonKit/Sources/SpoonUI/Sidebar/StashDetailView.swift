@@ -82,7 +82,7 @@ struct StashDetailView: View {
       if diffs.isEmpty {
         ContentUnavailableView("Empty Stash", systemImage: "tray")
       } else {
-        FileDiffListView(diffs: diffs)
+        FileDiffListView(diffs: diffs, highlightsWordChanges: model.diffHighlightsWordChanges)
       }
     } else if let loadErrorMessage {
       ContentUnavailableView(

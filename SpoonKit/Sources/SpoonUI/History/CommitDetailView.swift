@@ -28,10 +28,13 @@ struct CommitDetailView: View {
             copyBar(lineSelection, diffs: detail.diffs)
             Divider()
           }
+          DiffOptionsBar(model: model)
+          Divider()
           FileDiffListView(
             diffs: detail.diffs,
             lineSelection: $lineSelection,
-            fileActions: { restoreActions(for: $0, in: detail.commit) }
+            fileActions: { restoreActions(for: $0, in: detail.commit) },
+            highlightsWordChanges: model.diffHighlightsWordChanges
           )
         }
       } else if let errorMessage {
@@ -60,7 +63,7 @@ struct CommitDetailView: View {
         "Uncommitted changes to \(request.path) are replaced. The index is not changed, so the result appears as an unstaged change."
       )
     }
-    .task(id: oid) {
+    .task(id: DetailKey(oid: oid, options: model.diffOptions)) {
       do {
         errorMessage = nil
         lineSelection = nil
@@ -186,4 +189,9 @@ private struct FileRestoreRequest: Hashable {
   }
 
   var confirmTitle: String { isDeletion ? "Delete File" : "Restore File" }
+}
+
+private struct DetailKey: Hashable {
+  let oid: ObjectID
+  let options: DiffOptions
 }
