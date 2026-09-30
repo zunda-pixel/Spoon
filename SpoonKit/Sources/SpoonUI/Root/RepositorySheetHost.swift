@@ -34,6 +34,8 @@ struct RepositorySheetHost: ViewModifier {
         LineHistorySheet(model: model, path: path, lines: lines, navigation: navigation)
       case .repositorySettings:
         RepositorySettingsSheet(model: model)
+      case .ignoredFiles:
+        IgnoredFilesSheet(model: model)
       case .codeSearch:
         CodeSearchSheet(model: model, navigation: navigation)
       case .addRemote:

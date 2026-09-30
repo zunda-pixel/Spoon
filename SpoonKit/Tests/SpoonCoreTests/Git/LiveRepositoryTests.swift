@@ -222,6 +222,43 @@ struct LiveRepositoryTests {
         == ["reformat", "reformat"])
   }
 
+  @MainActor
+  @Test func ignoredPathsAndTheRulesBehindThem() async throws {
+    let root = try await LiveRepoFixture.makeTemporaryRepo(
+      commits: [
+        // Tracked before the rule that would ignore it.
+        .init(file: "tracked.log", content: "tracked\n", message: "tracked log"),
+        .init(file: ".gitignore", content: "build/\n*.log\n!keep.log\n", message: "ignore"),
+        .init(file: "sub/.gitignore", content: "secret.txt\n", message: "sub ignore"),
+      ],
+      runner: runner
+    )
+    defer { try? FileManager.default.removeItem(at: root) }
+    for file in ["build/out.o", "build/deep/more.o", "a.log", "keep.log", "sub/secret.txt", "notes.txt"] {
+      let url = root.appending(path: file)
+      try FileManager.default.createDirectory(
+        at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+      try Data("x\n".utf8).write(to: url)
+    }
+    let model = RepositoryModel(repository: Repository(rootURL: root), gitClient: makeClient(root))
+
+    let ignored = try await model.ignoredPaths()
+    #expect(ignored.paths.map(\.path) == ["a.log", "build/", "sub/secret.txt"])
+    #expect(ignored.paths.map(\.rule?.pattern) == ["*.log", "build/", "secret.txt"])
+    #expect(ignored.paths.last?.rule?.source == "sub/.gitignore")
+    #expect(!ignored.isTruncated)
+    #expect(try await model.ignoredPaths(limit: 1).isTruncated)
+
+    #expect(
+      try await model.ignoreStatus(of: "a.log")
+        == .ignored(IgnoreRule(source: ".gitignore", line: 2, pattern: "*.log")))
+    #expect(
+      try await model.ignoreStatus(of: "keep.log")
+        == .reincluded(IgnoreRule(source: ".gitignore", line: 3, pattern: "!keep.log")))
+    #expect(try await model.ignoreStatus(of: "notes.txt") == .notIgnored)
+    #expect(try await model.ignoreStatus(of: "tracked.log") == .tracked)
+  }
+
   @Test func conflictsResolveToEitherSideOrADeletion() async throws {
     let root = try await LiveRepoFixture.makeTemporaryRepo(
       commits: [

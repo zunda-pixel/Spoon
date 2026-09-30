@@ -111,6 +111,11 @@ public struct SpoonCommands: Commands {
       .keyboardShortcut("f", modifiers: [.option, .command])
       .disabled(model == nil || navigation == nil)
 
+      Button("Ignored Files…") {
+        navigation?.present(.ignoredFiles)
+      }
+      .disabled(model == nil || navigation == nil)
+
       Button("Blame File…") {
         chooseFileToBlame()
       }
