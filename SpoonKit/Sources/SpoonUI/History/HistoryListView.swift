@@ -27,6 +27,9 @@ struct HistoryListView: View {
         submit: submitSearch,
         clear: clearSearch
       )
+      if model.isShallow {
+        ShallowHistoryBanner(model: model, navigation: navigation)
+      }
       if let activeSearch {
         HistorySearchResultsView(model: model, search: activeSearch, navigation: navigation)
       } else {

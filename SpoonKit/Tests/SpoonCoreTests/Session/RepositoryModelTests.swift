@@ -742,6 +742,23 @@ struct RepositoryModelTests {
       ])
   }
 
+  @Test func shallowClonesAreDetectedAndDeepened() async {
+    let client = FakeRepositoryGitClient()
+    let oid = makeOID("88888888")
+    await client.configure(
+      status: makeStatus(oid: oid, branch: "main"),
+      branches: [makeBranch("main", oid: oid, isCurrent: true)]
+    )
+    await client.setShallow(true)
+    let model = makeModel(client)
+
+    await model.refresh()
+    #expect(model.isShallow)
+    #expect(await model.deepenHistory(.commits(100)))
+    #expect(await model.deepenHistory(.full))
+    #expect(await client.mutationCalls == ["deepen:--deepen=100", "deepen:--unshallow"])
+  }
+
   @Test func failedMutationErrorSurvivesTheFollowUpRefresh() async {
     let client = FakeRepositoryGitClient()
     let oid = makeOID("88888888")
@@ -1592,6 +1609,12 @@ private actor FakeRepositoryGitClient: GitClient {
     mutationCalls.append("publish:\(remoteName):\(branch)")
   }
   func fetch() async throws { throw Failure.unimplemented }
+  private var currentShallow = false
+  func setShallow(_ shallow: Bool) { currentShallow = shallow }
+  func isShallowRepository() async throws -> Bool { currentShallow }
+  func deepenHistory(_ depth: HistoryDepth) async throws {
+    mutationCalls.append("deepen:\(depth.arguments.joined(separator: " "))")
+  }
   func backfill() async throws { throw Failure.unimplemented }
   func partialCloneRemote() async throws -> String? { currentPartialCloneRemote }
   func missingObjectIDs() async throws -> [ObjectID] { currentMissingObjects }

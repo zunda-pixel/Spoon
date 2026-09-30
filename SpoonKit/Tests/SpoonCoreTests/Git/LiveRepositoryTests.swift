@@ -893,6 +893,37 @@ struct LiveRepositoryTests {
     #expect(staged == [".gitmodules", "Vendor/Lib"])
   }
 
+  @Test func shallowCloneFetchesMoreHistoryOnRequest() async throws {
+    let git = try LiveRepoFixture.makeFileProtocolGitWrapper()
+    let source = try await LiveRepoFixture.makeTemporaryRepo(runner: runner)
+    let clone = URL.temporaryDirectory.appending(path: "spoon-shallow-\(UUID().uuidString)")
+    defer {
+      for url in [git, source, clone] { try? FileManager.default.removeItem(at: url) }
+    }
+    for index in 1...6 {
+      try await LiveRepoFixture.commitFile(
+        "f.txt", content: "\(index)\n", message: "commit \(index)", in: source, runner: runner)
+    }
+    let command = Command(
+      executable: git,
+      arguments: ["clone", "--quiet", "--depth", "1", source.absoluteString, clone.path],
+      workingDirectory: source)
+    _ = try await runner.run(command).checkSuccess(of: command)
+    let client = SystemGitClient(repositoryRoot: clone, git: git, runner: runner)
+    func commitCount() async throws -> Int {
+      let text = try await client.run(["rev-list", "--count", "HEAD"]).standardOutputText
+      return Int(text.trimmingCharacters(in: .whitespacesAndNewlines)) ?? 0
+    }
+
+    #expect(try await client.isShallowRepository())
+    #expect(try await commitCount() == 1)
+    try await client.deepenHistory(.commits(2))
+    #expect(try await commitCount() == 3)
+    try await client.deepenHistory(.full)
+    #expect(try await commitCount() == 6)
+    #expect(!(try await client.isShallowRepository()))
+  }
+
   @Test func recursiveCloneChecksOutSubmoduleContent() async throws {
     let git = try LiveRepoFixture.makeFileProtocolGitWrapper()
     let submodule = try await LiveRepoFixture.makeTemporaryRepo(

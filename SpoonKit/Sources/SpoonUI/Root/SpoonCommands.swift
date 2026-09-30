@@ -64,6 +64,13 @@ public struct SpoonCommands: Commands {
         .disabled(repositoryMutationUnavailable)
       }
 
+      if model?.isShallow == true {
+        Button("Fetch More History…") {
+          navigation?.present(.fetchHistory)
+        }
+        .disabled(repositoryMutationUnavailable)
+      }
+
       if model?.gitCapabilities.supportsBackfill == true {
         Button("Backfill Missing Objects…") {
           navigation?.present(.backfill)

@@ -47,6 +47,7 @@ final class RepositoryNavigationState {
     case stashBranch(Stash)
     case dropLargeBlobs
     case backfill
+    case fetchHistory
     case fileHistory(path: String)
     case blame(path: String)
     case lineHistory(path: String, lines: ClosedRange<Int>)
@@ -108,6 +109,8 @@ final class RepositoryNavigationState {
         "delete-merged-branches"
       case .codeSearch:
         "code-search"
+      case .fetchHistory:
+        "fetch-history"
       case .ignoredFiles:
         "ignored-files"
       case .repositorySettings:

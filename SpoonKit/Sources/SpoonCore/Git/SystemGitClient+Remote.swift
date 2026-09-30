@@ -79,6 +79,16 @@ extension SystemGitClient {
     try await runVoid(["fetch", "--all", "--prune"], timeout: .seconds(300))
   }
 
+  public func isShallowRepository() async throws -> Bool {
+    let result = try await run(["rev-parse", "--is-shallow-repository"], timeout: .seconds(10))
+    return result.standardOutputText.trimmingCharacters(in: .whitespacesAndNewlines) == "true"
+  }
+
+  public func deepenHistory(_ depth: HistoryDepth) async throws {
+    // A full history can be large; allow a long download.
+    try await runVoid(["fetch"] + depth.arguments, timeout: .seconds(3600))
+  }
+
   public func backfill() async throws {
     try await runVoid(["backfill"], timeout: .seconds(3600))
   }

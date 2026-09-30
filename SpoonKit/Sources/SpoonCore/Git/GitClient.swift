@@ -158,6 +158,11 @@ public protocol GitRemoteClient: Sendable {
   /// Pushes local `branch` to the same name on `remoteName` and sets it as upstream.
   func publishBranch(_ branch: String, to remoteName: String) async throws
   func fetch() async throws
+  /// Whether this is a shallow clone, missing history beyond a boundary
+  /// (`git rev-parse --is-shallow-repository`).
+  func isShallowRepository() async throws -> Bool
+  /// Fetches older history into a shallow clone from its default remote.
+  func deepenHistory(_ depth: HistoryDepth) async throws
   /// Downloads blobs omitted by a partial clone (requires
   /// `GitCapabilities.supportsBackfill`).
   func backfill() async throws

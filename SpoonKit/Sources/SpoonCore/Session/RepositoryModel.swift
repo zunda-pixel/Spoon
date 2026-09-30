@@ -21,6 +21,8 @@ public final class RepositoryModel {
   public internal(set) var gitCapabilities = GitCapabilities()
   /// Promisor remote of a partial clone; `nil` for a full clone.
   public internal(set) var partialCloneRemote: String?
+  /// A shallow clone, missing history beyond a boundary.
+  public internal(set) var isShallow = false
   /// An in-progress rebase / cherry-pick / revert (conflict or edit pause).
   public internal(set) var sequencerState: SequencerState?
   /// An in-progress `git bisect`.
