@@ -11,6 +11,7 @@ struct RepositorySettingsSheet: View {
   @State private var loadState: AsyncLoadState<RepositoryConfig> = .loading
   /// Local values being edited; a missing key means "inherit".
   @State private var draft: [RepositorySetting: String] = [:]
+  @State private var confirmingForgetAll = false
 
   var body: some View {
     VStack(spacing: 0) {
@@ -79,6 +80,21 @@ struct RepositorySettingsSheet: View {
           .signingFormat, "Format", config,
           options: [("openpgp", "GPG"), ("ssh", "SSH"), ("x509", "X.509")])
         text(.signingKey, "Signing key", config, prompt: "Key ID or path to an SSH public key")
+      }
+      Section("Conflicts") {
+        toggle(.rerereEnabled, "Remember how conflicts were resolved (rerere)", config)
+        toggle(.rerereAutoUpdate, "Stage files resolved from a recording", config)
+        Button("Forget All Recorded Resolutions…") { confirmingForgetAll = true }
+          .disabled(model.isBusy)
+          .confirmationDialog(
+            "Forget every recorded conflict resolution?", isPresented: $confirmingForgetAll
+          ) {
+            Button("Forget All", role: .destructive) {
+              Task { await model.forgetAllRecordedResolutions() }
+            }
+          } message: {
+            Text("Conflicts rerere would have resolved from these recordings have to be resolved by hand again.")
+          }
       }
       Section("Blame") {
         text(

@@ -23,6 +23,9 @@ public final class RepositoryModel {
   public internal(set) var partialCloneRemote: String?
   /// A shallow clone, missing history beyond a boundary.
   public internal(set) var isShallow = false
+  /// Conflicted paths rerere resolved from a recorded resolution; they
+  /// only need reviewing and staging.
+  public internal(set) var rerereResolvedPaths: Set<String> = []
   /// An in-progress rebase / cherry-pick / revert (conflict or edit pause).
   public internal(set) var sequencerState: SequencerState?
   /// An in-progress `git bisect`.

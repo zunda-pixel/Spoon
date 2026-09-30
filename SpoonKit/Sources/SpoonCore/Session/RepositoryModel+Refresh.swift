@@ -17,6 +17,8 @@ public struct RepositoryGitSnapshot: Sendable, Hashable {
   public var partialCloneRemote: String?
   /// A shallow clone, missing history beyond a boundary.
   public var isShallow: Bool
+  /// Conflicted paths rerere hasn't resolved; `nil` when it isn't tracking.
+  public var rerereRemaining: Set<String>?
 
   public init(
     status: WorkingTreeStatus,
@@ -31,7 +33,8 @@ public struct RepositoryGitSnapshot: Sendable, Hashable {
     bisectState: BisectState? = nil,
     capabilities: GitCapabilities,
     partialCloneRemote: String? = nil,
-    isShallow: Bool = false
+    isShallow: Bool = false,
+    rerereRemaining: Set<String>? = nil
   ) {
     self.status = status
     self.branches = branches
@@ -46,6 +49,7 @@ public struct RepositoryGitSnapshot: Sendable, Hashable {
     self.capabilities = capabilities
     self.partialCloneRemote = partialCloneRemote
     self.isShallow = isShallow
+    self.rerereRemaining = rerereRemaining
   }
 
   static func load(from gitClient: any GitClient) async throws -> Self {
@@ -64,6 +68,7 @@ public struct RepositoryGitSnapshot: Sendable, Hashable {
     // Optional metadata: an unreadable config must not fail the refresh.
     async let partialCloneRemote = try? gitClient.partialCloneRemote()
     async let isShallow = try? gitClient.isShallowRepository()
+    async let rerereRemaining = try? gitClient.rerereRemaining()
 
     let loadedRemotes = try await remotes
     let remoteBranchesByRemote = try await loadRemoteBranches(
@@ -84,7 +89,8 @@ public struct RepositoryGitSnapshot: Sendable, Hashable {
       bisectState: bisectState ?? nil,
       capabilities: capabilities,
       partialCloneRemote: partialCloneRemote ?? nil,
-      isShallow: isShallow ?? false
+      isShallow: isShallow ?? false,
+      rerereRemaining: rerereRemaining ?? nil
     )
   }
 
@@ -170,5 +176,9 @@ extension RepositoryModel {
     gitCapabilities = snapshot.capabilities
     partialCloneRemote = snapshot.partialCloneRemote
     isShallow = snapshot.isShallow
+    rerereResolvedPaths =
+      snapshot.rerereRemaining.map { remaining in
+        Set(snapshot.status.conflictedEntries.map(\.path)).subtracting(remaining)
+      } ?? []
   }
 }

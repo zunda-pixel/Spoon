@@ -66,10 +66,32 @@ struct ConflictsResolvedBar: View {
   let path: String
   let onChange: () -> Void
 
+  @State private var confirmingForget = false
+
   var body: some View {
     HStack {
-      Label("No conflict markers left", systemImage: "checkmark.circle")
-        .foregroundStyle(.green)
+      if model.rerereResolvedPaths.contains(path) {
+        Label("Resolved from a recorded resolution", systemImage: "arrow.triangle.2.circlepath")
+          .foregroundStyle(.green)
+          .help("rerere applied how this conflict was resolved before; review it, then mark it resolved")
+        Button("Forget Resolution…") { confirmingForget = true }
+          .disabled(model.isBusy)
+          .confirmationDialog(
+            "Forget the recorded resolution for “\(path)”?", isPresented: $confirmingForget
+          ) {
+            Button("Forget Resolution", role: .destructive) {
+              Task {
+                await model.forgetRecordedResolution(path: path)
+                onChange()
+              }
+            }
+          } message: {
+            Text("The conflict markers come back so you can resolve it again; the new resolution is recorded instead.")
+          }
+      } else {
+        Label("No conflict markers left", systemImage: "checkmark.circle")
+          .foregroundStyle(.green)
+      }
       Spacer()
       RestoreConflictMarkersButton(model: model, path: path, onChange: onChange)
       Button("Mark Resolved") {

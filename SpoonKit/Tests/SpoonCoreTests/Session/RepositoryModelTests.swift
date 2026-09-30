@@ -759,6 +759,25 @@ struct RepositoryModelTests {
     #expect(await client.mutationCalls == ["deepen:--deepen=100", "deepen:--unshallow"])
   }
 
+  @Test func rerereResolvedPathsAreTheConflictsItNoLongerLists() async {
+    let client = FakeRepositoryGitClient()
+    let oid = makeOID("88888888")
+    var status = makeStatus(oid: oid, branch: "main")
+    status.entries = ["a.txt", "b.txt"].map { FileStatusEntry(path: $0, conflict: .bothModified) }
+    await client.configure(status: status, branches: [makeBranch("main", oid: oid, isCurrent: true)])
+    let model = makeModel(client)
+
+    await model.refresh()
+    #expect(model.rerereResolvedPaths.isEmpty)  // rerere not tracking
+
+    await client.setRerereRemaining(["b.txt"])
+    await model.refresh()
+    #expect(model.rerereResolvedPaths == ["a.txt"])
+
+    await model.forgetRecordedResolution(path: "a.txt")
+    #expect(await client.mutationCalls == ["rerere-forget:a.txt", "remerge:a.txt"])
+  }
+
   @Test func failedMutationErrorSurvivesTheFollowUpRefresh() async {
     let client = FakeRepositoryGitClient()
     let oid = makeOID("88888888")
@@ -1466,6 +1485,13 @@ private actor FakeRepositoryGitClient: GitClient {
   func restoreConflictMarkers(path: String) async throws {
     mutationCalls.append("remerge:\(path)")
   }
+  private var currentRerereRemaining: Set<String>?
+  func setRerereRemaining(_ remaining: Set<String>?) { currentRerereRemaining = remaining }
+  func rerereRemaining() async throws -> Set<String>? { currentRerereRemaining }
+  func forgetRecordedResolution(path: String) async throws {
+    mutationCalls.append("rerere-forget:\(path)")
+  }
+  func forgetAllRecordedResolutions() async throws { mutationCalls.append("rerere-forget-all") }
   func stage(paths: [String]) async throws {
     stageCallCount += 1
     currentStatus.entries = currentStatus.entries.map { entry in

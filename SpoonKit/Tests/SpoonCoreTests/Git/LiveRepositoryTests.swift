@@ -269,6 +269,52 @@ struct LiveRepositoryTests {
     }
   }
 
+  @MainActor
+  @Test func rerereReplaysARecordedResolutionUntilForgotten() async throws {
+    let root = try await LiveRepoFixture.makeTemporaryRepo(
+      commits: [.init(file: "f.txt", content: "base\n", message: "base")],
+      runner: runner
+    )
+    defer { try? FileManager.default.removeItem(at: root) }
+    func git(_ arguments: [String]) async throws {
+      try await LiveRepoFixture.run(arguments, in: root, runner: runner)
+    }
+    let client = makeClient(root)
+    try await client.setRepositoryConfig(.rerereEnabled, to: "true")
+    try await git(["switch", "-c", "topic"])
+    try await LiveRepoFixture.commitFile(
+      "f.txt", content: "topic\n", message: "topic", in: root, runner: runner)
+    try await git(["switch", "main"])
+    try await LiveRepoFixture.commitFile(
+      "f.txt", content: "main\n", message: "main", in: root, runner: runner)
+    let model = RepositoryModel(repository: Repository(rootURL: root), gitClient: client)
+    let fileURL = root.appending(path: "f.txt")
+
+    await #expect(throws: CommandError.self) { try await client.merge(branch: "topic", options: .standard) }
+    #expect(try await client.rerereRemaining() == ["f.txt"])
+    try Data("both\n".utf8).write(to: fileURL)
+    try await git(["add", "f.txt"])
+    try await git(["commit", "--no-edit"])
+    try await git(["reset", "--hard", "HEAD~1"])
+
+    // The same conflict again: rerere writes the recorded resolution.
+    await #expect(throws: CommandError.self) { try await client.merge(branch: "topic", options: .standard) }
+    await model.refresh()
+    #expect(model.rerereResolvedPaths == ["f.txt"])
+    #expect(try String(contentsOf: fileURL, encoding: .utf8) == "both\n")
+
+    await model.forgetRecordedResolution(path: "f.txt")
+    #expect(try String(contentsOf: fileURL, encoding: .utf8).contains("<<<<<<<"))
+    #expect(model.rerereResolvedPaths.isEmpty)
+
+    let cache = root.appending(path: ".git/rr-cache")
+    #expect(FileManager.default.fileExists(atPath: cache.path))
+    await model.forgetAllRecordedResolutions()
+    // git recreates the folder, empty, when rerere next runs.
+    let recordings = (try? FileManager.default.contentsOfDirectory(atPath: cache.path)) ?? []
+    #expect(recordings.isEmpty)
+  }
+
   @Test func conflictsResolveToEitherSideOrADeletion() async throws {
     let root = try await LiveRepoFixture.makeTemporaryRepo(
       commits: [
