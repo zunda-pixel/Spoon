@@ -10,6 +10,7 @@ struct ChangeFileContextMenu: View {
   let area: RepositoryModel.ChangeArea
   let targets: Set<RepositoryModel.FileSelection>
   @Binding var confirmingDiscard: RepositoryModel.FileSelection?
+  @Binding var confirmingMultiDiscard: RepositoryModel.DiscardPlan?
   @Binding var confirmingConflictResolution: ConflictResolutionRequest?
   let moveFiles: (_ stagePaths: [String], _ unstagePaths: [String]) -> Void
 
@@ -34,6 +35,13 @@ struct ChangeFileContextMenu: View {
       Button("Unstage (\(staged.count))") {
         moveFiles([], staged.map(\.path))
       }
+    }
+    let plan = RepositoryModel.DiscardPlan(targets)
+    if !plan.isEmpty {
+      Button(DiscardButtonTitle.make(for: plan), role: .destructive) {
+        confirmingMultiDiscard = plan
+      }
+      .disabled(model.isBusy)
     }
     stashButton(paths: Set(targets.filter { $0.area != .conflicted }.map(\.path)).sorted())
   }
@@ -101,5 +109,41 @@ struct ChangeFileContextMenu: View {
 
   private var fileURL: URL {
     model.repository.rootURL.appending(path: entry.path)
+  }
+}
+
+/// "Discard Changes (3)…", or "Discard (5)…" when untracked files would be
+/// deleted too.
+enum DiscardButtonTitle {
+  static func make(for plan: RepositoryModel.DiscardPlan) -> String {
+    plan.untrackedPaths.isEmpty
+      ? "Discard Changes (\(plan.count))…"
+      : plan.modifiedPaths.isEmpty ? "Delete (\(plan.count))…" : "Discard (\(plan.count))…"
+  }
+}
+
+extension View {
+  /// Confirms, then carries out, discarding a multi-file selection.
+  func discardConfirmation(
+    _ plan: Binding<RepositoryModel.DiscardPlan?>, model: RepositoryModel
+  ) -> some View {
+    confirmationDialog(
+      plan.wrappedValue?.question ?? "",
+      isPresented: .init(
+        get: { plan.wrappedValue != nil },
+        set: { if !$0 { plan.wrappedValue = nil } }
+      ),
+      presenting: plan.wrappedValue
+    ) { plan in
+      Button(plan.modifiedPaths.isEmpty ? "Delete" : "Discard", role: .destructive) {
+        Task { await model.discard(plan) }
+      }
+    } message: { plan in
+      Text(
+        plan.untrackedPaths.isEmpty
+          ? "Unstaged changes are lost. Staged changes are kept. This cannot be undone."
+          : "Unstaged changes are lost and untracked files are deleted, not moved to the Trash. Staged changes are kept. This cannot be undone."
+      )
+    }
   }
 }

@@ -48,6 +48,19 @@ extension RepositoryModel {
     await perform { try await $0.deleteUntracked(paths: paths) }
   }
 
+  /// Reverts the plan's unstaged edits and deletes its untracked files.
+  public func discard(_ plan: DiscardPlan) async {
+    guard !plan.isEmpty else { return }
+    await perform {
+      if !plan.modifiedPaths.isEmpty {
+        try await $0.discardWorkingTree(paths: plan.modifiedPaths)
+      }
+      if !plan.untrackedPaths.isEmpty {
+        try await $0.deleteUntracked(paths: plan.untrackedPaths)
+      }
+    }
+  }
+
   public func stageHunk(_ hunkID: Hunk.ID, of diff: FileDiff) async {
     guard let patch = DiffPatchBuilder.patch(for: diff, including: [hunkID]) else { return }
     await perform { try await $0.applyPatch(patch, reverse: false, toIndex: true) }

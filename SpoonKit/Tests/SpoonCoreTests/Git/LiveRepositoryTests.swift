@@ -315,6 +315,40 @@ struct LiveRepositoryTests {
     #expect(recordings.isEmpty)
   }
 
+  @MainActor
+  @Test func discardingSeveralFilesKeepsStagedChanges() async throws {
+    let root = try await LiveRepoFixture.makeTemporaryRepo(
+      commits: [
+        .init(file: "a.txt", content: "a\n", message: "a"),
+        .init(file: "b.txt", content: "b\n", message: "b"),
+      ],
+      runner: runner
+    )
+    defer { try? FileManager.default.removeItem(at: root) }
+    func write(_ file: String, _ content: String) throws {
+      try Data(content.utf8).write(to: root.appending(path: file))
+    }
+    try write("a.txt", "a staged\n")
+    try await LiveRepoFixture.run(["add", "a.txt"], in: root, runner: runner)
+    try write("a.txt", "a staged, then edited\n")
+    try write("b.txt", "b edited\n")
+    try write("new.txt", "new\n")
+    let model = RepositoryModel(repository: Repository(rootURL: root), gitClient: makeClient(root))
+
+    await model.discard(
+      RepositoryModel.DiscardPlan([
+        .init(path: "a.txt", area: .unstaged), .init(path: "b.txt", area: .unstaged),
+        .init(path: "new.txt", area: .untracked), .init(path: "a.txt", area: .staged),
+      ]))
+
+    #expect(model.lastErrorMessage == nil)
+    #expect(try String(contentsOf: root.appending(path: "a.txt"), encoding: .utf8) == "a staged\n")
+    #expect(try String(contentsOf: root.appending(path: "b.txt"), encoding: .utf8) == "b\n")
+    #expect(!FileManager.default.fileExists(atPath: root.appending(path: "new.txt").path))
+    #expect(model.status?.entries.map(\.path) == ["a.txt"])
+    #expect(model.status?.stagedEntries.map(\.path) == ["a.txt"])
+  }
+
   @Test func conflictsResolveToEitherSideOrADeletion() async throws {
     let root = try await LiveRepoFixture.makeTemporaryRepo(
       commits: [
