@@ -1484,6 +1484,9 @@ private actor FakeRepositoryGitClient: GitClient {
   func ignoredPaths() async throws -> [String] { [] }
   func ignoreRules(for paths: [String]) async throws -> [String: IgnoreRule?] { [:] }
   func isTracked(path: String) async throws -> Bool { false }
+  func deleteIgnored(paths: [String]) async throws {
+    mutationCalls.append("clean-ignored:\(paths.joined(separator: ","))")
+  }
   private var commitsSucceed = false
   func allowCommits() { commitsSucceed = true }
   func commit(message: String, options: CommitOptions) async throws {

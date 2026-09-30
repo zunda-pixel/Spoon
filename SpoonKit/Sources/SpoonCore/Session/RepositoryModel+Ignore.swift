@@ -17,6 +17,12 @@ extension RepositoryModel {
     return (paths.map { IgnoredPath(path: $0, rule: rules[$0] ?? nil) }, all.count > limit)
   }
 
+  /// Deletes the ignored `paths`, or every ignored path when empty.
+  @discardableResult
+  public func deleteIgnored(_ paths: [String]) async -> Bool {
+    await perform { try await $0.deleteIgnored(paths: paths) }
+  }
+
   /// Whether `path` is ignored, and by which line of which file.
   public func ignoreStatus(of path: String) async throws -> IgnoreStatus {
     if try await gitClient.isTracked(path: path) { return .tracked }
