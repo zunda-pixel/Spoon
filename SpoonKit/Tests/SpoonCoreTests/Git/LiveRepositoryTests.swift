@@ -511,6 +511,28 @@ struct LiveRepositoryTests {
     #expect(try await client.status().headBranch == "main")
   }
 
+  @Test func bisectRunFindsTheFirstBadCommitWithACommand() async throws {
+    let root = try await LiveRepoFixture.makeTemporaryRepo(
+      commits: (1...8).map { .init(file: "v.txt", content: "\($0)\n", message: "v\($0)") },
+      runner: runner
+    )
+    defer { try? FileManager.default.removeItem(at: root) }
+    let client = makeClient(root)
+    let commits = try await client.log(LogQuery(maxCount: 10)).commits
+    let bySubject = Dictionary(uniqueKeysWithValues: commits.map { ($0.subject, $0.oid) })
+    _ = try await client.startBisect(bad: bySubject["v8"]!, good: bySubject["v1"]!)
+
+    // Versions from 6 on are "broken"; 3 can't be tested (exit 125).
+    let progress = try await client.runBisect(
+      command: #"v=$(cat v.txt); [ "$v" -eq 3 ] && exit 125; [ "$v" -lt 6 ]"#)
+
+    #expect(progress == .found(bySubject["v6"]!))
+    if !(await client.capabilities()).supportsBisectResetWhenFound {
+      try await client.resetBisect()
+    }
+    #expect(try await client.status().headBranch == "main")
+  }
+
   @Test func historySearchMatchesMessagesAuthorsAndCode() async throws {
     let root = try await LiveRepoFixture.makeTemporaryRepo(
       commits: [

@@ -320,6 +320,11 @@ public protocol GitBisectClient: Sendable {
   func startBisect(bad: ObjectID, good: ObjectID) async throws -> BisectProgress
   /// Marks `revision` (HEAD when `nil`) and moves to the next commit to test.
   func markBisect(_ mark: BisectMark, revision: ObjectID?) async throws -> BisectProgress
+  /// Tests commits with a shell command until the first bad one is found
+  /// (`git bisect run`): exit status 0 marks good, 125 skip, and any other
+  /// status below 128 bad. The command runs in a login shell at the
+  /// repository root, so it sees the user's `PATH`.
+  func runBisect(command: String) async throws -> BisectProgress
   /// Ends the bisect and returns to the commit checked out before it began.
   func resetBisect() async throws
 }

@@ -25,6 +25,9 @@ extension Defaults.Keys {
     default: []
   )
 
+  /// The last `git bisect run` command, keyed by repository ID.
+  public static let bisectRunCommands = Key<[String: String]>("bisectRunCommands", default: [:])
+
   /// Stash local changes around every pull (`git pull --autostash`).
   public static let pullAutostash = Key<Bool>("pullAutostash", default: false)
 

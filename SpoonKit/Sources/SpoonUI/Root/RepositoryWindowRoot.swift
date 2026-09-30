@@ -126,7 +126,7 @@ struct RepositorySplitView: View {
             SequencerBannerView(model: model, state: state)
           }
           if let state = model.bisectState {
-            BisectBannerView(model: model, state: state)
+            BisectBannerView(model: model, state: state, navigation: navigation)
           }
         }
       }
