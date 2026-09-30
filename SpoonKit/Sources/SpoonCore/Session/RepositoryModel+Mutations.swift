@@ -478,6 +478,13 @@ extension RepositoryModel {
     await perform { try await $0.disableSparseCheckout() }
   }
 
+  /// Fetches older history into a shallow clone; the refresh that
+  /// follows reloads History with it.
+  @discardableResult
+  public func deepenHistory(_ depth: HistoryDepth) async -> Bool {
+    await perform { try await $0.deepenHistory(depth) }
+  }
+
   public func fetch() async {
     await perform { try await $0.fetch() }
     await syncPullRequests(force: true)

@@ -26,6 +26,8 @@ struct RepositorySheetHost: ViewModifier {
         DropLargeBlobsSheet(model: model)
       case .backfill:
         BackfillSheet(model: model)
+      case .fetchHistory:
+        FetchHistorySheet(model: model)
       case .fileHistory(let path):
         FileHistorySheet(model: model, path: path)
       case .blame(let path):

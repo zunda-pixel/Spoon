@@ -15,6 +15,8 @@ public struct RepositoryGitSnapshot: Sendable, Hashable {
   public var capabilities: GitCapabilities
   /// Promisor remote of a partial clone; `nil` for a full clone.
   public var partialCloneRemote: String?
+  /// A shallow clone, missing history beyond a boundary.
+  public var isShallow: Bool
 
   public init(
     status: WorkingTreeStatus,
@@ -28,7 +30,8 @@ public struct RepositoryGitSnapshot: Sendable, Hashable {
     sequencerState: SequencerState?,
     bisectState: BisectState? = nil,
     capabilities: GitCapabilities,
-    partialCloneRemote: String? = nil
+    partialCloneRemote: String? = nil,
+    isShallow: Bool = false
   ) {
     self.status = status
     self.branches = branches
@@ -42,6 +45,7 @@ public struct RepositoryGitSnapshot: Sendable, Hashable {
     self.bisectState = bisectState
     self.capabilities = capabilities
     self.partialCloneRemote = partialCloneRemote
+    self.isShallow = isShallow
   }
 
   static func load(from gitClient: any GitClient) async throws -> Self {
@@ -59,6 +63,7 @@ public struct RepositoryGitSnapshot: Sendable, Hashable {
     async let capabilities = gitClient.capabilities()
     // Optional metadata: an unreadable config must not fail the refresh.
     async let partialCloneRemote = try? gitClient.partialCloneRemote()
+    async let isShallow = try? gitClient.isShallowRepository()
 
     let loadedRemotes = try await remotes
     let remoteBranchesByRemote = try await loadRemoteBranches(
@@ -78,7 +83,8 @@ public struct RepositoryGitSnapshot: Sendable, Hashable {
       sequencerState: sequencerState,
       bisectState: bisectState ?? nil,
       capabilities: capabilities,
-      partialCloneRemote: partialCloneRemote ?? nil
+      partialCloneRemote: partialCloneRemote ?? nil,
+      isShallow: isShallow ?? false
     )
   }
 
@@ -163,5 +169,6 @@ extension RepositoryModel {
     bisectState = snapshot.bisectState
     gitCapabilities = snapshot.capabilities
     partialCloneRemote = snapshot.partialCloneRemote
+    isShallow = snapshot.isShallow
   }
 }
