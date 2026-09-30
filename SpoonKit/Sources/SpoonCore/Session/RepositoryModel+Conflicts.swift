@@ -57,6 +57,20 @@ extension RepositoryModel {
     return succeeded
   }
 
+  /// Drops rerere's recorded resolution for `path` and puts its conflict
+  /// markers back, so it can be resolved (and recorded) again.
+  public func forgetRecordedResolution(path: String) async {
+    await perform {
+      try await $0.forgetRecordedResolution(path: path)
+      try await $0.restoreConflictMarkers(path: path)
+    }
+  }
+
+  /// Deletes every resolution rerere has recorded in this repository.
+  public func forgetAllRecordedResolutions() async {
+    await perform { try await $0.forgetAllRecordedResolutions() }
+  }
+
   /// Puts every conflict marker of `path` back, discarding resolutions
   /// made so far.
   public func restoreConflictMarkers(path: String) async {

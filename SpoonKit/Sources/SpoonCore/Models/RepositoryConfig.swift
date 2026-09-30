@@ -66,6 +66,8 @@ public enum RepositorySetting: String, Sendable, Hashable, CaseIterable {
   case signingFormat = "gpg.format"
   case signingKey = "user.signingKey"
   case blameIgnoreRevsFile = "blame.ignoreRevsFile"
+  case rerereEnabled = "rerere.enabled"
+  case rerereAutoUpdate = "rerere.autoUpdate"
 
   /// A regular expression matching every setting, for `--get-regexp`.
   static var pattern: String {

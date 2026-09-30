@@ -96,6 +96,27 @@ extension SystemGitClient {
     try await runVoid(["checkout", "--merge", "--", path])
   }
 
+  public func rerereRemaining() async throws -> Set<String>? {
+    // MERGE_RR records the conflicts rerere is tracking; without it,
+    // `rerere remaining` prints nothing and means nothing.
+    let paths = try await repositoryPaths()
+    let mergeRR = paths.gitDirectory.appending(path: "MERGE_RR")
+    guard FileManager.default.fileExists(atPath: mergeRR.path) else { return nil }
+    let result = try await run(["rerere", "remaining"])
+    return Set(result.standardOutputText.split(whereSeparator: \.isNewline).map(String.init))
+  }
+
+  public func forgetRecordedResolution(path: String) async throws {
+    try await runVoid(["rerere", "forget", "--", path])
+  }
+
+  public func forgetAllRecordedResolutions() async throws {
+    let paths = try await repositoryPaths()
+    let cache = paths.commonDirectory.appending(path: "rr-cache", directoryHint: .isDirectory)
+    guard FileManager.default.fileExists(atPath: cache.path) else { return }
+    try FileManager.default.removeItem(at: cache)
+  }
+
   public func restoreFile(path: String, from revision: ObjectID) async throws {
     try await runVoid(["restore", "--source=\(revision.rawValue)", "--worktree", "--", path])
   }

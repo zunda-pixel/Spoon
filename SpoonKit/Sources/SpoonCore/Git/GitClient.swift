@@ -28,6 +28,14 @@ public protocol GitWorkingTreeClient: Sendable {
   /// Rewrites a conflicted path with fresh conflict markers, undoing any
   /// edits made while resolving it (`git checkout --merge`).
   func restoreConflictMarkers(path: String) async throws
+  /// Conflicted paths rerere has not resolved from a recording
+  /// (`git rerere remaining`); `nil` when rerere isn't tracking the
+  /// current conflict, e.g. because it was off when the merge began.
+  func rerereRemaining() async throws -> Set<String>?
+  /// Drops rerere's recorded resolution for `path` (`git rerere forget`).
+  func forgetRecordedResolution(path: String) async throws
+  /// Deletes every resolution rerere has recorded (`.git/rr-cache`).
+  func forgetAllRecordedResolutions() async throws
   /// Removes paths from the index, keeping working-tree contents.
   func unstage(paths: [String]) async throws
   /// Applies a patch (from `DiffPatchBuilder`). `toIndex` targets the index

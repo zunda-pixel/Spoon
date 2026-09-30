@@ -49,7 +49,25 @@ struct DiffDetailView: View {
           onChange: { conflictReload += 1 }
         )
       } else if let diffs {
-        if diffs.isEmpty {
+        if diffs.isEmpty, conflictDocument != nil {
+          // git reports a resolved conflict as a combined diff, which isn't
+          // parsed, but the file still needs marking resolved.
+          VStack(spacing: 0) {
+            ConflictsResolvedBar(
+              model: model,
+              path: selection.path,
+              onChange: { conflictReload += 1 }
+            )
+            Divider()
+            ContentUnavailableView(
+              "No Conflicts Left",
+              systemImage: "doc",
+              description: Text("Review the file in your editor, then mark it resolved.")
+            )
+            .frame(maxHeight: .infinity)
+          }
+          .frame(maxHeight: .infinity, alignment: .top)
+        } else if diffs.isEmpty {
           ContentUnavailableView(
             "No Changes",
             systemImage: "doc",
