@@ -165,6 +165,38 @@ struct LiveGitTests {
     #expect(try await subjects(HistorySearch(text: "count", field: .code)) == ["add count"])
   }
 
+  @Test func describePlacesACommitBetweenTags() async throws {
+    let root = try await makeTemporaryRepo()
+    defer { try? FileManager.default.removeItem(at: root) }
+    func commit(_ message: String) async throws {
+      try await LiveRepoFixture.commitFile(
+        "f.txt", content: message, message: message, in: root, runner: runner)
+    }
+    let client = SystemGitClient(repositoryRoot: root, git: git, runner: runner)
+    func oid(_ revision: String) async throws -> ObjectID {
+      let text = try await client.run(["rev-parse", revision]).standardOutputText
+      return try #require(ObjectID(rawValue: text.trimmingCharacters(in: .whitespacesAndNewlines)))
+    }
+    try await commit("one")
+    #expect(try await client.describe(try await oid("HEAD")).isEmpty)
+    try await runGit(["tag", "release-1"], in: root)
+    try await commit("two")
+    try await commit("three")
+    try await runGit(["tag", "-a", "-m", "second", "release-2"], in: root)
+    try await commit("four")
+
+    let two = try await client.describe(try await oid("HEAD~2"))
+    #expect(two == CommitDescription(nearestTag: "release-1", commitsSinceTag: 1, firstContainingTag: "release-2"))
+    let tagged = try await client.describe(try await oid("release-2"))
+    #expect(tagged.nearestTag == "release-2")
+    #expect(tagged.commitsSinceTag == 0)
+    #expect(tagged.firstContainingTag == "release-2")
+    let unreleased = try await client.describe(try await oid("HEAD"))
+    #expect(unreleased.nearestTag == "release-2")
+    #expect(unreleased.commitsSinceTag == 1)
+    #expect(unreleased.firstContainingTag == nil)
+  }
+
   @Test func statusAndBranchesOnRealRepo() async throws {
     let root = try await makeTemporaryRepo()
     defer { try? FileManager.default.removeItem(at: root) }

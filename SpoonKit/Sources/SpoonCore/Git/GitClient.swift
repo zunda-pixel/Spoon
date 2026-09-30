@@ -82,6 +82,10 @@ public protocol GitHistoryClient: Sendable {
   /// following them as they move (`git log -L`). At most `limit` commits.
   func lineHistory(path: String, lines: ClosedRange<Int>, limit: Int) async throws
     -> [LineHistoryEntry]
+  /// The commit's nearest earlier tag and the first tag containing it
+  /// (`git describe`, counting lightweight tags too). Both are `nil` in a
+  /// repository without tags.
+  func describe(_ oid: ObjectID) async throws -> CommitDescription
   /// Lines matching `query` (`git grep`), at most `limit` of them.
   func searchCode(_ query: CodeSearchQuery, limit: Int) async throws -> CodeSearchResult
 }

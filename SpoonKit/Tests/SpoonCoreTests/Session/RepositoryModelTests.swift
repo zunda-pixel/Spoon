@@ -1519,6 +1519,9 @@ private actor FakeRepositoryGitClient: GitClient {
   func lineHistory(path: String, lines: ClosedRange<Int>, limit: Int) async throws
     -> [LineHistoryEntry]
   { [] }
+  func describe(_ oid: ObjectID) async throws -> CommitDescription {
+    CommitDescription(nearestTag: nil)
+  }
   func searchCode(_ query: CodeSearchQuery, limit: Int) async throws -> CodeSearchResult {
     CodeSearchResult(matches: [], isTruncated: false)
   }
