@@ -1608,6 +1608,7 @@ private actor FakeRepositoryGitClient: GitClient {
     mutationCalls.append("tag:\(name):\(message ?? ""):\(signing)")
   }
   func deleteTag(name: String) async throws { throw Failure.unimplemented }
+  func verifyTag(name: String) async throws -> CommitSignature? { nil }
   func pushTag(name: String, to remoteName: String) async throws { throw Failure.unimplemented }
   func pushAllTags(to remoteName: String) async throws { throw Failure.unimplemented }
   func deleteRemoteTag(name: String, from remoteName: String) async throws {

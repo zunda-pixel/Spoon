@@ -146,6 +146,18 @@ extension RepositoryModel {
     }
   }
 
+  /// Verifies every signed tag on `oid`, in name order; unverifiable
+  /// results are kept so the UI can say so.
+  public func verifiedTags(at oid: ObjectID) async -> [(tag: Tag, signature: CommitSignature)] {
+    var results: [(tag: Tag, signature: CommitSignature)] = []
+    for tag in tags.filter({ $0.target == oid && $0.isSigned }).sorted(by: { $0.name < $1.name }) {
+      if let signature = try? await gitClient.verifyTag(name: tag.name) {
+        results.append((tag, signature))
+      }
+    }
+    return results
+  }
+
   public func deleteTag(name: String) async {
     await perform { try await $0.deleteTag(name: name) }
   }

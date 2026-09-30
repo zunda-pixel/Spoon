@@ -6,12 +6,14 @@ import SwiftUI
 @MainActor
 struct SignatureBadge: View {
   let signature: CommitSignature
+  /// What is signed, when not the commit itself, e.g. "Tag v1.0".
+  var subject: String? = nil
 
   var body: some View {
-    Label(title, systemImage: symbol)
+    Label(subject.map { "\($0): \(title)" } ?? title, systemImage: symbol)
       .foregroundStyle(tint)
       .help(helpText)
-      .accessibilityLabel("Signature: \(title)")
+      .accessibilityLabel("\(subject.map { "\($0) signature" } ?? "Signature"): \(title)")
       .accessibilityHint(helpText)
   }
 
@@ -54,7 +56,7 @@ struct SignatureBadge: View {
     }
     if signature.status == .unverifiable {
       lines.append(
-        "Git could not check this signature, usually because the signing key is not available."
+        "Git could not check this signature, usually because the signing key is not available (for SSH, set gpg.ssh.allowedSignersFile)."
       )
     }
     return lines.isEmpty ? title : lines.joined(separator: "\n")
