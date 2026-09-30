@@ -51,6 +51,13 @@ extension SystemGitClient {
     return GitBisectParser.parseProgress(result.standardOutputText)
   }
 
+  public func runBisect(command: String) async throws -> BisectProgress {
+    // Builds and test suites can take a while, once per commit tested.
+    let result = try await run(
+      ["bisect", "run", "/bin/zsh", "-lc", command], timeout: .seconds(3 * 3600))
+    return GitBisectParser.parseProgress(result.standardOutputText)
+  }
+
   public func resetBisect() async throws {
     try await runVoid(["bisect", "reset"], timeout: .seconds(120))
   }

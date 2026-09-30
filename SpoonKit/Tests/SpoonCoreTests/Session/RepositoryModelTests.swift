@@ -1,3 +1,4 @@
+import Defaults
 import Foundation
 import Testing
 
@@ -776,6 +777,22 @@ struct RepositoryModelTests {
 
     await model.forgetRecordedResolution(path: "a.txt")
     #expect(await client.mutationCalls == ["rerere-forget:a.txt", "remerge:a.txt"])
+  }
+
+  @Test func bisectRunReportsTheCulpritAndRemembersTheCommand() async {
+    let client = FakeRepositoryGitClient()
+    let culprit = makeOID("12345678")
+    await client.setNextBisectProgress(.found(culprit))
+    let root = URL(filePath: "/tmp/bisect-run-\(UUID().uuidString)")
+    let model = RepositoryModel(repository: Repository(rootURL: root), gitClient: client)
+    #expect(model.lastBisectRunCommand.isEmpty)
+
+    await model.runBisect(command: "swift test")
+
+    #expect(model.bisectResult == culprit)
+    #expect(await client.mutationCalls == ["bisect-run:swift test"])
+    #expect(model.lastBisectRunCommand == "swift test")
+    Defaults[.bisectRunCommands][model.repository.id] = nil
   }
 
   @Test func failedMutationErrorSurvivesTheFollowUpRefresh() async {
@@ -1759,6 +1776,10 @@ private actor FakeRepositoryGitClient: GitClient {
     return nextBisectProgress
   }
   func resetBisect() async throws { mutationCalls.append("bisect-reset") }
+  func runBisect(command: String) async throws -> BisectProgress {
+    mutationCalls.append("bisect-run:\(command)")
+    return nextBisectProgress
+  }
   func setNextBisectProgress(_ progress: BisectProgress) { nextBisectProgress = progress }
   func mergeBase(_ a: String, _ b: String) async throws -> ObjectID {
     guard let oid = mergeBases["\(a)...\(b)"] else { throw Failure.unimplemented }

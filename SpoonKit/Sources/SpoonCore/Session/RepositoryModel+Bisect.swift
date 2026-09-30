@@ -1,4 +1,11 @@
+import Defaults
+
 extension RepositoryModel {
+  /// The command last used with `runBisect` here, to offer again.
+  public var lastBisectRunCommand: String {
+    Defaults[.bisectRunCommands][repository.id] ?? ""
+  }
+
   public var isBisecting: Bool { bisectState != nil }
 
   /// Whether a bisect can start with `commit` as the known-good end and the
@@ -20,6 +27,12 @@ extension RepositoryModel {
   /// Marks `revision` (the commit under test when `nil`).
   public func markBisect(_ mark: BisectMark, revision: ObjectID? = nil) async {
     await runBisect { try await $0.markBisect(mark, revision: revision) }
+  }
+
+  /// Lets `command` mark each commit until the first bad one is found.
+  public func runBisect(command: String) async {
+    Defaults[.bisectRunCommands][repository.id] = command
+    await runBisect { try await $0.runBisect(command: command) }
   }
 
   public func resetBisect() async {

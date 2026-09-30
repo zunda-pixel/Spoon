@@ -7,6 +7,7 @@ import SwiftUI
 struct BisectBannerView: View {
   let model: RepositoryModel
   let state: BisectState
+  let navigation: RepositoryNavigationState
   @State private var confirmingReset = false
 
   var body: some View {
@@ -14,13 +15,14 @@ struct BisectBannerView: View {
       HStack(spacing: 12) {
         message
         Spacer(minLength: 0)
-        actions
+        actions.fixedSize()
       }
       VStack(alignment: .leading, spacing: 8) {
         message
         HStack(spacing: 8) {
           Spacer(minLength: 0)
-          actions
+          // Whole labels; the row fits the column once below the message.
+          actions.fixedSize()
         }
       }
     }
@@ -70,6 +72,9 @@ struct BisectBannerView: View {
         .disabled(model.isBusy || state.badOID == nil && mark != .bad)
         .help(markHelp(mark))
       }
+      Button("Run…") { navigation.present(.bisectRun) }
+        .disabled(model.isBusy || state.badOID == nil || state.goodOIDs.isEmpty)
+        .help("Let a command, such as a test, mark each commit until the first bad one is found")
     }
     Button(found == nil ? "End Bisect…" : "End Bisect") {
       if found == nil {
