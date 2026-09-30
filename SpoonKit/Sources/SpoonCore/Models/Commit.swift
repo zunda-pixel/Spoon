@@ -26,6 +26,10 @@ public struct HistorySearch: Sendable, Hashable {
     case author
     /// Commits that add or remove the text (`-S`, the "pickaxe").
     case code
+    /// Commits whose added or removed lines match an extended regular
+    /// expression (`-G`), case-insensitive. Unlike `code`, a line that only
+    /// moves or changes around a match still counts.
+    case changedLines
   }
 
   public var text: String
@@ -36,12 +40,14 @@ public struct HistorySearch: Sendable, Hashable {
     self.field = field
   }
 
-  /// The text is matched literally, never as a regular expression.
+  /// The text is matched literally, except by `changedLines`, which takes
+  /// a regular expression.
   var arguments: [String] {
     switch field {
     case .message: ["--regexp-ignore-case", "--fixed-strings", "--grep=\(text)"]
     case .author: ["--regexp-ignore-case", "--fixed-strings", "--author=\(text)"]
     case .code: ["-S\(text)"]
+    case .changedLines: ["--regexp-ignore-case", "-G\(text)"]
     }
   }
 }

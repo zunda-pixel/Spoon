@@ -646,6 +646,7 @@ struct SystemGitClientTests {
       (.message, ["--regexp-ignore-case", "--fixed-strings", "--grep=fix (ui)"]),
       (.author, ["--regexp-ignore-case", "--fixed-strings", "--author=fix (ui)"]),
       (.code, ["-Sfix (ui)"]),
+      (.changedLines, ["--regexp-ignore-case", "-Gfix (ui)"]),
     ] as [(HistorySearch.Field, [String])]
   )
   func historySearchSendsLiteralFilters(field: HistorySearch.Field, filter: [String]) async throws {
