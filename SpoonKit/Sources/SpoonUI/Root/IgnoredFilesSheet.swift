@@ -13,6 +13,8 @@ struct IgnoredFilesSheet: View {
   @State private var query = ""
   @State private var checked: (path: String, status: IgnoreStatus)?
   @State private var checkError: String?
+  /// Ignored paths to delete once confirmed; empty means every one.
+  @State private var pendingDelete: [String]?
 
   var body: some View {
     VStack(spacing: 0) {
@@ -20,6 +22,11 @@ struct IgnoredFilesSheet: View {
         Text("Ignored Files")
           .font(.headline)
         Spacer()
+        if case .loaded(let result) = loadState, !result.paths.isEmpty {
+          Button("Delete All Ignored Files…", role: .destructive) { pendingDelete = [] }
+            .disabled(model.isBusy)
+            .help("Delete every ignored file and folder, such as build output (git clean -X)")
+        }
         Button("Done") { dismiss() }
           .keyboardShortcut(.cancelAction)
       }
@@ -41,12 +48,39 @@ struct IgnoredFilesSheet: View {
       )
     }
     .frame(minWidth: 720, minHeight: 520)
-    .task {
-      do {
-        loadState = .loaded(try await model.ignoredPaths())
-      } catch {
-        loadState = .failed(error.localizedDescription)
+    .task { await load() }
+    .confirmationDialog(
+      deleteTitle,
+      isPresented: .init(get: { pendingDelete != nil }, set: { if !$0 { pendingDelete = nil } })
+    ) {
+      Button("Delete", role: .destructive) {
+        guard let paths = pendingDelete else { return }
+        Task {
+          await model.deleteIgnored(paths)
+          await load()
+        }
       }
+    } message: {
+      Text(
+        "They are deleted from disk, not moved to the Trash, and can only be recreated, e.g. by building again. Tracked files and untracked files that aren’t ignored stay."
+      )
+    }
+  }
+
+  private func load() async {
+    do {
+      loadState = .loaded(try await model.ignoredPaths())
+    } catch {
+      loadState = .failed(error.localizedDescription)
+    }
+  }
+
+  private var deleteTitle: String {
+    guard let pendingDelete else { return "" }
+    switch pendingDelete.count {
+    case 0: return "Delete every ignored file and folder?"
+    case 1: return "Delete “\(pendingDelete[0])”?"
+    default: return "Delete \(pendingDelete.count) ignored paths?"
     }
   }
 
@@ -149,6 +183,9 @@ struct IgnoredFilesSheet: View {
           if let rule = entry.rule {
             Button("Open \(rule.source)") { open(rule) }
           }
+          Divider()
+          Button("Delete…", role: .destructive) { pendingDelete = [entry.path] }
+            .disabled(model.isBusy)
           Divider()
           Button("Copy Path") {
             NSPasteboard.general.clearContents()

@@ -257,6 +257,16 @@ struct LiveRepositoryTests {
         == .reincluded(IgnoreRule(source: ".gitignore", line: 3, pattern: "!keep.log")))
     #expect(try await model.ignoreStatus(of: "notes.txt") == .notIgnored)
     #expect(try await model.ignoreStatus(of: "tracked.log") == .tracked)
+
+    // Deleting ignored paths leaves tracked and plain untracked files.
+    #expect(await model.deleteIgnored(["build/"]))
+    #expect(!FileManager.default.fileExists(atPath: root.appending(path: "build").path))
+    #expect(try await model.ignoredPaths().paths.map(\.path) == ["a.log", "sub/secret.txt"])
+    #expect(await model.deleteIgnored([]))
+    #expect(try await model.ignoredPaths().paths.isEmpty)
+    for kept in ["tracked.log", "notes.txt", "keep.log"] {
+      #expect(FileManager.default.fileExists(atPath: root.appending(path: kept).path))
+    }
   }
 
   @Test func conflictsResolveToEitherSideOrADeletion() async throws {

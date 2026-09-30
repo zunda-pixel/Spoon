@@ -156,6 +156,11 @@ extension SystemGitClient {
     return IgnoreRule.parse(result.standardOutputText)
   }
 
+  public func deleteIgnored(paths: [String]) async throws {
+    // Build folders can be large; give the delete time.
+    try await runVoid(["clean", "-f", "-d", "-X", "--"] + paths, timeout: .seconds(300))
+  }
+
   public func isTracked(path: String) async throws -> Bool {
     let result = try await run(["ls-files", "-z", "--", path])
     return !result.standardOutput.isEmpty
