@@ -199,6 +199,11 @@ public struct SpoonCommands: Commands {
 
       Divider()
 
+      Button("Maintenance…") {
+        navigation?.present(.maintenance)
+      }
+      .disabled(model == nil || navigation == nil)
+
       Button("Repository Settings…") {
         navigation?.present(.repositorySettings)
       }

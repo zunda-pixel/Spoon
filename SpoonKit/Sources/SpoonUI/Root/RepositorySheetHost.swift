@@ -28,6 +28,8 @@ struct RepositorySheetHost: ViewModifier {
         BackfillSheet(model: model)
       case .fetchHistory:
         FetchHistorySheet(model: model)
+      case .maintenance:
+        MaintenanceSheet(model: model)
       case .bisectRun:
         BisectRunSheet(model: model)
       case .fileHistory(let path):

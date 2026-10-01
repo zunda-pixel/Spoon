@@ -859,6 +859,17 @@ struct RepositoryModelTests {
       ])
   }
 
+  @Test func maintenanceRunsAndToggles() async {
+    let client = FakeRepositoryGitClient()
+    let model = makeModel(client)
+
+    #expect(await model.optimize(aggressive: true))
+    #expect(!(await model.isBackgroundMaintenanceEnabled()))
+    #expect(await model.setBackgroundMaintenance(true))
+    #expect(await model.isBackgroundMaintenanceEnabled())
+    #expect(await client.mutationCalls == ["gc:true", "maintenance:true"])
+  }
+
   @Test func failedMutationErrorSurvivesTheFollowUpRefresh() async {
     let client = FakeRepositoryGitClient()
     let oid = makeOID("88888888")
@@ -1810,6 +1821,14 @@ private actor FakeRepositoryGitClient: GitClient {
   }
   func removeSubmodule(path: String, force: Bool) async throws {
     mutationCalls.append("submodule-remove:\(path):\(force)")
+  }
+  func storage() async throws -> RepositoryStorage { RepositoryStorage(looseObjects: 3) }
+  func optimize(aggressive: Bool) async throws { mutationCalls.append("gc:\(aggressive)") }
+  private var backgroundMaintenance = false
+  func isBackgroundMaintenanceEnabled() async throws -> Bool { backgroundMaintenance }
+  func setBackgroundMaintenance(_ enabled: Bool) async throws {
+    backgroundMaintenance = enabled
+    mutationCalls.append("maintenance:\(enabled)")
   }
   func sparseCheckoutPaths() async throws -> [String]? { nil }
   func setSparseCheckout(paths: [String]) async throws { throw Failure.unimplemented }
