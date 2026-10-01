@@ -1,3 +1,4 @@
+import Algorithms
 import Foundation
 public import MemberwiseInit
 
@@ -14,14 +15,15 @@ public struct GitConfigEntry: Sendable, Hashable {
   /// `scope NUL key LF value NUL`.
   static func parse(_ output: String) -> [Self] {
     let fields = output.split(separator: "\0", omittingEmptySubsequences: false)
-    return stride(from: 0, to: fields.count - 1, by: 2).compactMap { index in
-      let record = fields[index + 1]
+    return fields.chunks(ofCount: 2).compactMap { pair in
+      // A trailing field after the last NUL has no partner.
+      guard pair.count == 2, let scope = pair.first, let record = pair.last else { return nil }
       guard let newline = record.firstIndex(of: "\n") else {
         // A bare key (no `=`) is a boolean true.
-        return record.isEmpty ? nil : Self(scope: String(fields[index]), key: String(record), value: "true")
+        return record.isEmpty ? nil : Self(scope: String(scope), key: String(record), value: "true")
       }
       return Self(
-        scope: String(fields[index]),
+        scope: String(scope),
         key: String(record[..<newline]),
         value: String(record[record.index(after: newline)...])
       )
