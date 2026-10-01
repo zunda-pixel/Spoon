@@ -1,5 +1,6 @@
 import AppKit
 import MacAppSettingsUI
+public import SpoonCore
 
 /// The ⌘, window, built with MacAppSettingsUI: a preferences-style toolbar
 /// with one pane per tab. Created on first use and kept for the app's life,
@@ -13,16 +14,22 @@ public final class SettingsWindowPresenter {
   private init() {}
 
   /// Shows the window, building it the first time.
-  public func show() {
-    let controller = controller ?? makeController()
+  /// `openSoftwareUpdate` opens the SwiftUI Software Update window, which
+  /// this AppKit window can't reach through `openWindow` itself.
+  public func show(appModel: AppModel, openSoftwareUpdate: @escaping () -> Void) {
+    let controller =
+      controller ?? makeController(appModel: appModel, openSoftwareUpdate: openSoftwareUpdate)
     self.controller = controller
     controller.showWindow(nil)
     controller.window?.makeKeyAndOrderFront(nil)
   }
 
-  private func makeController() -> SettingsWindowController {
+  private func makeController(
+    appModel: AppModel, openSoftwareUpdate: @escaping () -> Void
+  ) -> SettingsWindowController {
     let controller = SettingsWindowController(with: [
-      GitHubSettingsPane()
+      GitHubSettingsPane(),
+      UpdateSettingsPane(appModel: appModel, openSoftwareUpdate: openSoftwareUpdate),
     ])
     controller.restoresLastSelectedTab = true
     return controller

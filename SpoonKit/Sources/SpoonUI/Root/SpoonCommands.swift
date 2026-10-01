@@ -46,7 +46,9 @@ public struct SpoonCommands: Commands {
 
     CommandGroup(replacing: .appSettings) {
       Button("Settings…") {
-        SettingsWindowPresenter.shared.show()
+        SettingsWindowPresenter.shared.show(appModel: appModel) {
+          openWindow(id: softwareUpdateWindowID)
+        }
       }
       .keyboardShortcut(",")
     }
