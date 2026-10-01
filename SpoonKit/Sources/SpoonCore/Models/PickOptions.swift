@@ -1,21 +1,18 @@
+public import MemberwiseInit
+
 /// How `git cherry-pick` applies commits.
+@MemberwiseInit(.public)
 public struct CherryPickOptions: Sendable, Hashable {
   /// The parent, from 1, whose side of a merge commit counts as the base:
   /// the merge's changes are taken relative to it (`--mainline`). git
   /// accepts it for ordinary commits too, so a mixed list can use it.
-  public var mainline: Int?
+  public var mainline: Int? = nil
   /// Append "(cherry picked from commit …)" to each message (`-x`), as
   /// backports usually do.
-  public var recordsOrigin: Bool
+  public var recordsOrigin: Bool = false
   /// Apply the changes to the index and working tree without committing
   /// (`--no-commit`).
-  public var commits: Bool
-
-  public init(mainline: Int? = nil, recordsOrigin: Bool = false, commits: Bool = true) {
-    self.mainline = mainline
-    self.recordsOrigin = recordsOrigin
-    self.commits = commits
-  }
+  public var commits: Bool = true
 
   var arguments: [String] {
     var arguments = mainline.map { ["--mainline", String($0)] } ?? []
@@ -26,18 +23,14 @@ public struct CherryPickOptions: Sendable, Hashable {
 }
 
 /// How `git revert` undoes commits.
+@MemberwiseInit(.public)
 public struct RevertOptions: Sendable, Hashable {
   /// As for `CherryPickOptions.mainline`: the parent a merge is undone
   /// back to.
-  public var mainline: Int?
+  public var mainline: Int? = nil
   /// Undo the changes in the index and working tree without committing
   /// (`--no-commit`).
-  public var commits: Bool
-
-  public init(mainline: Int? = nil, commits: Bool = true) {
-    self.mainline = mainline
-    self.commits = commits
-  }
+  public var commits: Bool = true
 
   var arguments: [String] {
     var arguments = mainline.map { ["--mainline", String($0)] } ?? []

@@ -1,5 +1,6 @@
 public import Foundation
 import Defaults
+public import MemberwiseInit
 
 extension RepositoryModel {
   /// Stages paths; conflicted ones are marked resolved, so on git 2.56+
@@ -338,17 +339,12 @@ extension RepositoryModel {
   }
 
   /// One branch of a bulk delete.
+  @MemberwiseInit(.public)
   public struct BranchDeletion: Sendable, Hashable {
     public var name: String
     public var force: Bool
     /// `remote/branch` to delete from its remote as well, if any.
-    public var remoteUpstream: String?
-
-    public init(name: String, force: Bool, remoteUpstream: String? = nil) {
-      self.name = name
-      self.force = force
-      self.remoteUpstream = remoteUpstream
-    }
+    public var remoteUpstream: String? = nil
   }
 
   /// Deletes several local branches, and optionally their remote branches,

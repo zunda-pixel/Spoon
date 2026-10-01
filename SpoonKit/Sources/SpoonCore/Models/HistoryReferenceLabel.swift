@@ -1,4 +1,5 @@
 public import Foundation
+public import MemberwiseInit
 
 /// Stable identity for a branch reference that can focus the unified history.
 public enum HistoryReferenceIdentity: Sendable, Hashable {
@@ -15,6 +16,7 @@ public enum HistoryReferenceIdentity: Sendable, Hashable {
 }
 
 /// One reference badge displayed beside a commit in the unified history.
+@MemberwiseInit(.public)
 public struct HistoryReferenceLabel: Sendable, Hashable, Identifiable {
   public enum Kind: Int, Sendable, Hashable {
     case localBranch
@@ -27,25 +29,12 @@ public struct HistoryReferenceLabel: Sendable, Hashable, Identifiable {
   public let id: String
   public let name: String
   public let kind: Kind
+  @Init(default: false)
   public let isCurrent: Bool
+  @Init(default: false)
   public let isCheckedOutInWorktree: Bool
+  @Init(default: nil)
   public let referenceIdentity: HistoryReferenceIdentity?
-
-  public init(
-    id: String,
-    name: String,
-    kind: Kind,
-    isCurrent: Bool = false,
-    isCheckedOutInWorktree: Bool = false,
-    referenceIdentity: HistoryReferenceIdentity? = nil
-  ) {
-    self.id = id
-    self.name = name
-    self.kind = kind
-    self.isCurrent = isCurrent
-    self.isCheckedOutInWorktree = isCheckedOutInWorktree
-    self.referenceIdentity = referenceIdentity
-  }
 }
 
 /// Builds deterministic commit-to-reference mappings independently of SwiftUI.

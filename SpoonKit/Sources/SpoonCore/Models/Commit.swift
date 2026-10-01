@@ -18,6 +18,7 @@ public struct Commit: Sendable, Hashable, Identifiable {
 }
 
 /// A history filter: commits whose message, author, or code changes match.
+@MemberwiseInit(.public)
 public struct HistorySearch: Sendable, Hashable {
   public enum Field: String, Sendable, Hashable, CaseIterable {
     /// Commit message (`--grep`), case-insensitive.
@@ -35,11 +36,6 @@ public struct HistorySearch: Sendable, Hashable {
   public var text: String
   public var field: Field
 
-  public init(text: String, field: Field) {
-    self.text = text
-    self.field = field
-  }
-
   /// The text is matched literally, except by `changedLines`, which takes
   /// a regular expression.
   var arguments: [String] {
@@ -53,49 +49,26 @@ public struct HistorySearch: Sendable, Hashable {
 }
 
 /// Parameters for one `git log` page.
+@MemberwiseInit(.public)
 public struct LogQuery: Sendable, Hashable {
   /// Ref to walk from; `nil` means HEAD unless `allReferences` is enabled.
-  public var reference: String?
+  public var reference: String? = nil
   /// Repository-relative path to follow; `nil` means all paths.
-  public var path: String?
+  public var path: String? = nil
   /// Keep following `path` across renames (`--follow`). Ignored without `path`.
-  public var followRenames: Bool
-  public var maxCount: Int
-  public var skip: Int
+  public var followRenames: Bool = false
+  public var maxCount: Int = 500
+  public var skip: Int = 0
   /// Include commits reachable from every ref.
-  public var allReferences: Bool
-  /// Explicit reference tips to walk when `allReferences` is false.
-  public var references: [String]
-  /// References to subtract from an `--all` walk.
-  public var excludedReferences: [String]
+  public var allReferences: Bool = false
   /// Extra commit tips to walk, such as detached worktree HEADs.
-  public var additionalRevisions: [ObjectID]
+  public var additionalRevisions: [ObjectID] = []
+  /// Explicit reference tips to walk when `allReferences` is false.
+  public var references: [String] = []
+  /// References to subtract from an `--all` walk.
+  public var excludedReferences: [String] = []
   /// Only commits matching this search; `nil` means every commit.
-  public var search: HistorySearch?
-
-  public init(
-    reference: String? = nil,
-    path: String? = nil,
-    followRenames: Bool = false,
-    maxCount: Int = 500,
-    skip: Int = 0,
-    allReferences: Bool = false,
-    additionalRevisions: [ObjectID] = [],
-    references: [String] = [],
-    excludedReferences: [String] = [],
-    search: HistorySearch? = nil
-  ) {
-    self.reference = reference
-    self.path = path
-    self.followRenames = followRenames
-    self.maxCount = maxCount
-    self.skip = skip
-    self.allReferences = allReferences
-    self.additionalRevisions = additionalRevisions
-    self.references = references
-    self.excludedReferences = excludedReferences
-    self.search = search
-  }
+  public var search: HistorySearch? = nil
 
   public func next() -> LogQuery {
     LogQuery(
@@ -113,12 +86,8 @@ public struct LogQuery: Sendable, Hashable {
   }
 }
 
+@MemberwiseInit(.public)
 public struct LogPage: Sendable, Hashable {
   public var commits: [Commit]
   public var hasMore: Bool
-
-  public init(commits: [Commit], hasMore: Bool) {
-    self.commits = commits
-    self.hasMore = hasMore
-  }
 }

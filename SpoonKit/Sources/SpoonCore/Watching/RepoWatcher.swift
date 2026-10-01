@@ -1,4 +1,5 @@
 public import Foundation
+public import MemberwiseInit
 
 /// Classifies FSEvents under a repository into refresh-worthy changes and
 /// coalesces bursts, so the UI refreshes once per logical change.
@@ -13,16 +14,11 @@ public enum RepoWatcher {
   /// keeps HEAD and its index in a per-worktree git directory, while refs
   /// live in the repository's shared common directory; both can sit outside
   /// the worktree root.
+  @MemberwiseInit(.public)
   public struct Layout: Sendable, Hashable {
     public var root: URL
     public var gitDirectory: URL
     public var commonDirectory: URL
-
-    public init(root: URL, gitDirectory: URL, commonDirectory: URL) {
-      self.root = root
-      self.gitDirectory = gitDirectory
-      self.commonDirectory = commonDirectory
-    }
 
     /// A non-linked checkout whose metadata is `<root>/.git`.
     public init(root: URL) {

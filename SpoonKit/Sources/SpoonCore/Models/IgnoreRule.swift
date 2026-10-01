@@ -1,6 +1,8 @@
 public import Foundation
+public import MemberwiseInit
 
 /// The `.gitignore`-style line that decides whether a path is ignored.
+@MemberwiseInit(.public)
 public struct IgnoreRule: Sendable, Hashable {
   /// The file the pattern is in: a repository-relative `.gitignore`,
   /// `.git/info/exclude`, or an absolute `core.excludesFile`.
@@ -8,12 +10,6 @@ public struct IgnoreRule: Sendable, Hashable {
   /// 1-based line of the pattern in `source`.
   public var line: Int
   public var pattern: String
-
-  public init(source: String, line: Int, pattern: String) {
-    self.source = source
-    self.line = line
-    self.pattern = pattern
-  }
 
   /// A `!pattern` re-includes the path, so it is not ignored after all.
   public var reincludes: Bool { pattern.hasPrefix("!") }

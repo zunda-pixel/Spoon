@@ -1,20 +1,16 @@
 public import Foundation
+public import MemberwiseInit
 
 /// Builds the prompts and JSON schemas for AI tasks. Pure — snapshot-testable.
 public enum PromptBuilder {
   /// Keep prompts well under CLI context limits; diffs are the fat part.
   static let diffBudget = 60_000
 
+  @MemberwiseInit(.public)
   public struct CommitContext: Sendable {
     public var branchName: String?
     public var recentSubjects: [String]
     public var stagedDiff: String
-
-    public init(branchName: String?, recentSubjects: [String], stagedDiff: String) {
-      self.branchName = branchName
-      self.recentSubjects = recentSubjects
-      self.stagedDiff = stagedDiff
-    }
   }
 
   public static func commitMessagePrompt(_ context: CommitContext) -> String {
@@ -42,18 +38,12 @@ public enum PromptBuilder {
     return prompt
   }
 
+  @MemberwiseInit(.public)
   public struct ReviewContext: Sendable {
     public var branchName: String?
     public var baseReference: String
     public var diff: String
     public var guidelines: String?
-
-    public init(branchName: String?, baseReference: String, diff: String, guidelines: String?) {
-      self.branchName = branchName
-      self.baseReference = baseReference
-      self.diff = diff
-      self.guidelines = guidelines
-    }
   }
 
   public static func reviewPrompt(_ context: ReviewContext) -> String {

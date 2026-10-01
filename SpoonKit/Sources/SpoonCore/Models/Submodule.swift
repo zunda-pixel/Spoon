@@ -1,6 +1,8 @@
 import Foundation
+public import MemberwiseInit
 
 /// One submodule of the repository, as `git submodule status` reports it.
+@MemberwiseInit(.public)
 public struct Submodule: Sendable, Hashable, Identifiable {
   public enum State: Sendable, Hashable {
     /// Checked out at the commit the superproject records.
@@ -19,29 +21,13 @@ public struct Submodule: Sendable, Hashable, Identifiable {
   /// The checked-out commit, or the recorded one when not initialized.
   public var commit: ObjectID
   /// `git describe` of `commit`, such as `heads/main` or `v1.2`.
-  public var describe: String?
+  public var describe: String? = nil
   /// The name `.gitmodules` knows it by; usually its path.
-  public var name: String?
+  public var name: String? = nil
   /// URL from `.gitmodules`; may be relative to the superproject's remote.
-  public var url: String?
+  public var url: String? = nil
 
   public var id: String { path }
-
-  public init(
-    path: String,
-    state: State,
-    commit: ObjectID,
-    describe: String? = nil,
-    name: String? = nil,
-    url: String? = nil
-  ) {
-    self.path = path
-    self.state = state
-    self.commit = commit
-    self.describe = describe
-    self.name = name
-    self.url = url
-  }
 }
 
 enum SubmoduleParser {

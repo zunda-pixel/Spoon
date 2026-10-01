@@ -1,6 +1,8 @@
 public import Foundation
+public import MemberwiseInit
 
 /// One commit pairing from `git range-diff`.
+@MemberwiseInit(.public)
 public struct RangeDiffEntry: Sendable, Hashable, Identifiable {
   public enum Relation: Sendable, Hashable {
     /// The commit is unchanged (`=`).
@@ -22,25 +24,7 @@ public struct RangeDiffEntry: Sendable, Hashable, Identifiable {
   public var newOID: String?
   public var subject: String
   /// For `.changed`: the diff between the two patches, one line each.
-  public var patchDiff: [String]
-
-  public init(
-    relation: Relation,
-    oldPosition: Int?,
-    oldOID: String?,
-    newPosition: Int?,
-    newOID: String?,
-    subject: String,
-    patchDiff: [String] = []
-  ) {
-    self.relation = relation
-    self.oldPosition = oldPosition
-    self.oldOID = oldOID
-    self.newPosition = newPosition
-    self.newOID = newOID
-    self.subject = subject
-    self.patchDiff = patchDiff
-  }
+  public var patchDiff: [String] = []
 
   public var id: String { "\(oldOID ?? "-")>\(newOID ?? "-")" }
 }

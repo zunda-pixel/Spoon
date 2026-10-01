@@ -1,6 +1,8 @@
 import Foundation
+public import MemberwiseInit
 
 /// A `git grep` over the working tree or one revision.
+@MemberwiseInit(.public)
 public struct CodeSearchQuery: Sendable, Hashable {
   public enum Syntax: String, Sendable, Hashable, CaseIterable {
     /// The pattern is plain text (`--fixed-strings`).
@@ -11,32 +13,14 @@ public struct CodeSearchQuery: Sendable, Hashable {
 
   public var pattern: String
   /// Commit, branch, or tag to search; `nil` searches the working tree.
-  public var revision: String?
-  public var matchesCase: Bool
-  public var matchesWholeWord: Bool
-  public var syntax: Syntax
+  public var revision: String? = nil
+  public var matchesCase: Bool = false
+  public var matchesWholeWord: Bool = false
+  public var syntax: Syntax = .literal
   /// Also search untracked files; ignored for a revision.
-  public var includesUntracked: Bool
+  public var includesUntracked: Bool = false
   /// Pathspecs such as `*.swift` or `Sources/`; empty searches everything.
-  public var paths: [String]
-
-  public init(
-    pattern: String,
-    revision: String? = nil,
-    matchesCase: Bool = false,
-    matchesWholeWord: Bool = false,
-    syntax: Syntax = .literal,
-    includesUntracked: Bool = false,
-    paths: [String] = []
-  ) {
-    self.pattern = pattern
-    self.revision = revision
-    self.matchesCase = matchesCase
-    self.matchesWholeWord = matchesWholeWord
-    self.syntax = syntax
-    self.includesUntracked = includesUntracked
-    self.paths = paths
-  }
+  public var paths: [String] = []
 
   /// Most matches `git grep` reports for one file.
   static let maxMatchesPerFile = 200
@@ -76,6 +60,7 @@ public struct CodeSearchQuery: Sendable, Hashable {
 }
 
 /// One matching line.
+@MemberwiseInit(.public)
 public struct CodeSearchMatch: Sendable, Hashable, Identifiable {
   /// Repository-relative path.
   public var path: String
@@ -85,24 +70,13 @@ public struct CodeSearchMatch: Sendable, Hashable, Identifiable {
   public var text: String
 
   public var id: String { "\(path):\(lineNumber)" }
-
-  public init(path: String, lineNumber: Int, column: Int, text: String) {
-    self.path = path
-    self.lineNumber = lineNumber
-    self.column = column
-    self.text = text
-  }
 }
 
+@MemberwiseInit(.public)
 public struct CodeSearchResult: Sendable, Hashable {
   public var matches: [CodeSearchMatch]
   /// More lines matched than were kept.
   public var isTruncated: Bool
-
-  public init(matches: [CodeSearchMatch], isTruncated: Bool) {
-    self.matches = matches
-    self.isTruncated = isTruncated
-  }
 
   /// Matches grouped by file, in the order git reported the files.
   public var files: [(path: String, matches: [CodeSearchMatch])] {

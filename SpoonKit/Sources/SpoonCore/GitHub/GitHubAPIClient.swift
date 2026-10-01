@@ -1,6 +1,7 @@
 public import Foundation
 import HTTPTypes
 import HTTPTypesFoundation
+public import MemberwiseInit
 
 /// Transport seam so tests can replay recorded GraphQL responses.
 public protocol GitHubTransport: Sendable {
@@ -26,6 +27,7 @@ public struct URLSessionGitHubTransport: GitHubTransport {
   }
 }
 
+@MemberwiseInit(.public)
 public struct GitHubError: Error, Sendable, LocalizedError {
   public enum Kind: Sendable, Equatable {
     case unauthenticated
@@ -36,10 +38,6 @@ public struct GitHubError: Error, Sendable, LocalizedError {
   }
 
   public var kind: Kind
-
-  public init(kind: Kind) {
-    self.kind = kind
-  }
 
   public var errorDescription: String? {
     switch kind {

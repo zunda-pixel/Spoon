@@ -1,4 +1,5 @@
 public import Foundation
+public import MemberwiseInit
 
 /// A fully resolved subprocess invocation.
 ///
@@ -47,16 +48,11 @@ public struct Command: Sendable, Hashable {
   }
 }
 
+@MemberwiseInit(.public)
 public struct CommandResult: Sendable {
   public var exitCode: Int32
   public var standardOutput: Data
   public var standardError: Data
-
-  public init(exitCode: Int32, standardOutput: Data, standardError: Data) {
-    self.exitCode = exitCode
-    self.standardOutput = standardOutput
-    self.standardError = standardError
-  }
 
   public var isSuccess: Bool { exitCode == 0 }
 
@@ -91,6 +87,7 @@ public enum CommandEvent: Sendable {
   case exited(Int32)
 }
 
+@MemberwiseInit(.public)
 public struct CommandError: Error, Sendable {
   public enum Kind: Sendable, Equatable {
     case launchFailed(reason: String)
@@ -101,17 +98,8 @@ public struct CommandError: Error, Sendable {
 
   public var kind: Kind
   public var command: Command
-  public var exitCode: Int32?
-  public var standardErrorExcerpt: String
-
-  public init(
-    kind: Kind, command: Command, exitCode: Int32? = nil, standardErrorExcerpt: String = ""
-  ) {
-    self.kind = kind
-    self.command = command
-    self.exitCode = exitCode
-    self.standardErrorExcerpt = standardErrorExcerpt
-  }
+  public var exitCode: Int32? = nil
+  public var standardErrorExcerpt: String = ""
 
   /// Last few lines of stderr — the part users need to see in error alerts.
   public static func excerpt(from stderr: Data, maxLines: Int = 8, maxBytes: Int = 2048) -> String {

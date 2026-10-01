@@ -1,6 +1,8 @@
 import Foundation
+public import MemberwiseInit
 
 /// How `git commit` records a new commit.
+@MemberwiseInit(.public)
 public struct CommitOptions: Sendable, Hashable {
   public enum Signing: Sendable, Hashable {
     /// Follow `commit.gpgSign`.
@@ -12,23 +14,13 @@ public struct CommitOptions: Sendable, Hashable {
   }
 
   /// Replace the tip commit instead of adding one.
-  public var amend: Bool
+  public var amend: Bool = false
   /// Add a `Signed-off-by:` trailer for the committer (`--signoff`).
-  public var signOff: Bool
-  public var signing: Signing
+  public var signOff: Bool = false
+  public var signing: Signing = .configured
   /// `Key: value` lines git appends to the message (`--trailer`), placing
   /// them after a blank line and merging them with `Signed-off-by:`.
-  public var trailers: [String]
-
-  public init(
-    amend: Bool = false, signOff: Bool = false, signing: Signing = .configured,
-    trailers: [String] = []
-  ) {
-    self.amend = amend
-    self.signOff = signOff
-    self.signing = signing
-    self.trailers = trailers
-  }
+  public var trailers: [String] = []
 
   var arguments: [String] {
     var arguments: [String] = []
@@ -47,6 +39,7 @@ public struct CommitOptions: Sendable, Hashable {
 }
 
 /// The repository's commit-signing settings, as git resolves them.
+@MemberwiseInit(.public)
 public struct CommitSigningConfiguration: Sendable, Hashable {
   public enum Format: String, Sendable, Hashable {
     case openPGP = "openpgp"
@@ -63,22 +56,12 @@ public struct CommitSigningConfiguration: Sendable, Hashable {
   }
 
   /// `commit.gpgSign`: whether git signs every commit unless told not to.
-  public var signsByDefault: Bool
+  public var signsByDefault: Bool = false
   /// `tag.gpgSign`: whether git signs every annotated tag unless told not to.
-  public var signsTagsByDefault: Bool
-  public var format: Format
+  public var signsTagsByDefault: Bool = false
+  public var format: Format = .openPGP
   /// `user.signingKey`; `nil` lets GPG pick a key from the committer email.
-  public var key: String?
-
-  public init(
-    signsByDefault: Bool = false, signsTagsByDefault: Bool = false, format: Format = .openPGP,
-    key: String? = nil
-  ) {
-    self.signsByDefault = signsByDefault
-    self.signsTagsByDefault = signsTagsByDefault
-    self.format = format
-    self.key = key
-  }
+  public var key: String? = nil
 
   /// SSH and X.509 signing need an explicit key; GPG can find one itself.
   public var canSign: Bool {
@@ -127,14 +110,10 @@ public enum TagSigning: Sendable, Hashable {
 
 /// Someone credited on a commit with a `Co-authored-by:` trailer, which
 /// GitHub and GitLab show as a co-author.
+@MemberwiseInit(.public)
 public struct CoAuthor: Sendable, Hashable, Identifiable, Codable {
   public var name: String
   public var email: String
-
-  public init(name: String, email: String) {
-    self.name = name
-    self.email = email
-  }
 
   public var id: String { email.lowercased() }
 

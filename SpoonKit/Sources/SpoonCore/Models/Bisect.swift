@@ -1,25 +1,16 @@
+public import MemberwiseInit
+
 /// An in-progress `git bisect`, read from the `refs/bisect/*` refs.
+@MemberwiseInit(.public)
 public struct BisectState: Sendable, Hashable {
   /// The commit known to contain the problem (`refs/bisect/bad`).
-  public var badOID: ObjectID?
+  public var badOID: ObjectID? = nil
   /// Commits known to be free of it (`refs/bisect/good-*`).
-  public var goodOIDs: [ObjectID]
+  public var goodOIDs: [ObjectID] = []
   /// Commits skipped as untestable (`refs/bisect/skip-*`).
-  public var skippedOIDs: [ObjectID]
+  public var skippedOIDs: [ObjectID] = []
   /// Commits still between the good and bad marks; `nil` until both exist.
-  public var remainingCount: Int?
-
-  public init(
-    badOID: ObjectID? = nil,
-    goodOIDs: [ObjectID] = [],
-    skippedOIDs: [ObjectID] = [],
-    remainingCount: Int? = nil
-  ) {
-    self.badOID = badOID
-    self.goodOIDs = goodOIDs
-    self.skippedOIDs = skippedOIDs
-    self.remainingCount = remainingCount
-  }
+  public var remainingCount: Int? = nil
 
   /// About how many more marks git needs (log2 of the remaining range).
   public var estimatedStepsLeft: Int? {

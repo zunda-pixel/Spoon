@@ -1,20 +1,16 @@
 import Foundation
+public import MemberwiseInit
 
 /// Where a commit sits relative to the repository's tags.
+@MemberwiseInit(.public)
 public struct CommitDescription: Sendable, Hashable {
   /// The closest tag at or before the commit (`git describe --tags`).
   public var nearestTag: String?
   /// Commits between `nearestTag` and this one; 0 when it is tagged itself.
-  public var commitsSinceTag: Int
+  public var commitsSinceTag: Int = 0
   /// The first tag that includes the commit (`git describe --contains`),
   /// i.e. the release it shipped in; `nil` while no tag contains it.
-  public var firstContainingTag: String?
-
-  public init(nearestTag: String?, commitsSinceTag: Int = 0, firstContainingTag: String? = nil) {
-    self.nearestTag = nearestTag
-    self.commitsSinceTag = commitsSinceTag
-    self.firstContainingTag = firstContainingTag
-  }
+  public var firstContainingTag: String? = nil
 
   public var isEmpty: Bool { nearestTag == nil && firstContainingTag == nil }
 

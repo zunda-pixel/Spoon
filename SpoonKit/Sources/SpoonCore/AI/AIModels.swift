@@ -78,16 +78,13 @@ public struct ReviewFinding: Sendable, Hashable, Codable, Identifiable {
   }
 }
 
+@MemberwiseInit(.public)
 public struct ReviewReport: Sendable, Hashable, Codable {
   public var summary: String
   public var findings: [ReviewFinding]
-
-  public init(summary: String, findings: [ReviewFinding]) {
-    self.summary = summary
-    self.findings = findings
-  }
 }
 
+@MemberwiseInit(.public)
 public struct AIError: Error, Sendable, LocalizedError {
   public enum Kind: Sendable, Equatable {
     case notInstalled(AIProviderID)
@@ -99,12 +96,7 @@ public struct AIError: Error, Sendable, LocalizedError {
 
   public var kind: Kind
   /// Raw model output, kept so a failed parse is never a total loss.
-  public var rawOutput: String?
-
-  public init(kind: Kind, rawOutput: String? = nil) {
-    self.kind = kind
-    self.rawOutput = rawOutput
-  }
+  public var rawOutput: String? = nil
 
   public var errorDescription: String? {
     switch kind {

@@ -1,3 +1,5 @@
+public import MemberwiseInit
+
 extension RepositoryModel {
   public enum ChangeArea: Sendable, Hashable {
     case staged
@@ -7,14 +9,10 @@ extension RepositoryModel {
   }
 
   /// Identifies one row in the Changes list for the detail column.
+  @MemberwiseInit(.public)
   public struct FileSelection: Sendable, Hashable {
     public var path: String
     public var area: ChangeArea
-
-    public init(path: String, area: ChangeArea) {
-      self.path = path
-      self.area = area
-    }
   }
 
   /// What discarding a selection of Changes rows does: unstaged edits are
