@@ -349,6 +349,37 @@ struct LiveRepositoryTests {
     #expect(model.status?.stagedEntries.map(\.path) == ["a.txt"])
   }
 
+  @Test func skipWorktreeHidesLocalChangesUntilTrackedAgain() async throws {
+    let root = try await LiveRepoFixture.makeTemporaryRepo(
+      commits: [
+        .init(file: "config.json", content: "{}\n", message: "config"),
+        .init(file: "docs/guide.md", content: "guide\n", message: "docs"),
+      ],
+      runner: runner
+    )
+    defer { try? FileManager.default.removeItem(at: root) }
+    let client = makeClient(root)
+    try Data("{\"local\": true}\n".utf8).write(to: root.appending(path: "config.json"))
+    #expect(try await client.status().unstagedEntries.map(\.path) == ["config.json"])
+
+    try await client.setSkipWorktree(paths: ["config.json"], skip: true)
+    #expect(try await client.status().isClean)
+    #expect(try await client.skipWorktreePaths() == ["config.json"])
+
+    try await client.setSkipWorktree(paths: ["config.json"], skip: false)
+    #expect(try await client.status().unstagedEntries.map(\.path) == ["config.json"])
+    #expect(try await client.skipWorktreePaths().isEmpty)
+
+    // Sparse checkout sets the bit on files it leaves out, which aren't
+    // listed, and won't let it be set by hand.
+    try await client.setSparseCheckout(paths: ["other"])
+    #expect(!FileManager.default.fileExists(atPath: root.appending(path: "docs/guide.md").path))
+    #expect(try await client.skipWorktreePaths().isEmpty)
+    await #expect(throws: SkipWorktreeError.managedBySparseCheckout) {
+      try await client.setSkipWorktree(paths: ["config.json"], skip: true)
+    }
+  }
+
   @Test func conflictsResolveToEitherSideOrADeletion() async throws {
     let root = try await LiveRepoFixture.makeTemporaryRepo(
       commits: [

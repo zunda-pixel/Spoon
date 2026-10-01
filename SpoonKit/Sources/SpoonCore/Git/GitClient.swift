@@ -56,6 +56,14 @@ public protocol GitWorkingTreeClient: Sendable {
   /// The pattern that last matched each path (`git check-ignore`); `nil`
   /// for a path no pattern matches.
   func ignoreRules(for paths: [String]) async throws -> [String: IgnoreRule?]
+  /// Tracked files whose local changes git ignores (the index's
+  /// skip-worktree bit, `git update-index --skip-worktree`), sorted. Files
+  /// sparse checkout leaves out carry the same bit but aren't on disk, so
+  /// they aren't listed.
+  func skipWorktreePaths() async throws -> [String]
+  /// Sets or clears the skip-worktree bit, so git stops or resumes noticing
+  /// local changes to `paths`.
+  func setSkipWorktree(paths: [String], skip: Bool) async throws
   /// Whether `path` is in the index, where ignore rules don't apply.
   func isTracked(path: String) async throws -> Bool
   /// Deletes ignored files and folders under `paths`, or every ignored

@@ -49,6 +49,12 @@ extension RepositoryModel {
     await perform { try await $0.deleteUntracked(paths: paths) }
   }
 
+  /// Makes git stop (or resume) noticing local changes to tracked
+  /// `paths`, e.g. a config file edited only on this machine.
+  public func setSkipWorktree(paths: [String], skip: Bool) async {
+    await perform { try await $0.setSkipWorktree(paths: paths, skip: skip) }
+  }
+
   /// Reverts the plan's unstaged edits and deletes its untracked files.
   public func discard(_ plan: DiscardPlan) async {
     guard !plan.isEmpty else { return }

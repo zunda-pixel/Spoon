@@ -56,6 +56,8 @@ public final class RepositoryModel {
       Defaults[.commitSignOffRepositoryIDs] = ids.sorted()
     }
   }
+  /// Tracked files whose local changes git is told to ignore.
+  public internal(set) var skipWorktreePaths: [String] = []
   /// Co-authors credited on the next commit; cleared once it is made.
   public var commitCoAuthors: [CoAuthor] = []
   /// Bumped after Spoon writes `git config`, so views that read it reload.
