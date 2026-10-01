@@ -82,19 +82,24 @@ struct RepositoryToolbar: ToolbarContent {
       .accessibilityHint("Choose a coding agent to review this branch")
       .accessibilityValue(model.aiActivity == nil ? "Idle" : "Review in progress")
 
-      if model.isBusy || model.isRefreshing || model.aiActivity != nil {
-        ProgressView()
-          .controlSize(.small)
-          .accessibilityLabel("Repository operation in progress")
-      } else {
-        Button {
-          Task { await model.refresh() }
-        } label: {
+      // One item whose label changes: swapping the button for a separate
+      // progress item on every refresh made AppKit rebuild and re-lay out
+      // the whole toolbar, which stalled the window in large repositories.
+      let isWorking = model.isBusy || model.isRefreshing || model.aiActivity != nil
+      Button {
+        Task { await model.refresh() }
+      } label: {
+        if isWorking {
+          ProgressView()
+            .controlSize(.small)
+            .accessibilityLabel("Repository operation in progress")
+        } else {
           Label("Refresh", systemImage: "arrow.clockwise")
         }
-        .keyboardShortcut("r", modifiers: .command)
-        .accessibilityHint("Reloads repository status and related data")
       }
+      .keyboardShortcut("r", modifiers: .command)
+      .disabled(isWorking)
+      .accessibilityHint("Reloads repository status and related data")
     }
     ToolbarItem(placement: .primaryAction) {
       Button {

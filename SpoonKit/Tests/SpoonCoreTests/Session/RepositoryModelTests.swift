@@ -765,7 +765,8 @@ struct RepositoryModelTests {
     let oid = makeOID("88888888")
     var status = makeStatus(oid: oid, branch: "main")
     status.entries = ["a.txt", "b.txt"].map { FileStatusEntry(path: $0, conflict: .bothModified) }
-    await client.configure(status: status, branches: [makeBranch("main", oid: oid, isCurrent: true)])
+    await client.configure(
+      status: status, branches: [makeBranch("main", oid: oid, isCurrent: true)])
     let model = makeModel(client)
 
     await model.refresh()
@@ -888,6 +889,35 @@ struct RepositoryModelTests {
     await model.applyPatches([URL(filePath: "/tmp/x/0001-a.patch")])
     #expect(
       await client.mutationCalls == ["format-patch:bbbb2222,cccc3333", "am:0001-a.patch"])
+  }
+
+  @Test func revertabilityFollowsReloadedHistory() async {
+    let client = FakeRepositoryGitClient()
+    var base = makeCommit("aaaa1111", subject: "base")
+    var head = makeCommit("bbbb2222", subject: "head")
+    head.parents = [base.oid]
+    let other = makeCommit("cccc3333", subject: "other")
+    base.parents = []
+    await client.configure(
+      status: makeStatus(oid: head.oid, branch: "main"),
+      branches: [makeBranch("main", oid: head.oid, isCurrent: true)],
+      logPages: [0: LogPage(commits: [head, base, other], hasMore: false)]
+    )
+    let model = makeModel(client)
+    await model.refresh()
+    await model.loadHistoryIfNeeded()
+
+    #expect(model.canRevert(base.oid))
+    #expect(!model.canRevert(other.oid))  // loaded, but not behind HEAD
+
+    // The cached ancestry must not survive a reload with other commits.
+    await client.configure(
+      status: makeStatus(oid: head.oid, branch: "main"),
+      branches: [makeBranch("main", oid: head.oid, isCurrent: true)],
+      logPages: [0: LogPage(commits: [head], hasMore: false)]
+    )
+    await model.reloadHistory()
+    #expect(!model.canRevert(base.oid))
   }
 
   @Test func failedMutationErrorSurvivesTheFollowUpRefresh() async {

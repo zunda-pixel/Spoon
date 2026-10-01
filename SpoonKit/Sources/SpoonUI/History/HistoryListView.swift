@@ -85,27 +85,23 @@ struct HistoryListView: View {
             )
           }
         } else {
+          // Built once per update: rebuilding it for each row made large
+          // repositories hang.
+          let labelsByOID = referenceLabelsByOID
           List(selection: $navigation.selectedCommitIDs) {
             ForEach(model.historyRows) { row in
+              let labels = labelsByOID[row.commit.oid] ?? []
               CommitGraphRowView(
                 model: model,
                 navigation: navigation,
                 row: row,
-                referenceLabels: referenceLabelsByOID[row.commit.oid] ?? [],
+                referenceLabels: labels,
                 selectedReference: focus?.reference,
                 openWorktree: openWorktree
               )
               .tag(row.id)
               .id(row.id)
               .listRowSeparator(.hidden)
-              .contextMenu {
-                let selected = selectedCommits
-                if selected.count > 1, selected.contains(where: { $0.oid == row.commit.oid }) {
-                  multipleCommitsMenu(selected)
-                } else {
-                  commitMenu(row.commit)
-                }
-              }
               .onAppear {
                 if row.id == model.historyRows.last?.id, model.hasMoreHistory {
                   Task { await model.loadMoreHistory() }
@@ -123,6 +119,17 @@ struct HistoryListView: View {
             }
           }
           .listStyle(.plain)
+          // One menu for the list, built only when it opens, for the
+          // clicked row or the selection it belongs to. A per-row
+          // .contextMenu is built with every row on every update.
+          .contextMenu(forSelectionType: String.self) { ids in
+            let commits = model.historyRows.map(\.commit).filter { ids.contains($0.id) }
+            if commits.count > 1 {
+              multipleCommitsMenu(commits)
+            } else if let commit = commits.first {
+              commitMenu(commit, labels: referenceLabelsByOID[commit.oid] ?? [])
+            }
+          }
         }
       }
       .task(id: focus) {
@@ -179,13 +186,6 @@ struct HistoryListView: View {
     return !Task.isCancelled
   }
 
-  /// The selected commits in history order (newest first).
-  private var selectedCommits: [Commit] {
-    let ids = navigation.selectedCommitIDs
-    guard ids.count > 1 else { return [] }
-    return model.historyRows.map(\.commit).filter { ids.contains($0.id) }
-  }
-
   @ViewBuilder
   private func multipleCommitsMenu(_ commits: [Commit]) -> some View {
     let containsMerge = commits.contains(where: \.isMerge)
@@ -209,9 +209,9 @@ struct HistoryListView: View {
   }
 
   @ViewBuilder
-  private func commitMenu(_ commit: Commit) -> some View {
-    let branches = localBranches(on: commit)
-    let tags = tags(on: commit)
+  private func commitMenu(_ commit: Commit, labels: [HistoryReferenceLabel]) -> some View {
+    let branches = localBranches(in: labels)
+    let tags = tags(in: labels)
     ForEach(branches) { branch in
       Menu(branchMenuTitle(for: branch)) {
         Button("Select Branch") {
@@ -419,8 +419,8 @@ struct HistoryListView: View {
     "A merge commit applies the changes it brought into its first parent"
   }
 
-  private func localBranches(on commit: Commit) -> [Branch] {
-    (referenceLabelsByOID[commit.oid] ?? []).compactMap { label in
+  private func localBranches(in labels: [HistoryReferenceLabel]) -> [Branch] {
+    labels.compactMap { label in
       guard case .localBranch(let name) = label.referenceIdentity else { return nil }
       return model.branches.first { $0.name == name }
     }
@@ -433,8 +433,8 @@ struct HistoryListView: View {
     return "Branch “\(branch.name)”"
   }
 
-  private func tags(on commit: Commit) -> [Tag] {
-    (referenceLabelsByOID[commit.oid] ?? []).compactMap { label in
+  private func tags(in labels: [HistoryReferenceLabel]) -> [Tag] {
+    labels.compactMap { label in
       guard case .tag(let name) = label.referenceIdentity else { return nil }
       return model.tags.first { $0.name == name }
     }
