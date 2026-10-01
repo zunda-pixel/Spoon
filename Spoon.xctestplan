@@ -32,6 +32,13 @@
         "identifier" : "SpoonIntentTests",
         "name" : "SpoonIntentTests"
       }
+    },
+    {
+      "target" : {
+        "containerPath" : "container:SpoonKit",
+        "identifier" : "SpoonUITests",
+        "name" : "SpoonUITests"
+      }
     }
   ],
   "version" : 1
