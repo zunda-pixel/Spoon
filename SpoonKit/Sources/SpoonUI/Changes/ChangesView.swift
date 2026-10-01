@@ -1,4 +1,3 @@
-import AppKit
 import SpoonCore
 import SwiftUI
 import UniformTypeIdentifiers
@@ -39,8 +38,6 @@ struct ChangesView: View {
   /// long enough for the double-click handler to act on all of it.
   @State private var recentMultiSelection:
     (rows: Set<RepositoryModel.FileSelection>, at: ContinuousClock.Instant)?
-  /// Anchor row for shift-click range selection.
-  @State private var selectionAnchor: RepositoryModel.FileSelection?
   /// Collapsed tree directories, keyed `"<area>|<path>"` — storing the
   /// collapsed side keeps newly appearing directories expanded.
   @State private var collapsedDirectories: Set<String> = []
@@ -132,30 +129,18 @@ struct ChangesView: View {
     // pay for the cheap leaf walk below.
     let trees = model.changeTrees
 
-    // Flat depth-first display order, for shift-click range selection.
-    func selections(
-      _ tree: [FileTreeNode], _ area: RepositoryModel.ChangeArea
-    ) -> [RepositoryModel.FileSelection] {
-      FileTreeBuilder.leafEntries(tree).map {
-        RepositoryModel.FileSelection(path: $0.path, area: area)
-      }
-    }
-    let order =
-      selections(trees.conflicted, .conflicted) + selections(trees.staged, .staged)
-      + selections(trees.unstaged, .unstaged) + selections(trees.untracked, .untracked)
-
     return List(selection: $selection) {
-      section("Conflicts", tree: trees.conflicted, area: .conflicted, order: order)
+      section("Conflicts", tree: trees.conflicted, area: .conflicted)
       // A visible Changes list always has unstaged content when Staged is
       // empty, so the stage drop target needs no further condition.
       section(
-        "Staged", tree: trees.staged, area: .staged, order: order, showsEmptyDropTarget: true
+        "Staged", tree: trees.staged, area: .staged, showsEmptyDropTarget: true
       )
       section(
-        "Modified", tree: trees.unstaged, area: .unstaged, order: order,
+        "Modified", tree: trees.unstaged, area: .unstaged,
         showsEmptyDropTarget: !trees.staged.isEmpty
       )
-      section("Untracked", tree: trees.untracked, area: .untracked, order: order)
+      section("Untracked", tree: trees.untracked, area: .untracked)
     }
     // Return mirrors double-click: stage/unstage everything selected.
     .onKeyPress(.return) {
@@ -170,7 +155,6 @@ struct ChangesView: View {
     _ title: String,
     tree: [FileTreeNode],
     area: RepositoryModel.ChangeArea,
-    order: [RepositoryModel.FileSelection],
     showsEmptyDropTarget: Bool = false
   ) -> some View {
     if !tree.isEmpty || showsEmptyDropTarget {
@@ -195,7 +179,7 @@ struct ChangesView: View {
             node: node,
             isExpanded: { expansionBinding(for: $0, area: area) },
             fileRow: { entry, name in
-              fileRow(entry, displayName: name, area: area, order: order)
+              fileRow(entry, displayName: name, area: area)
             },
             onDrop: { items in handleDrop(items, into: area) }
           )
@@ -207,8 +191,7 @@ struct ChangesView: View {
   private func fileRow(
     _ entry: FileStatusEntry,
     displayName: String,
-    area: RepositoryModel.ChangeArea,
-    order: [RepositoryModel.FileSelection]
+    area: RepositoryModel.ChangeArea
   ) -> some View {
     FileStatusRow(entry: entry, displayName: displayName)
       .tag(RepositoryModel.FileSelection(path: entry.path, area: area))
@@ -217,16 +200,11 @@ struct ChangesView: View {
           ? "Press Return to unstage; use the context menu for more actions"
           : "Press Return to stage; use the context menu for more actions"
       )
-      // Any SwiftUI gesture on the row content swallows the click
-      // before the List's AppKit row selection sees it, so this
-      // handler performs selection itself (and the double-click
-      // action via NSEvent.clickCount). Clicks on the row's blank
-      // area still go through the List natively.
-      .simultaneousGesture(
-        TapGesture().onEnded {
-          handleRowClick(for: entry, area: area, order: order)
-        }
-      )
+      // Selection (plain, ⌘, and ⇧ clicks) is the List's own; a
+      // double-click moves the file across the index.
+      .onTapGesture(count: 2) {
+        doubleClickAction(for: entry, area: area)
+      }
       .contextMenu {
         ChangeFileContextMenu(
           model: model,
@@ -260,39 +238,6 @@ struct ChangesView: View {
         }
       }
     )
-  }
-
-  /// Manual selection for clicks landing on row content: plain click
-  /// selects, ⌘ toggles, ⇧ extends the range from the anchor, and the
-  /// second click of a double-click triggers the primary action.
-  private func handleRowClick(
-    for entry: FileStatusEntry,
-    area: RepositoryModel.ChangeArea,
-    order: [RepositoryModel.FileSelection]
-  ) {
-    let clicked = RepositoryModel.FileSelection(path: entry.path, area: area)
-    if NSApp.currentEvent?.clickCount == 2 {
-      doubleClickAction(for: entry, area: area)
-      return
-    }
-    let modifiers = NSEvent.modifierFlags
-    if modifiers.contains(.command) {
-      if selection.contains(clicked) {
-        selection.remove(clicked)
-      } else {
-        selection.insert(clicked)
-      }
-      selectionAnchor = clicked
-    } else if modifiers.contains(.shift),
-      let anchor = selectionAnchor ?? selection.first,
-      let anchorIndex = order.firstIndex(of: anchor),
-      let clickedIndex = order.firstIndex(of: clicked)
-    {
-      selection = Set(order[min(anchorIndex, clickedIndex)...max(anchorIndex, clickedIndex)])
-    } else {
-      selection = [clicked]
-      selectionAnchor = clicked
-    }
   }
 
   // MARK: - Drag & drop between areas
