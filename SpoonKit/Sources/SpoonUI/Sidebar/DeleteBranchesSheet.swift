@@ -1,3 +1,4 @@
+import AsyncOperations
 import SpoonCore
 import SwiftUI
 
@@ -71,12 +72,16 @@ struct DeleteBranchesSheet: View {
         )
     }
     .task {
+      let model = model
+      let results = await deletable.asyncMap(numberOfConcurrentTasks: concurrentGitReads) {
+        ($0.name, await model.deletionSafety(of: $0))
+      }
       var unmerged: Set<String> = []
       var contentMerged: Set<String> = []
-      for branch in deletable {
-        switch await model.deletionSafety(of: branch) {
-        case .unmerged: unmerged.insert(branch.name)
-        case .contentMerged: contentMerged.insert(branch.name)
+      for (name, safety) in results {
+        switch safety {
+        case .unmerged: unmerged.insert(name)
+        case .contentMerged: contentMerged.insert(name)
         case .merged: break
         }
       }

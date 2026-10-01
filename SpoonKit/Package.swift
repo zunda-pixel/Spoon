@@ -37,6 +37,7 @@ let package = Package(
     .package(url: "https://github.com/usagimaru/MacAppSettingsUI.git", from: "2.1.0"),
     .package(url: "https://github.com/apple/swift-collections.git", from: "1.7.1"),
     .package(url: "https://github.com/apple/swift-algorithms.git", from: "1.2.1"),
+    .package(url: "https://github.com/mtj0928/swift-async-operations.git", from: "0.5.0"),
   ],
   targets: [
     .target(
@@ -52,6 +53,7 @@ let package = Package(
         .product(name: "Subprocess", package: "swift-subprocess"),
         .product(name: "AsyncAlgorithms", package: "swift-async-algorithms"),
         .product(name: "Algorithms", package: "swift-algorithms"),
+        .product(name: "AsyncOperations", package: "swift-async-operations"),
       ],
       swiftSettings: swiftSettings
     ),
@@ -80,6 +82,7 @@ let package = Package(
       dependencies: [
         .target(name: "SpoonCore"),
         .product(name: "MacAppSettingsUI", package: "MacAppSettingsUI"),
+        .product(name: "AsyncOperations", package: "swift-async-operations"),
         .product(name: "OrderedCollections", package: "swift-collections"),
       ],
       swiftSettings: swiftSettings

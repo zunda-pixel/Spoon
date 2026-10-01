@@ -224,6 +224,11 @@ struct LiveSequencerTests {
     let files = try await client.formatPatches([a, b], to: out)
     #expect(files.map(\.lastPathComponent) == ["0001-Add-a.patch", "0002-Add-b.patch"])
     #expect(try await client.patchText(for: [b]).contains("Subject: [PATCH] Add b"))
+    // Run concurrently, the patches still come back in the given order.
+    let reversed = try await client.patchText(for: [b, a])
+    let addB = try #require(reversed.range(of: "Subject: [PATCH] Add b"))
+    let addA = try #require(reversed.range(of: "Subject: [PATCH] Add a"))
+    #expect(addB.lowerBound < addA.lowerBound)
 
     try await LiveRepoFixture.run(["reset", "--hard", "HEAD~2"], in: root, runner: runner)
     try await client.applyPatches(files)

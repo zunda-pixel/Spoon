@@ -1,3 +1,4 @@
+import AsyncOperations
 public import Foundation
 
 extension SystemGitClient {
@@ -202,28 +203,26 @@ extension SystemGitClient {
   }
 
   public func formatPatches(_ oids: [ObjectID], to directory: URL) async throws -> [URL] {
-    var files: [URL] = []
-    // One commit at a time keeps the given order for a selection that
-    // isn't a contiguous range; --start-number keeps the files in order.
-    for (index, oid) in oids.enumerated() {
-      let result = try await run(
-        [
-          "format-patch", "-1", "--start-number=\(index + 1)", "-o",
-          directory.path(percentEncoded: false), oid.rawValue,
-        ], timeout: .seconds(60))
-      files += result.standardOutputText.split(whereSeparator: \.isNewline).map {
+    // One commit per run keeps the given order for a selection that isn't
+    // a contiguous range; --start-number keeps the files in order.
+    let directoryPath = directory.path(percentEncoded: false)
+    return try await Array(oids.enumerated()).asyncFlatMap(
+      numberOfConcurrentTasks: concurrentGitReads
+    ) { index, oid in
+      let result = try await self.run(
+        ["format-patch", "-1", "--start-number=\(index + 1)", "-o", directoryPath, oid.rawValue],
+        timeout: .seconds(60))
+      return result.standardOutputText.split(whereSeparator: \.isNewline).map {
         URL(filePath: String($0))
       }
     }
-    return files
   }
 
   public func patchText(for oids: [ObjectID]) async throws -> String {
-    var text = ""
-    for oid in oids {
-      text += try await run(["format-patch", "-1", "--stdout", oid.rawValue]).standardOutputText
+    try await oids.asyncMap(numberOfConcurrentTasks: concurrentGitReads) { oid in
+      try await self.run(["format-patch", "-1", "--stdout", oid.rawValue]).standardOutputText
     }
-    return text
+    .joined()
   }
 
   public func applyPatches(_ files: [URL]) async throws {
