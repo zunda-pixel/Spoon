@@ -1,3 +1,5 @@
+public import Foundation
+
 extension RepositoryModel {
   public var isSequencing: Bool { sequencerState != nil }
 
@@ -169,6 +171,25 @@ extension RepositoryModel {
   /// the branch it was merged into, which is what users almost always mean.
   private static func mainline(for commits: [Commit]) -> Int? {
     commits.contains(where: \.isMerge) ? 1 : nil
+  }
+
+  /// Writes `commits`, oldest first, as numbered patch files in
+  /// `directory`; `nil` when git fails, with the error shown.
+  public func exportPatches(_ commits: [Commit], to directory: URL) async -> [URL]? {
+    let oids = historyOrder(commits).reversed().map(\.oid)
+    var files: [URL]?
+    await perform { files = try await $0.formatPatches(Array(oids), to: directory) }
+    return files
+  }
+
+  /// `commits`, oldest first, as patch text for the clipboard.
+  public func patchText(for commits: [Commit]) async throws -> String {
+    try await gitClient.patchText(for: historyOrder(commits).reversed().map(\.oid))
+  }
+
+  /// Applies patch files as commits onto the current branch.
+  public func applyPatches(_ files: [URL]) async {
+    await perform { try await $0.applyPatches(files) }
   }
 
   /// `commits` in the history list's newest-first order.

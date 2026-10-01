@@ -870,6 +870,26 @@ struct RepositoryModelTests {
     #expect(await client.mutationCalls == ["gc:true", "maintenance:true"])
   }
 
+  @Test func patchesExportOldestFirstAndApply() async throws {
+    let client = FakeRepositoryGitClient()
+    let head = makeOID("aaaa1111")
+    let commits = ["cccc3333", "bbbb2222"].map { makeCommit($0, subject: $0) }
+    await client.configure(
+      status: makeStatus(oid: head, branch: "main"),
+      branches: [makeBranch("main", oid: head, isCurrent: true)],
+      logPages: [0: LogPage(commits: commits, hasMore: false)]
+    )
+    let model = makeModel(client)
+    await model.refresh()
+    await model.loadHistoryIfNeeded()
+
+    _ = await model.exportPatches(commits, to: URL(filePath: "/tmp/out"))
+    #expect(try await model.patchText(for: commits) == "bbbb2222+cccc3333")
+    await model.applyPatches([URL(filePath: "/tmp/x/0001-a.patch")])
+    #expect(
+      await client.mutationCalls == ["format-patch:bbbb2222,cccc3333", "am:0001-a.patch"])
+  }
+
   @Test func failedMutationErrorSurvivesTheFollowUpRefresh() async {
     let client = FakeRepositoryGitClient()
     let oid = makeOID("88888888")
@@ -1860,6 +1880,16 @@ private actor FakeRepositoryGitClient: GitClient {
   func dropCommit(_ oid: ObjectID, dryRun: Bool) async throws -> [RefUpdate] {
     mutationCalls.append("drop:\(oid.rawValue):\(dryRun)")
     return []
+  }
+  func formatPatches(_ oids: [ObjectID], to directory: URL) async throws -> [URL] {
+    mutationCalls.append("format-patch:" + oids.map(\.rawValue).joined(separator: ","))
+    return []
+  }
+  func patchText(for oids: [ObjectID]) async throws -> String {
+    oids.map(\.rawValue).joined(separator: "+")
+  }
+  func applyPatches(_ files: [URL]) async throws {
+    mutationCalls.append("am:" + files.map(\.lastPathComponent).joined(separator: ","))
   }
   func continueSequencer(_ kind: SequencerState.Kind) async throws { throw Failure.unimplemented }
   func skipSequencer(_ kind: SequencerState.Kind) async throws { throw Failure.unimplemented }

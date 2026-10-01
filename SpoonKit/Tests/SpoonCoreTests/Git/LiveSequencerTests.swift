@@ -198,6 +198,53 @@ struct LiveSequencerTests {
     #expect(try await client.status().stagedEntries.map(\.path) == ["more.txt"])
   }
 
+  @Test func patchesExportAndApplyAndStopOnConflicts() async throws {
+    let root = try await LiveRepoFixture.makeTemporaryRepo(
+      commits: [.init(file: "base.txt", content: "base\n", message: "base")],
+      runner: runner
+    )
+    let out = URL.temporaryDirectory.appending(path: "spoon-patches-\(UUID().uuidString)")
+    defer {
+      try? FileManager.default.removeItem(at: root)
+      try? FileManager.default.removeItem(at: out)
+    }
+    try FileManager.default.createDirectory(at: out, withIntermediateDirectories: true)
+    try await LiveRepoFixture.commitFile(
+      "a.txt", content: "a\n", message: "Add a", in: root, runner: runner)
+    try await LiveRepoFixture.commitFile(
+      "b.txt", content: "b\n", message: "Add b", in: root, runner: runner)
+    let client = makeClient(root)
+    func oid(_ revision: String) async throws -> ObjectID {
+      let text = try await client.run(["rev-parse", revision]).standardOutputText
+      return try #require(ObjectID(rawValue: text.trimmingCharacters(in: .whitespacesAndNewlines)))
+    }
+    let a = try await oid("HEAD~1")
+    let b = try await oid("HEAD")
+
+    let files = try await client.formatPatches([a, b], to: out)
+    #expect(files.map(\.lastPathComponent) == ["0001-Add-a.patch", "0002-Add-b.patch"])
+    #expect(try await client.patchText(for: [b]).contains("Subject: [PATCH] Add b"))
+
+    try await LiveRepoFixture.run(["reset", "--hard", "HEAD~2"], in: root, runner: runner)
+    try await client.applyPatches(files)
+    let subjects = try await client.log(LogQuery(maxCount: 5)).commits.map(\.subject)
+    #expect(subjects == ["Add b", "Add a", "base"])
+    #expect(try await client.sequencerState() == nil)
+
+    // A patch that no longer applies leaves `git am` in progress.
+    try await LiveRepoFixture.run(["reset", "--hard", "HEAD~2"], in: root, runner: runner)
+    try await LiveRepoFixture.commitFile(
+      "a.txt", content: "other\n", message: "Other a", in: root, runner: runner)
+    await #expect(throws: CommandError.self) { try await client.applyPatches(files) }
+    let state = try #require(try await client.sequencerState())
+    #expect(state.kind == .applyingPatches)
+    #expect(state.stepNumber == 1)
+    #expect(state.stepCount == 2)
+    try await client.abortSequencer(.applyingPatches)
+    #expect(try await client.sequencerState() == nil)
+    #expect(try await client.log(LogQuery(maxCount: 1)).commits.first?.subject == "Other a")
+  }
+
   @Test func conflictIsDetectedAndAbortRestoresEverything() async throws {
     let root = try await LiveRepoFixture.makeTemporaryRepo(runner: runner)
     defer { try? FileManager.default.removeItem(at: root) }

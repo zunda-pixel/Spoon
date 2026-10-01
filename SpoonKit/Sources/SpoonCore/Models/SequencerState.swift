@@ -10,6 +10,8 @@ public struct SequencerState: Sendable, Hashable {
     case cherryPick
     case revert
     case merge
+    /// `git am` applying patch files.
+    case applyingPatches
   }
 
   public var kind: Kind

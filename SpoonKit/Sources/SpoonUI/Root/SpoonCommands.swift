@@ -123,6 +123,11 @@ public struct SpoonCommands: Commands {
       }
       .disabled(model == nil || navigation == nil)
 
+      Button("Apply Patches…") {
+        chooseAndApplyPatches()
+      }
+      .disabled(repositoryMutationUnavailable)
+
       Button("Blame File…") {
         chooseFileToBlame()
       }
@@ -277,7 +282,23 @@ public struct SpoonCommands: Commands {
     case .cherryPick: "Cherry-Pick"
     case .revert: "Revert"
     case .merge: "Merge"
+    case .applyingPatches: "Patch Application"
     }
+  }
+
+  /// Picks patch files (git format-patch output or an mbox) and applies
+  /// them as commits onto the current branch.
+  private func chooseAndApplyPatches() {
+    guard let model else { return }
+    let panel = NSOpenPanel()
+    panel.canChooseDirectories = false
+    panel.allowsMultipleSelection = true
+    panel.prompt = "Apply"
+    panel.message = "Choose patch files to apply as commits onto \(model.currentBranch?.name ?? "HEAD")."
+    guard panel.runModal() == .OK, !panel.urls.isEmpty else { return }
+    // Name order is the order git format-patch numbers them in.
+    let files = panel.urls.sorted { $0.lastPathComponent < $1.lastPathComponent }
+    Task { await model.applyPatches(files) }
   }
 
   /// Picks any file inside the repository and opens its blame.
