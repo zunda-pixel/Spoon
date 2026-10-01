@@ -56,6 +56,8 @@ public final class RepositoryModel {
       Defaults[.commitSignOffRepositoryIDs] = ids.sorted()
     }
   }
+  /// Co-authors credited on the next commit; cleared once it is made.
+  public var commitCoAuthors: [CoAuthor] = []
   /// Bumped after Spoon writes `git config`, so views that read it reload.
   public internal(set) var configGeneration = 0
   public internal(set) var focusedHistoryReferenceIDs: Set<String> = []

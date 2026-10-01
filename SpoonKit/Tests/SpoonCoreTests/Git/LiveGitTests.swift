@@ -50,6 +50,19 @@ struct LiveGitTests {
     #expect(raw.contains("gpgsig -----BEGIN SSH SIGNATURE-----"))
     #expect(raw.contains("Signed-off-by: Spoon Tests <test@example.com>"))
 
+    // Trailers join the sign-off in one block; git drops the duplicate.
+    try Data("paired\n".utf8).write(to: root.appending(path: "paired.txt"))
+    try await runGit(["add", "paired.txt"], in: root)
+    let ada = "Co-authored-by: Ada <ada@example.com>"
+    try await client.commit(
+      message: "Pair on it\n\nBody", options: CommitOptions(signOff: true, trailers: [ada, ada]))
+    let message = try await client.run(["log", "-1", "--format=%B"]).standardOutputText
+    #expect(
+      message.trimmingCharacters(in: .newlines)
+        == "Pair on it\n\nBody\n\nSigned-off-by: Spoon Tests <test@example.com>\n\(ada)")
+    let authors = try await client.recentAuthors(limit: 10)
+    #expect(authors == [CoAuthor(name: "Spoon Tests", email: "test@example.com")])
+
     // Tags: signed on request, and left unsigned despite tag.gpgSign.
     try await runGit(["config", "tag.gpgsign", "true"], in: root)
     #expect(try await client.commitSigningConfiguration().signsTagsByDefault)

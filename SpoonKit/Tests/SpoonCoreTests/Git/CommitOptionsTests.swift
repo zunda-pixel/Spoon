@@ -16,6 +16,7 @@ struct CommitOptionsTests {
       ["commit", "-F", "-"],
       ["commit", "-F", "-", "--amend", "--signoff", "--gpg-sign"],
       ["commit", "-F", "-", "--no-gpg-sign"],
+      ["commit", "-F", "-", "--signoff", "--trailer", "Co-authored-by: Ada <ada@example.com>"],
     ]
     for arguments in expected {
       runner.stub(arguments: prefix + arguments)
@@ -25,6 +26,9 @@ struct CommitOptionsTests {
     try await client.commit(
       message: "all", options: CommitOptions(amend: true, signOff: true, signing: .sign))
     try await client.commit(message: "unsigned", options: CommitOptions(signing: .doNotSign))
+    try await client.commit(
+      message: "paired",
+      options: CommitOptions(signOff: true, trailers: ["Co-authored-by: Ada <ada@example.com>"]))
 
     #expect(runner.invocations.map { Array($0.arguments.dropFirst(prefix.count)) } == expected)
     #expect(runner.invocations[1].standardInput == Data("all".utf8))
@@ -48,6 +52,16 @@ struct CommitOptionsTests {
       configuration
         == CommitSigningConfiguration(
           signsByDefault: true, format: .ssh, key: "~/.ssh/id_ed25519.pub"))
+  }
+
+  @Test func coAuthorIdentitiesParse() {
+    let ada = CoAuthor(identity: "  Ada Lovelace <ada@example.com> ")
+    #expect(ada == CoAuthor(name: "Ada Lovelace", email: "ada@example.com"))
+    #expect(ada?.trailer == "Co-authored-by: Ada Lovelace <ada@example.com>")
+    #expect(CoAuthor(identity: "Ada <Ada@Example.com>")?.id == "ada@example.com")
+    for invalid in ["Ada", "<ada@example.com>", "Ada <ada>", "Ada <a b@x>", "Ada ada@example.com"] {
+      #expect(CoAuthor(identity: invalid) == nil)
+    }
   }
 
   @Test func signingConfigurationDefaultsAndBooleans() {

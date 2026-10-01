@@ -1,3 +1,5 @@
+import Foundation
+
 /// How `git commit` records a new commit.
 public struct CommitOptions: Sendable, Hashable {
   public enum Signing: Sendable, Hashable {
@@ -14,11 +16,18 @@ public struct CommitOptions: Sendable, Hashable {
   /// Add a `Signed-off-by:` trailer for the committer (`--signoff`).
   public var signOff: Bool
   public var signing: Signing
+  /// `Key: value` lines git appends to the message (`--trailer`), placing
+  /// them after a blank line and merging them with `Signed-off-by:`.
+  public var trailers: [String]
 
-  public init(amend: Bool = false, signOff: Bool = false, signing: Signing = .configured) {
+  public init(
+    amend: Bool = false, signOff: Bool = false, signing: Signing = .configured,
+    trailers: [String] = []
+  ) {
     self.amend = amend
     self.signOff = signOff
     self.signing = signing
+    self.trailers = trailers
   }
 
   var arguments: [String] {
@@ -29,6 +38,9 @@ public struct CommitOptions: Sendable, Hashable {
     case .configured: break
     case .sign: arguments.append("--gpg-sign")
     case .doNotSign: arguments.append("--no-gpg-sign")
+    }
+    for trailer in trailers {
+      arguments += ["--trailer", trailer]
     }
     return arguments
   }
@@ -111,4 +123,34 @@ public enum TagSigning: Sendable, Hashable {
   case sign
   /// Leave it unsigned even if `tag.gpgSign` is set (`--no-sign`).
   case doNotSign
+}
+
+/// Someone credited on a commit with a `Co-authored-by:` trailer, which
+/// GitHub and GitLab show as a co-author.
+public struct CoAuthor: Sendable, Hashable, Identifiable, Codable {
+  public var name: String
+  public var email: String
+
+  public init(name: String, email: String) {
+    self.name = name
+    self.email = email
+  }
+
+  public var id: String { email.lowercased() }
+
+  /// `Ada Lovelace <ada@example.com>`
+  public var identity: String { "\(name) <\(email)>" }
+
+  public var trailer: String { "Co-authored-by: \(identity)" }
+
+  /// Reads `Name <email>`; `nil` without both parts.
+  public init?(identity: String) {
+    let text = identity.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard text.hasSuffix(">"), let open = text.lastIndex(of: "<") else { return nil }
+    let name = text[..<open].trimmingCharacters(in: .whitespaces)
+    let email = text[text.index(after: open)..<text.index(before: text.endIndex)]
+      .trimmingCharacters(in: .whitespaces)
+    guard !name.isEmpty, email.contains("@"), !email.contains(" ") else { return nil }
+    self.init(name: name, email: email)
+  }
 }

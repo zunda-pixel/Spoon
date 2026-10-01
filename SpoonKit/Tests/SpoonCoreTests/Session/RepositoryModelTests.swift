@@ -818,6 +818,28 @@ struct RepositoryModelTests {
     #expect(RepositoryModel.DiscardPlan([.init(path: "x", area: .staged)]).isEmpty)
   }
 
+  @Test func coAuthorsAreAddedToTheCommitThenRememberedAndCleared() async {
+    let client = FakeRepositoryGitClient()
+    await client.allowCommits()
+    let model = makeModel(client)
+    let saved = Defaults[.coAuthors]
+    defer { Defaults[.coAuthors] = saved }
+    Defaults[.coAuthors] = [CoAuthor(name: "Grace", email: "grace@example.com")]
+    let ada = CoAuthor(name: "Ada", email: "ada@example.com")
+
+    model.commitCoAuthors = [ada]
+    #expect(await model.commit(message: "paired"))
+
+    #expect(
+      await client.mutationCalls == [
+        "commit:false:false:configured:Co-authored-by: Ada <ada@example.com>"
+      ])
+    #expect(model.commitCoAuthors.isEmpty)
+    #expect(model.rememberedCoAuthors.map(\.name) == ["Ada", "Grace"])
+    model.forget(ada)
+    #expect(model.rememberedCoAuthors.map(\.name) == ["Grace"])
+  }
+
   @Test func failedMutationErrorSurvivesTheFollowUpRefresh() async {
     let client = FakeRepositoryGitClient()
     let oid = makeOID("88888888")
@@ -1578,7 +1600,9 @@ private actor FakeRepositoryGitClient: GitClient {
   func allowCommits() { commitsSucceed = true }
   func commit(message: String, options: CommitOptions) async throws {
     guard commitsSucceed else { throw Failure.unimplemented }
-    mutationCalls.append("commit:\(options.amend):\(options.signOff):\(options.signing)")
+    mutationCalls.append(
+      "commit:\(options.amend):\(options.signOff):\(options.signing)"
+        + (options.trailers.isEmpty ? "" : ":" + options.trailers.joined(separator: "|")))
   }
   func commitSigningConfiguration() async throws -> CommitSigningConfiguration {
     CommitSigningConfiguration()
@@ -1609,6 +1633,9 @@ private actor FakeRepositoryGitClient: GitClient {
   private var configuredIgnoreRevsFiles: [String] = []
   func setIgnoreRevsFiles(_ files: [String]) { configuredIgnoreRevsFiles = files }
   func blameIgnoreRevsFiles() async throws -> [String] { configuredIgnoreRevsFiles }
+  func recentAuthors(limit: Int) async throws -> [CoAuthor] {
+    [CoAuthor(name: "Ada Lovelace", email: "ada@example.com")]
+  }
   func lineHistory(path: String, lines: ClosedRange<Int>, limit: Int) async throws
     -> [LineHistoryEntry]
   { [] }

@@ -10,6 +10,8 @@ struct CommitComposerView: View {
   @State private var sign = false
   /// `nil` until loaded, or when git config can't be read.
   @State private var signing: CommitSigningConfiguration?
+  @State private var recentAuthors: [CoAuthor] = []
+  @State private var addingCoAuthor = false
 
   init(model: RepositoryModel) {
     self.model = model
@@ -35,6 +37,10 @@ struct CommitComposerView: View {
           }
         }
 
+      if !model.commitCoAuthors.isEmpty {
+        CoAuthorChips(model: model)
+      }
+
       // The options move to their own row when the column is too narrow.
       ViewThatFits(in: .horizontal) {
         HStack {
@@ -52,6 +58,10 @@ struct CommitComposerView: View {
       signing = await model.commitSigningConfiguration()
       sign = signing?.signsByDefault ?? false
     }
+    .task { recentAuthors = await model.recentAuthors() }
+    .sheet(isPresented: $addingCoAuthor) {
+      AddCoAuthorSheet(model: model)
+    }
   }
 
   @ViewBuilder
@@ -68,6 +78,53 @@ struct CommitComposerView: View {
       .fixedSize()
       .disabled(signing?.canSign == false && !sign)
       .help(signingHelp)
+    coAuthorMenu
+  }
+
+  /// Credits others with `Co-authored-by:` trailers on the next commit.
+  private var coAuthorMenu: some View {
+    Menu {
+      let remembered = model.rememberedCoAuthors
+      ForEach(remembered) { coAuthor in
+        Toggle(coAuthor.identity, isOn: coAuthorBinding(coAuthor))
+      }
+      if !remembered.isEmpty { Divider() }
+      let suggestions = recentAuthors.filter { author in
+        !remembered.contains { $0.id == author.id }
+      }
+      if !suggestions.isEmpty {
+        Menu("Recent Authors") {
+          ForEach(suggestions.prefix(20)) { author in
+            Button(author.identity) { model.commitCoAuthors.append(author) }
+          }
+        }
+      }
+      Button("Add Co-author…") { addingCoAuthor = true }
+      if !remembered.isEmpty {
+        Menu("Forget") {
+          ForEach(remembered) { coAuthor in
+            Button(coAuthor.identity) { model.forget(coAuthor) }
+          }
+        }
+      }
+    } label: {
+      Label(
+        model.commitCoAuthors.isEmpty ? "Co-authors" : "Co-authors (\(model.commitCoAuthors.count))",
+        systemImage: "person.2")
+    }
+    .menuStyle(.borderlessButton)
+    .fixedSize()
+    .help("Credit others with Co-authored-by: lines, which GitHub and GitLab show as co-authors")
+  }
+
+  private func coAuthorBinding(_ coAuthor: CoAuthor) -> Binding<Bool> {
+    Binding(
+      get: { model.commitCoAuthors.contains { $0.id == coAuthor.id } },
+      set: { selected in
+        model.commitCoAuthors.removeAll { $0.id == coAuthor.id }
+        if selected { model.commitCoAuthors.append(coAuthor) }
+      }
+    )
   }
 
   @ViewBuilder
@@ -147,5 +204,82 @@ struct CommitComposerView: View {
         message = generated
       }
     }
+  }
+}
+
+/// The co-authors credited on the next commit, each removable.
+@MainActor
+private struct CoAuthorChips: View {
+  let model: RepositoryModel
+
+  var body: some View {
+    HStack(spacing: 6) {
+      Image(systemName: "person.2")
+        .foregroundStyle(.secondary)
+        .accessibilityHidden(true)
+      ScrollView(.horizontal, showsIndicators: false) {
+        HStack(spacing: 6) {
+          ForEach(model.commitCoAuthors) { coAuthor in
+            HStack(spacing: 4) {
+              Text(coAuthor.name)
+              Button("Remove \(coAuthor.name)", systemImage: "xmark.circle.fill") {
+                model.commitCoAuthors.removeAll { $0.id == coAuthor.id }
+              }
+              .labelStyle(.iconOnly)
+              .buttonStyle(.borderless)
+              .foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 2)
+            .background(.quaternary, in: Capsule())
+            .help(coAuthor.trailer)
+          }
+        }
+      }
+    }
+    .font(.callout)
+    .accessibilityElement(children: .contain)
+    .accessibilityLabel("Co-authors")
+  }
+}
+
+/// Enters a co-author by name and email.
+@MainActor
+struct AddCoAuthorSheet: View {
+  let model: RepositoryModel
+  @Environment(\.dismiss) private var dismiss
+  @State private var name = ""
+  @State private var email = ""
+
+  var body: some View {
+    SheetFormLayout(
+      title: "Add Co-author",
+      subtitle: "Credited with a Co-authored-by: line on the next commit. Use the email their GitHub account knows."
+    ) {
+      Form {
+        TextField("Name", text: $name, prompt: Text("Ada Lovelace"))
+        TextField("Email", text: $email, prompt: Text("ada@example.com"))
+          .onSubmit(add)
+      }
+      .textFieldStyle(.roundedBorder)
+      .frame(width: 360)
+    } actions: {
+      Button("Cancel", role: .cancel) { dismiss() }
+      Button("Add", action: add)
+        .keyboardShortcut(.defaultAction)
+        .disabled(coAuthor == nil)
+    }
+  }
+
+  private var coAuthor: CoAuthor? {
+    CoAuthor(identity: "\(name) <\(email)>")
+  }
+
+  private func add() {
+    guard let coAuthor else { return }
+    model.remember([coAuthor])
+    model.commitCoAuthors.removeAll { $0.id == coAuthor.id }
+    model.commitCoAuthors.append(coAuthor)
+    dismiss()
   }
 }

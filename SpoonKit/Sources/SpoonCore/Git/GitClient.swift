@@ -97,6 +97,8 @@ public protocol GitHistoryClient: Sendable {
     -> [BlameLine]
   /// Files `blame.ignoreRevsFile` lists, which git reads on every blame.
   func blameIgnoreRevsFiles() async throws -> [String]
+  /// Distinct authors of the most recent `limit` commits, newest first.
+  func recentAuthors(limit: Int) async throws -> [CoAuthor]
   /// The commits, newest first, that changed `lines` (1-based, inclusive)
   /// of `path` as it is at HEAD, each with the diff of just those lines,
   /// following them as they move (`git log -L`). At most `limit` commits.
