@@ -1,4 +1,5 @@
 public import Foundation
+public import MemberwiseInit
 
 public enum ResetMode: String, Sendable, Hashable, CaseIterable {
   case soft
@@ -6,6 +7,7 @@ public enum ResetMode: String, Sendable, Hashable, CaseIterable {
   case hard
 }
 
+@MemberwiseInit(.public)
 public struct ReflogEntry: Sendable, Hashable, Identifiable {
   public var oid: ObjectID
   public var selector: String
@@ -15,20 +17,4 @@ public struct ReflogEntry: Sendable, Hashable, Identifiable {
   public var date: Date
 
   public var id: String { selector }
-
-  public init(
-    oid: ObjectID,
-    selector: String,
-    subject: String,
-    authorName: String,
-    authorEmail: String,
-    date: Date
-  ) {
-    self.oid = oid
-    self.selector = selector
-    self.subject = subject
-    self.authorName = authorName
-    self.authorEmail = authorEmail
-    self.date = date
-  }
 }

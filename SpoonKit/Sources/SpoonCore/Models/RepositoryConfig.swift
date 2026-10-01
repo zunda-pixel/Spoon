@@ -1,18 +1,14 @@
 import Foundation
+public import MemberwiseInit
 
 /// One `git config` value and the file it came from.
+@MemberwiseInit(.public)
 public struct GitConfigEntry: Sendable, Hashable {
   /// `system`, `global`, `local`, `worktree`, or `command`.
   public var scope: String
   /// Lowercased section and variable name, as git prints it.
   public var key: String
   public var value: String
-
-  public init(scope: String, key: String, value: String) {
-    self.scope = scope
-    self.key = key
-    self.value = value
-  }
 
   /// Parses `git config --null --show-scope --get-regexp`: records of
   /// `scope NUL key LF value NUL`.
@@ -35,12 +31,9 @@ public struct GitConfigEntry: Sendable, Hashable {
 
 /// The settings Spoon edits for one repository, as `git config` resolves
 /// them: this repository's own values over the user's and the system's.
+@MemberwiseInit(.public)
 public struct RepositoryConfig: Sendable, Hashable {
-  public var entries: [GitConfigEntry]
-
-  public init(entries: [GitConfigEntry] = []) {
-    self.entries = entries
-  }
+  public var entries: [GitConfigEntry] = []
 
   /// This repository's value (`.git/config`); `nil` when it inherits one.
   public func localValue(_ key: RepositorySetting) -> String? {

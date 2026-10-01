@@ -1,27 +1,17 @@
 import Foundation
+public import MemberwiseInit
 
 /// One entry from `git stash list`.
+@MemberwiseInit(.public)
 public struct Stash: Sendable, Hashable, Identifiable {
   /// Position in the stash stack (`stash@{index}`).
   public var index: Int
   /// Commit stored at this stash entry.
   public var target: ObjectID
   /// Git's implementation-only index/untracked snapshot commits.
-  public var helperCommitOIDs: [ObjectID]
+  public var helperCommitOIDs: [ObjectID] = []
   /// e.g. `WIP on main: 4ae2b1b subject` or a custom message.
   public var message: String
-
-  public init(
-    index: Int,
-    target: ObjectID,
-    helperCommitOIDs: [ObjectID] = [],
-    message: String
-  ) {
-    self.index = index
-    self.target = target
-    self.helperCommitOIDs = helperCommitOIDs
-    self.message = message
-  }
 
   public var id: Int { index }
 
@@ -29,6 +19,7 @@ public struct Stash: Sendable, Hashable, Identifiable {
 }
 
 /// What `git stash push` saves.
+@MemberwiseInit(.public)
 public struct StashSaveOptions: Sendable, Hashable {
   public enum Scope: Sendable, Hashable {
     /// Staged and unstaged changes; both are removed from the working tree.
@@ -40,24 +31,12 @@ public struct StashSaveOptions: Sendable, Hashable {
     case keepingIndex
   }
 
-  public var message: String?
-  public var scope: Scope
+  public var message: String? = nil
+  public var scope: Scope = .allChanges
   /// Also stash untracked files. Not available with `.stagedOnly`.
-  public var includeUntracked: Bool
+  public var includeUntracked: Bool = false
   /// Limits the stash to these paths; empty means every change.
-  public var paths: [String]
-
-  public init(
-    message: String? = nil,
-    scope: Scope = .allChanges,
-    includeUntracked: Bool = false,
-    paths: [String] = []
-  ) {
-    self.message = message
-    self.scope = scope
-    self.includeUntracked = includeUntracked
-    self.paths = paths
-  }
+  public var paths: [String] = []
 
   /// `git stash push` arguments after `push`.
   var arguments: [String] {

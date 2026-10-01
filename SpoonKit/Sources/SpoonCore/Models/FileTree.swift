@@ -1,4 +1,5 @@
 import Foundation
+public import MemberwiseInit
 
 /// A node of the Changes list's directory tree.
 public struct FileTreeNode: Sendable, Hashable, Identifiable {
@@ -21,6 +22,7 @@ public struct FileTreeNode: Sendable, Hashable, Identifiable {
 /// The Changes list's four area trees for one status snapshot, built once
 /// per refresh rather than on every render (the natural-order sort is the
 /// expensive part).
+@MemberwiseInit(.public)
 public struct ChangeTrees: Sendable, Hashable {
   public var conflicted: [FileTreeNode]
   public var staged: [FileTreeNode]
@@ -28,16 +30,6 @@ public struct ChangeTrees: Sendable, Hashable {
   public var untracked: [FileTreeNode]
 
   public static let empty = ChangeTrees(conflicted: [], staged: [], unstaged: [], untracked: [])
-
-  public init(
-    conflicted: [FileTreeNode], staged: [FileTreeNode],
-    unstaged: [FileTreeNode], untracked: [FileTreeNode]
-  ) {
-    self.conflicted = conflicted
-    self.staged = staged
-    self.unstaged = unstaged
-    self.untracked = untracked
-  }
 
   public init(status: WorkingTreeStatus) {
     conflicted = FileTreeBuilder.build(status.conflictedEntries, namespace: "conflicted")

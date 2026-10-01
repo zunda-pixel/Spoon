@@ -1,16 +1,13 @@
 import Foundation
+public import MemberwiseInit
 
 /// One commit that changed a range of lines, with just that part of its diff.
+@MemberwiseInit(.public)
 public struct LineHistoryEntry: Sendable, Hashable, Identifiable {
   public var commit: Commit
   public var diffs: [FileDiff]
 
   public var id: ObjectID { commit.oid }
-
-  public init(commit: Commit, diffs: [FileDiff]) {
-    self.commit = commit
-    self.diffs = diffs
-  }
 }
 
 enum LineHistoryParser {

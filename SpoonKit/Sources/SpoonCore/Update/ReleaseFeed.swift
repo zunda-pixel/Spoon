@@ -1,4 +1,5 @@
 public import Foundation
+public import MemberwiseInit
 
 /// Where Spoon looks for its newest release.
 public protocol ReleaseFeed: Sendable {
@@ -9,14 +10,10 @@ public protocol ReleaseFeed: Sendable {
 
 /// The public GitHub Releases API. Unauthenticated requests are enough for
 /// one check per launch.
+@MemberwiseInit(.public)
 public struct GitHubReleaseFeed: ReleaseFeed {
-  public var owner: String
-  public var repository: String
-
-  public init(owner: String = "zunda-pixel", repository: String = "Spoon") {
-    self.owner = owner
-    self.repository = repository
-  }
+  public var owner: String = "zunda-pixel"
+  public var repository: String = "Spoon"
 
   public enum FeedError: LocalizedError, Sendable, Hashable {
     case unexpectedStatus(Int)

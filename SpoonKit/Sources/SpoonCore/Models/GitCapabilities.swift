@@ -1,14 +1,14 @@
-/// A `major.minor.patch` git release, ignoring vendor and release-candidate suffixes.
-public struct GitVersion: Sendable, Hashable, Comparable, CustomStringConvertible {
-  public var major: Int
-  public var minor: Int
-  public var patch: Int
+public import MemberwiseInit
 
-  public init(_ major: Int, _ minor: Int, _ patch: Int = 0) {
-    self.major = major
-    self.minor = minor
-    self.patch = patch
-  }
+/// A `major.minor.patch` git release, ignoring vendor and release-candidate suffixes.
+@MemberwiseInit(.public)
+public struct GitVersion: Sendable, Hashable, Comparable, CustomStringConvertible {
+  @Init(label: "_")
+  public var major: Int
+  @Init(label: "_")
+  public var minor: Int
+  @Init(label: "_")
+  public var patch: Int = 0
 
   public var description: String { "\(major).\(minor).\(patch)" }
 
@@ -21,13 +21,10 @@ public struct GitVersion: Sendable, Hashable, Comparable, CustomStringConvertibl
 ///
 /// Every feature defaults to unavailable, so an unknown or unparsable version
 /// hides version-gated UI instead of offering commands git would reject.
+@MemberwiseInit(.public)
 public struct GitCapabilities: Sendable, Hashable {
   /// `nil` when `git version` failed or printed something unrecognizable.
-  public var version: GitVersion?
-
-  public init(version: GitVersion? = nil) {
-    self.version = version
-  }
+  public var version: GitVersion? = nil
 
   /// `git backfill` (2.49+).
   public var supportsBackfill: Bool { supports(GitVersion(2, 49)) }

@@ -1,4 +1,7 @@
+public import MemberwiseInit
+
 /// A commit's GPG, SSH, or X.509 signature as git verified it (`%G?`).
+@MemberwiseInit(.public)
 public struct CommitSignature: Sendable, Hashable {
   public enum Status: Sendable, Hashable {
     /// `G`: valid and from a trusted key.
@@ -27,13 +30,7 @@ public struct CommitSignature: Sendable, Hashable {
 
   public var status: Status
   /// Signer as the key identifies it (`%GS`), when known.
-  public var signer: String?
+  public var signer: String? = nil
   /// Key ID (`%GK`) or fingerprint (`%GF`), when known.
-  public var key: String?
-
-  public init(status: Status, signer: String? = nil, key: String? = nil) {
-    self.status = status
-    self.signer = signer
-    self.key = key
-  }
+  public var key: String? = nil
 }

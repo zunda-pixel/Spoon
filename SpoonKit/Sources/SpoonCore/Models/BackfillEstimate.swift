@@ -1,4 +1,7 @@
+public import MemberwiseInit
+
 /// What `git backfill` would download, measured before running it.
+@MemberwiseInit(.public)
 public struct BackfillEstimate: Sendable, Hashable {
   /// Objects reachable from HEAD that are not present locally.
   public var missingObjectCount: Int
@@ -7,10 +10,4 @@ public struct BackfillEstimate: Sendable, Hashable {
   public var downloadByteCount: Int?
   /// Why `downloadByteCount` is unavailable, for display.
   public var sizeUnavailableReason: String?
-
-  public init(missingObjectCount: Int, downloadByteCount: Int?, sizeUnavailableReason: String?) {
-    self.missingObjectCount = missingObjectCount
-    self.downloadByteCount = downloadByteCount
-    self.sizeUnavailableReason = sizeUnavailableReason
-  }
 }

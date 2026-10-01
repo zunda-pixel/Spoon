@@ -1,4 +1,7 @@
+public import MemberwiseInit
+
 /// How `git pull` integrates the upstream branch.
+@MemberwiseInit(.public)
 public struct PullOptions: Sendable, Hashable {
   public enum Strategy: String, Sendable, Hashable, CaseIterable {
     /// Whatever the repository's `pull.rebase` / `pull.ff` config says.
@@ -11,14 +14,9 @@ public struct PullOptions: Sendable, Hashable {
     case fastForwardOnly
   }
 
-  public var strategy: Strategy
+  public var strategy: Strategy = .configured
   /// Stash local changes before pulling and reapply them afterwards.
-  public var autostash: Bool
-
-  public init(strategy: Strategy = .configured, autostash: Bool = false) {
-    self.strategy = strategy
-    self.autostash = autostash
-  }
+  public var autostash: Bool = false
 
   /// `git pull` arguments after `pull`.
   var arguments: [String] {

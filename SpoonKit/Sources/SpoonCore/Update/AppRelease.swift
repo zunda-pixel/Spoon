@@ -1,17 +1,16 @@
 public import Foundation
+public import MemberwiseInit
 
 /// A `major.minor.patch` app version, parsed from a release tag such as
 /// `0.0.4` or `v1.2.0`.
+@MemberwiseInit(.public)
 public struct AppVersion: Sendable, Hashable, Comparable, CustomStringConvertible {
+  @Init(label: "_")
   public var major: Int
+  @Init(label: "_")
   public var minor: Int
-  public var patch: Int
-
-  public init(_ major: Int, _ minor: Int, _ patch: Int = 0) {
-    self.major = major
-    self.minor = minor
-    self.patch = patch
-  }
+  @Init(label: "_")
+  public var patch: Int = 0
 
   /// `nil` unless the string is 1–3 dot-separated integers, optionally after `v`.
   public init?(_ string: String) {
@@ -32,6 +31,7 @@ public struct AppVersion: Sendable, Hashable, Comparable, CustomStringConvertibl
 }
 
 /// A published Spoon release on GitHub.
+@MemberwiseInit(.public)
 public struct AppRelease: Sendable, Hashable, Identifiable {
   public var version: AppVersion
   public var tagName: String
@@ -40,22 +40,6 @@ public struct AppRelease: Sendable, Hashable, Identifiable {
   public var archiveURL: URL
   public var notes: String
   public var publishedAt: Date?
-
-  public init(
-    version: AppVersion,
-    tagName: String,
-    pageURL: URL,
-    archiveURL: URL,
-    notes: String,
-    publishedAt: Date?
-  ) {
-    self.version = version
-    self.tagName = tagName
-    self.pageURL = pageURL
-    self.archiveURL = archiveURL
-    self.notes = notes
-    self.publishedAt = publishedAt
-  }
 
   public var id: String { tagName }
 

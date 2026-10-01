@@ -50,6 +50,7 @@ public struct Hunk: Sendable, Hashable, Identifiable {
   public var id: String { "\(oldStart)+\(newStart)" }
 }
 
+@MemberwiseInit(.public)
 public struct DiffLine: Sendable, Hashable {
   public enum Kind: Sendable, Hashable {
     case context
@@ -63,16 +64,9 @@ public struct DiffLine: Sendable, Hashable {
   /// Content without the leading `+`/`-`/space marker.
   public var text: String
   /// 1-based line number in the old file (context and deletions).
-  public var oldLine: Int?
+  public var oldLine: Int? = nil
   /// 1-based line number in the new file (context and additions).
-  public var newLine: Int?
-
-  public init(kind: Kind, text: String, oldLine: Int? = nil, newLine: Int? = nil) {
-    self.kind = kind
-    self.text = text
-    self.oldLine = oldLine
-    self.newLine = newLine
-  }
+  public var newLine: Int? = nil
 }
 
 /// Full detail for one commit: metadata, message, and first-parent patch.

@@ -1,25 +1,16 @@
+public import MemberwiseInit
+
 /// How the object database is stored, from `git count-objects -v`.
+@MemberwiseInit(.public)
 public struct RepositoryStorage: Sendable, Hashable {
   /// Objects stored one file each, which `git gc` packs.
-  public var looseObjects: Int
-  public var looseBytes: Int
-  public var packs: Int
-  public var packedObjects: Int
-  public var packBytes: Int
+  public var looseObjects: Int = 0
+  public var looseBytes: Int = 0
+  public var packs: Int = 0
+  public var packedObjects: Int = 0
+  public var packBytes: Int = 0
   /// Files in the object directory that aren't objects or packs.
-  public var garbageBytes: Int
-
-  public init(
-    looseObjects: Int = 0, looseBytes: Int = 0, packs: Int = 0, packedObjects: Int = 0,
-    packBytes: Int = 0, garbageBytes: Int = 0
-  ) {
-    self.looseObjects = looseObjects
-    self.looseBytes = looseBytes
-    self.packs = packs
-    self.packedObjects = packedObjects
-    self.packBytes = packBytes
-    self.garbageBytes = garbageBytes
-  }
+  public var garbageBytes: Int = 0
 
   public var totalBytes: Int { looseBytes + packBytes + garbageBytes }
 

@@ -1,61 +1,43 @@
 public import Foundation
+public import MemberwiseInit
 
 /// The commit that last changed one or more blamed lines.
+@MemberwiseInit(.public)
 public struct BlameCommit: Sendable, Hashable {
   public var oid: ObjectID
   public var authorName: String
   public var authoredAt: Date
   public var summary: String
 
-  public init(oid: ObjectID, authorName: String, authoredAt: Date, summary: String) {
-    self.oid = oid
-    self.authorName = authorName
-    self.authoredAt = authoredAt
-    self.summary = summary
-  }
-
   /// Git reports working-tree edits under the all-zero object ID.
   public var isUncommitted: Bool { oid.rawValue.allSatisfy { $0 == "0" } }
 }
 
 /// One line of `git blame` output.
+@MemberwiseInit(.public)
 public struct BlameLine: Sendable, Hashable, Identifiable {
   /// 1-based line number in the blamed file.
   public var lineNumber: Int
   public var commit: BlameCommit
   public var text: String
 
-  public init(lineNumber: Int, commit: BlameCommit, text: String) {
-    self.lineNumber = lineNumber
-    self.commit = commit
-    self.text = text
-  }
-
   public var id: Int { lineNumber }
 }
 
 /// Which commits blame looks past, attributing their lines to the commit
 /// before them — typically reformatting or other mechanical changes.
+@MemberwiseInit(.public)
 public struct BlameOptions: Sendable, Hashable {
   /// The file GitHub and many projects use for such commits.
   public static let conventionalIgnoreRevsFile = ".git-blame-ignore-revs"
 
   /// Honor the listed commits: those in `blame.ignoreRevsFile`, or in
   /// `ignoreRevsFile` when that is set. `false` resets git's list.
-  public var skipsListedCommits: Bool
+  public var skipsListedCommits: Bool = true
   /// A list to read when `blame.ignoreRevsFile` isn't configured.
-  public var ignoreRevsFile: String?
+  public var ignoreRevsFile: String? = nil
   /// More commits to look past, such as ones picked in the Blame view.
-  public var ignoredRevisions: [ObjectID]
-
-  public init(
-    skipsListedCommits: Bool = true, ignoreRevsFile: String? = nil,
-    ignoredRevisions: [ObjectID] = []
-  ) {
-    self.skipsListedCommits = skipsListedCommits
-    self.ignoreRevsFile = ignoreRevsFile
-    self.ignoredRevisions = ignoredRevisions
-  }
+  public var ignoredRevisions: [ObjectID] = []
 
   var arguments: [String] {
     var arguments: [String] = []
@@ -73,16 +55,12 @@ public struct BlameOptions: Sendable, Hashable {
 }
 
 /// How a repository lists commits for blame to look past.
+@MemberwiseInit(.public)
 public struct BlameIgnoreSettings: Sendable, Hashable {
   /// `blame.ignoreRevsFile` values, which git reads on every blame.
-  public var configuredFiles: [String]
+  public var configuredFiles: [String] = []
   /// Whether `.git-blame-ignore-revs` exists at the repository root.
-  public var hasConventionalFile: Bool
-
-  public init(configuredFiles: [String] = [], hasConventionalFile: Bool = false) {
-    self.configuredFiles = configuredFiles
-    self.hasConventionalFile = hasConventionalFile
-  }
+  public var hasConventionalFile: Bool = false
 
   /// Whether there is a list to honor at all.
   public var hasList: Bool { !configuredFiles.isEmpty || hasConventionalFile }

@@ -1,4 +1,7 @@
+public import MemberwiseInit
+
 /// Options controlling how `git merge` integrates a branch.
+@MemberwiseInit(.public)
 public struct MergeOptions: Sendable, Equatable {
   public enum CommitMode: String, Sendable, Hashable, CaseIterable {
     /// Let git fast-forward when possible and create a merge commit otherwise.
@@ -27,21 +30,11 @@ public struct MergeOptions: Sendable, Equatable {
     case theirs
   }
 
-  public var commitMode: CommitMode
-  public var strategy: Strategy
-  public var conflictPreference: ConflictPreference
+  public var commitMode: CommitMode = .automatic
+  public var strategy: Strategy = .automatic
+  public var conflictPreference: ConflictPreference = .automatic
 
   public static let standard = MergeOptions()
-
-  public init(
-    commitMode: CommitMode = .automatic,
-    strategy: Strategy = .automatic,
-    conflictPreference: ConflictPreference = .automatic
-  ) {
-    self.commitMode = commitMode
-    self.strategy = strategy
-    self.conflictPreference = conflictPreference
-  }
 
   /// Complete argv beginning with `merge` and ending with the source branch.
   func arguments(branch: String) -> [String] {

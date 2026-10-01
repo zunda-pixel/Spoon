@@ -1,6 +1,8 @@
 import Foundation
+public import MemberwiseInit
 
 /// A complete, internally consistent result of the repository's independent git reads.
+@MemberwiseInit(.public)
 public struct RepositoryGitSnapshot: Sendable, Hashable {
   public var status: WorkingTreeStatus
   public var branches: [Branch]
@@ -9,52 +11,18 @@ public struct RepositoryGitSnapshot: Sendable, Hashable {
   public var stashes: [Stash]
   public var tags: [Tag]
   public var worktrees: [Worktree]
-  public var submodules: [Submodule]
+  public var submodules: [Submodule] = []
   public var sequencerState: SequencerState?
-  public var bisectState: BisectState?
+  public var bisectState: BisectState? = nil
   public var capabilities: GitCapabilities
   /// Promisor remote of a partial clone; `nil` for a full clone.
-  public var partialCloneRemote: String?
+  public var partialCloneRemote: String? = nil
   /// A shallow clone, missing history beyond a boundary.
-  public var isShallow: Bool
+  public var isShallow: Bool = false
   /// Conflicted paths rerere hasn't resolved; `nil` when it isn't tracking.
-  public var rerereRemaining: Set<String>?
+  public var rerereRemaining: Set<String>? = nil
   /// Tracked files whose local changes git is told to ignore.
-  public var skipWorktreePaths: [String]
-
-  public init(
-    status: WorkingTreeStatus,
-    branches: [Branch],
-    remotes: [Remote],
-    remoteBranchesByRemote: [String: [Branch]],
-    stashes: [Stash],
-    tags: [Tag],
-    worktrees: [Worktree],
-    submodules: [Submodule] = [],
-    sequencerState: SequencerState?,
-    bisectState: BisectState? = nil,
-    capabilities: GitCapabilities,
-    partialCloneRemote: String? = nil,
-    isShallow: Bool = false,
-    rerereRemaining: Set<String>? = nil,
-    skipWorktreePaths: [String] = []
-  ) {
-    self.status = status
-    self.branches = branches
-    self.remotes = remotes
-    self.remoteBranchesByRemote = remoteBranchesByRemote
-    self.stashes = stashes
-    self.tags = tags
-    self.worktrees = worktrees
-    self.submodules = submodules
-    self.sequencerState = sequencerState
-    self.bisectState = bisectState
-    self.capabilities = capabilities
-    self.partialCloneRemote = partialCloneRemote
-    self.isShallow = isShallow
-    self.rerereRemaining = rerereRemaining
-    self.skipWorktreePaths = skipWorktreePaths
-  }
+  public var skipWorktreePaths: [String] = []
 
   static func load(from gitClient: any GitClient) async throws -> Self {
     async let status = gitClient.status()
