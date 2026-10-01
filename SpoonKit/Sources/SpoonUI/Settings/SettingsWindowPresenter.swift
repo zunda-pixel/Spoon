@@ -30,6 +30,7 @@ public final class SettingsWindowPresenter {
     let controller = SettingsWindowController(with: [
       GitHubSettingsPane(),
       UpdateSettingsPane(appModel: appModel, openSoftwareUpdate: openSoftwareUpdate),
+      LicensesSettingsPane(),
     ])
     controller.restoresLastSelectedTab = true
     return controller
