@@ -1,4 +1,5 @@
 import Foundation
+import Retry
 import Testing
 
 @testable import SpoonCore
@@ -139,11 +140,32 @@ struct PullRequestSyncTests {
     func token() async -> String? { value }
   }
 
-  private func makeService(transport: StubTransport, token: String? = "tok")
+  /// Answers with each status in turn, then with 200 and `body`.
+  actor FlakyTransport: GitHubTransport {
+    private var statuses: [Int]
+    private let body: String
+    private(set) var calls = 0
+
+    init(statuses: [Int], body: String) {
+      self.statuses = statuses
+      self.body = body
+    }
+
+    func post(_ url: URL, headers: [String: String], body: Data) async throws -> (
+      status: Int, body: Data
+    ) {
+      calls += 1
+      let status = statuses.isEmpty ? 200 : statuses.removeFirst()
+      return (status, Data(self.body.utf8))
+    }
+  }
+
+  private func makeService(transport: any GitHubTransport, token: String? = "tok")
     -> PullRequestSyncService
   {
     PullRequestSyncService(
-      client: GitHubAPIClient(tokenProvider: StubToken(value: token), transport: transport),
+      client: GitHubAPIClient(
+        tokenProvider: StubToken(value: token), transport: transport, retryBackoff: .constant(.zero)),
       repoRef: RepoRef(owner: "o", name: "r")
     )
   }
@@ -181,6 +203,45 @@ struct PullRequestSyncTests {
     await #expect(throws: GitHubError.self) {
       try await service.openPullRequests(force: true)
     }
+  }
+}
+
+extension PullRequestSyncTests {
+  @Test func serverErrorsAreRetried() async throws {
+    let transport = FlakyTransport(statuses: [502, 503], body: fixture)
+    let prs = try await makeService(transport: transport).openPullRequests(force: true)
+    #expect(prs.count == 2)
+    #expect(await transport.calls == 3)
+  }
+
+  @Test func retriesStopAfterThreeAttempts() async {
+    let transport = FlakyTransport(statuses: [500, 500, 500, 500], body: fixture)
+    let error = await #expect(throws: GitHubError.self) {
+      try await makeService(transport: transport).openPullRequests(force: true)
+    }
+    #expect(error?.kind == .http(status: 500))
+    #expect(await transport.calls == 3)
+  }
+
+  @Test func signInAndRateLimitFailuresAreNotRetried() async {
+    for status in [401, 403, 429] {
+      let transport = FlakyTransport(statuses: [status], body: fixture)
+      await #expect(throws: GitHubError.self) {
+        try await makeService(transport: transport).openPullRequests(force: true)
+      }
+      #expect(await transport.calls == 1)
+    }
+  }
+
+  @Test func onlyTransientFailuresCountAsTransient() {
+    #expect(NetworkRetry.isTransient(URLError(.timedOut)))
+    #expect(NetworkRetry.isTransient(URLError(.networkConnectionLost)))
+    #expect(!NetworkRetry.isTransient(URLError(.cancelled)))
+    #expect(!NetworkRetry.isTransient(URLError(.userAuthenticationRequired)))
+    #expect(NetworkRetry.isTransient(GitHubReleaseFeed.FeedError.unexpectedStatus(503)))
+    #expect(!NetworkRetry.isTransient(GitHubReleaseFeed.FeedError.unexpectedStatus(404)))
+    #expect(!NetworkRetry.isTransient(GitHubError(kind: .http(status: 501))))
+    #expect(!NetworkRetry.isTransient(GitHubError(kind: .decoding)))
   }
 }
 
