@@ -31,6 +31,7 @@ jobs:
             -configuration Release \
             -destination 'generic/platform=macOS' \
             -derivedDataPath "$DERIVED_DATA_PATH" \
+            -skipPackagePluginValidation \
             MARKETING_VERSION="$TAG" \
             SPOON_RELEASE_TAG="$TAG" \
             CODE_SIGN_IDENTITY="-" \

@@ -35,6 +35,7 @@ let package = Package(
     .package(url: "https://github.com/swiftlang/swift-subprocess.git", from: "1.0.0"),
     .package(url: "https://github.com/apple/swift-async-algorithms.git", from: "1.0.0"),
     .package(url: "https://github.com/usagimaru/MacAppSettingsUI.git", from: "2.1.0"),
+    .package(url: "https://github.com/zunda-pixel/LicenseProvider.git", from: "1.6.0"),
     .package(url: "https://github.com/apple/swift-collections.git", from: "1.7.1"),
     .package(url: "https://github.com/apple/swift-algorithms.git", from: "1.2.1"),
     .package(url: "https://github.com/mtj0928/swift-async-operations.git", from: "0.5.0"),
@@ -90,7 +91,10 @@ let package = Package(
         .product(name: "AsyncOperations", package: "swift-async-operations"),
         .product(name: "OrderedCollections", package: "swift-collections"),
       ],
-      swiftSettings: swiftSettings
+      swiftSettings: swiftSettings,
+      plugins: [
+        .plugin(name: "LicenseProviderPlugin", package: "LicenseProvider")
+      ]
     ),
     .testTarget(
       name: "SpoonUITests",
