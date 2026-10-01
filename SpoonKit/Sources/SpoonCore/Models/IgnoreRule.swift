@@ -1,3 +1,4 @@
+import Algorithms
 public import Foundation
 public import MemberwiseInit
 
@@ -20,15 +21,14 @@ public struct IgnoreRule: Sendable, Hashable {
   static func parse(_ output: String) -> [String: IgnoreRule?] {
     let fields = output.split(separator: "\0", omittingEmptySubsequences: false).map(String.init)
     var rules: [String: IgnoreRule?] = [:]
-    var index = 0
-    while index + 3 < fields.count {
-      let path = fields[index + 3]
-      if let line = Int(fields[index + 1]), !fields[index].isEmpty {
-        rules[path] = IgnoreRule(source: fields[index], line: line, pattern: fields[index + 2])
+    // A trailing field after the last NUL has no record of its own.
+    for record in fields.chunks(ofCount: 4) where record.count == 4 {
+      let fields = Array(record)
+      if let line = Int(fields[1]), !fields[0].isEmpty {
+        rules[fields[3]] = IgnoreRule(source: fields[0], line: line, pattern: fields[2])
       } else {
-        rules[path] = .some(nil)
+        rules[fields[3]] = .some(nil)
       }
-      index += 4
     }
     return rules
   }

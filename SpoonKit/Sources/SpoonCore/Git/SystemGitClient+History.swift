@@ -1,3 +1,4 @@
+import Algorithms
 import Foundation
 
 extension SystemGitClient {
@@ -63,13 +64,12 @@ extension SystemGitClient {
   public func recentAuthors(limit: Int) async throws -> [CoAuthor] {
     let result = try await run(
       ["log", "--all", "--max-count=\(limit)", "-z", "--format=%an%x1f%ae"], timeout: .seconds(30))
-    var seen: Set<String> = []
     return result.standardOutputText.split(separator: "\0").compactMap { record in
       let fields = record.split(separator: "\u{1f}", omittingEmptySubsequences: false)
       guard fields.count == 2, !fields[0].isEmpty, !fields[1].isEmpty else { return nil }
-      let author = CoAuthor(name: String(fields[0]), email: String(fields[1]))
-      return seen.insert(author.id).inserted ? author : nil
+      return CoAuthor(name: String(fields[0]), email: String(fields[1]))
     }
+    .uniqued(on: \.id)
   }
 
   public func blameIgnoreRevsFiles() async throws -> [String] {

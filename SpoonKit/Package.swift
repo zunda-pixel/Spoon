@@ -36,6 +36,7 @@ let package = Package(
     .package(url: "https://github.com/apple/swift-async-algorithms.git", from: "1.0.0"),
     .package(url: "https://github.com/usagimaru/MacAppSettingsUI.git", from: "2.1.0"),
     .package(url: "https://github.com/apple/swift-collections.git", from: "1.7.1"),
+    .package(url: "https://github.com/apple/swift-algorithms.git", from: "1.2.1"),
   ],
   targets: [
     .target(
@@ -50,6 +51,7 @@ let package = Package(
         .product(name: "HTTPTypesFoundation", package: "swift-http-types"),
         .product(name: "Subprocess", package: "swift-subprocess"),
         .product(name: "AsyncAlgorithms", package: "swift-async-algorithms"),
+        .product(name: "Algorithms", package: "swift-algorithms"),
       ],
       swiftSettings: swiftSettings
     ),

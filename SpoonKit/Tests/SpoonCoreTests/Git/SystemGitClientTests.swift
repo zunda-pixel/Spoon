@@ -344,6 +344,27 @@ struct SystemGitClientTests {
     )
   }
 
+  @Test func remoteSizesAskForAtMost500ObjectsPerLine() async throws {
+    let runner = FakeCommandRunner()
+    runner.stub(
+      arguments: baseFlags + ["cat-file", "--batch-command=%(objectname) %(objectsize)"],
+      stdout: ""
+    )
+    let client = makeClient(runner)
+    let objects = (0..<501).compactMap { number in
+      let hex = String(number, radix: 16)
+      return ObjectID(rawValue: String(repeating: "0", count: 40 - hex.count) + hex)
+    }
+
+    _ = try await client.remoteObjectSizes(of: objects, from: "origin")
+
+    let command = try #require(runner.invocations.last)
+    let lines = String(decoding: try #require(command.standardInput), as: UTF8.self)
+      .split(separator: "\n")
+    #expect(lines.count == 2)
+    #expect(lines.map { $0.split(separator: " ").count - 2 } == [500, 1])
+  }
+
   @Test func mergePreviewReadsConflictedPathsFromMergeTree() async throws {
     let arguments =
       baseFlags + [

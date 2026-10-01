@@ -1,3 +1,4 @@
+import Algorithms
 import Foundation
 
 extension SystemGitClient {
@@ -109,10 +110,8 @@ extension SystemGitClient {
   ) async throws -> [ObjectID: Int] {
     guard !objects.isEmpty else { return [:] }
     // Chunk so each protocol request and stdin line stays modest.
-    let commands = stride(from: 0, to: objects.count, by: 500).map { start in
-      let chunk = objects[start..<min(start + 500, objects.count)]
-      return "remote-object-info \(remoteName) "
-        + chunk.map(\.rawValue).joined(separator: " ") + "\n"
+    let commands = objects.chunks(ofCount: 500).map { chunk in
+      "remote-object-info \(remoteName) " + chunk.map(\.rawValue).joined(separator: " ") + "\n"
     }
     let result = try await run(
       ["cat-file", "--batch-command=%(objectname) %(objectsize)"],
