@@ -98,6 +98,7 @@ struct SequencerBannerView: View {
     case .cherryPick: "Cherry-Pick"
     case .revert: "Revert"
     case .merge: "Merge"
+    case .applyingPatches: "Patch Application"
     }
   }
 
@@ -118,6 +119,12 @@ struct SequencerBannerView: View {
       return "Revert in progress"
     case .merge:
       return "Merge in progress"
+    case .applyingPatches:
+      var text = "Applying patches"
+      if let step = state.stepNumber, let count = state.stepCount {
+        text += " — \(step) of \(count)"
+      }
+      return text
     }
   }
 

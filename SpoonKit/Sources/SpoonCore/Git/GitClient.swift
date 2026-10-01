@@ -329,6 +329,14 @@ public protocol GitSequencerClient: Sendable {
   /// The branch is updated atomically, or not at all on conflicts.
   /// `linearize` drops merge commits and replays their commits individually.
   func replayBranch(_ branch: String, onto newBase: ObjectID, linearize: Bool) async throws
+  /// Writes each commit as a patch file in `directory`, numbered in the
+  /// given order (`git format-patch`), and returns the files.
+  func formatPatches(_ oids: [ObjectID], to directory: URL) async throws -> [URL]
+  /// The commits as one mbox-style patch text, in the given order.
+  func patchText(for oids: [ObjectID]) async throws -> String
+  /// Applies patch files as commits onto HEAD (`git am --3way`). Stops,
+  /// with `.applyingPatches` in progress, on a patch that conflicts.
+  func applyPatches(_ files: [URL]) async throws
   /// `nil` when no rebase/cherry-pick/revert is in progress.
   func sequencerState() async throws -> SequencerState?
   func continueSequencer(_ kind: SequencerState.Kind) async throws

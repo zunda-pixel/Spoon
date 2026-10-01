@@ -1,3 +1,4 @@
+import AppKit
 import SpoonCore
 import SwiftUI
 
@@ -199,6 +200,7 @@ struct HistoryListView: View {
       revert(commits, commit: true)
     }
     .disabled(model.isBusy || model.isSequencing || !canRevert)
+    patchMenuItems(commits)
     Button("Revert \(commits.count) Commits Without Committing\(containsMerge ? "…" : "")") {
       revert(commits, commit: false)
     }
@@ -329,6 +331,7 @@ struct HistoryListView: View {
     .disabled(model.isBusy || model.isSequencing)
     .help(commit.isMerge ? mergeHelp : "")
     cherryPickOptionsMenu([commit])
+    patchMenuItems([commit])
     if model.canRevert(commit.oid) {
       Button(commit.isMerge ? "Revert Merge…" : "Revert Commit") {
         revert([commit], commit: true)
@@ -341,6 +344,47 @@ struct HistoryListView: View {
       }
       .disabled(model.isBusy || model.isSequencing)
       .help(revertWithoutCommittingHelp)
+    }
+  }
+
+  /// `git format-patch` to files or the clipboard. Merge commits have no
+  /// single patch, so they're left out.
+  @ViewBuilder
+  private func patchMenuItems(_ commits: [Commit]) -> some View {
+    let patchable = commits.filter { !$0.isMerge }
+    if !patchable.isEmpty {
+      Button(
+        patchable.count == 1
+          ? "Export as Patch…" : "Export \(patchable.count) Commits as Patches…"
+      ) {
+        exportPatches(patchable)
+      }
+      .disabled(model.isBusy)
+      Button(patchable.count == 1 ? "Copy as Patch" : "Copy \(patchable.count) Commits as Patch") {
+        Task {
+          guard let text = try? await model.patchText(for: patchable) else { return }
+          NSPasteboard.general.clearContents()
+          NSPasteboard.general.setString(text, forType: .string)
+        }
+      }
+    }
+  }
+
+  /// Asks for a folder, writes the patches there, and shows them in Finder.
+  private func exportPatches(_ commits: [Commit]) {
+    let panel = NSOpenPanel()
+    panel.canChooseFiles = false
+    panel.canChooseDirectories = true
+    panel.canCreateDirectories = true
+    panel.prompt = "Export"
+    panel.message =
+      commits.count == 1
+      ? "Choose a folder for the patch." : "Choose a folder for the \(commits.count) patches."
+    guard panel.runModal() == .OK, let directory = panel.url else { return }
+    Task {
+      if let files = await model.exportPatches(commits, to: directory), !files.isEmpty {
+        NSWorkspace.shared.activateFileViewerSelecting(files)
+      }
     }
   }
 

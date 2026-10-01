@@ -1,4 +1,4 @@
-import Foundation
+public import Foundation
 
 extension SystemGitClient {
 
@@ -139,6 +139,17 @@ extension SystemGitClient {
     guard paths.count == 5 else { return nil }
     let exists = paths.map { FileManager.default.fileExists(atPath: $0.path) }
     // A conflicted rebase pick also writes CHERRY_PICK_HEAD, so rebase wins.
+    // `git am` shares rebase-apply with the old rebase backend; its
+    // `applying` marker tells them apart.
+    if exists[1],
+      FileManager.default.fileExists(atPath: paths[1].appending(path: "applying").path)
+    {
+      var state = rebaseState(directory: paths[1])
+      state.kind = .applyingPatches
+      state.stepNumber = state.stepNumber ?? readNumber(paths[1].appending(path: "next"))
+      state.stepCount = state.stepCount ?? readNumber(paths[1].appending(path: "last"))
+      return state
+    }
     if exists[0] || exists[1] {
       return rebaseState(directory: exists[0] ? paths[0] : paths[1])
     }
@@ -181,7 +192,47 @@ extension SystemGitClient {
     case .cherryPick: "cherry-pick"
     case .revert: "revert"
     case .merge: "merge"
+    case .applyingPatches: "am"
     }
+  }
+
+  private nonisolated func readNumber(_ url: URL) -> Int? {
+    (try? String(contentsOf: url, encoding: .utf8))
+      .flatMap { Int($0.trimmingCharacters(in: .whitespacesAndNewlines)) }
+  }
+
+  public func formatPatches(_ oids: [ObjectID], to directory: URL) async throws -> [URL] {
+    var files: [URL] = []
+    // One commit at a time keeps the given order for a selection that
+    // isn't a contiguous range; --start-number keeps the files in order.
+    for (index, oid) in oids.enumerated() {
+      let result = try await run(
+        [
+          "format-patch", "-1", "--start-number=\(index + 1)", "-o",
+          directory.path(percentEncoded: false), oid.rawValue,
+        ], timeout: .seconds(60))
+      files += result.standardOutputText.split(whereSeparator: \.isNewline).map {
+        URL(filePath: String($0))
+      }
+    }
+    return files
+  }
+
+  public func patchText(for oids: [ObjectID]) async throws -> String {
+    var text = ""
+    for oid in oids {
+      text += try await run(["format-patch", "-1", "--stdout", oid.rawValue]).standardOutputText
+    }
+    return text
+  }
+
+  public func applyPatches(_ files: [URL]) async throws {
+    // --3way falls back to a three-way merge, so a patch made against a
+    // slightly different base can still apply, with conflicts if needed.
+    try await runVoid(
+      ["am", "--3way", "--"] + files.map { $0.path(percentEncoded: false) },
+      extraEnvironment: ["GIT_EDITOR": "true"],
+      timeout: .seconds(300))
   }
 
   private nonisolated func resolveGitPath(_ path: String) -> URL {

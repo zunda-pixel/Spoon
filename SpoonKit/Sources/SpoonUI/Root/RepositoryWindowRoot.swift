@@ -289,6 +289,7 @@ struct RepositorySplitView: View {
     case .cherryPick: "Cherry-Pick"
     case .revert: "Revert"
     case .merge: "Merge"
+    case .applyingPatches: "Patch Application"
     case nil: "Operation"
     }
   }
