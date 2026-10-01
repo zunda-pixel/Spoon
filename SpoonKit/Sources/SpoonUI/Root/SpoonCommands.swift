@@ -44,6 +44,13 @@ public struct SpoonCommands: Commands {
       .disabled(isUpdaterBusy)
     }
 
+    CommandGroup(replacing: .appSettings) {
+      Button("Settings…") {
+        SettingsWindowPresenter.shared.show()
+      }
+      .keyboardShortcut(",")
+    }
+
     CommandMenu("Repository") {
       Button("Fetch") {
         run { await $0.fetch() }

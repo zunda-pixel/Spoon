@@ -40,11 +40,6 @@ struct SpoonApp: App {
     .windowResizability(.contentSize)
     .defaultLaunchBehavior(.suppressed)
     .restorationBehavior(.disabled)
-
-    Settings {
-      SettingsView()
-        .environment(appModel)
-    }
   }
 }
 
