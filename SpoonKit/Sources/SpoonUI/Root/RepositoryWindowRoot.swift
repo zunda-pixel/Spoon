@@ -1,3 +1,4 @@
+import OrderedCollections
 import SpoonCore
 import SwiftUI
 
@@ -7,8 +8,8 @@ struct RepositoryWindowRoot: View {
   let switchRepository: (Repository.ID) -> Void
 
   @Environment(AppModel.self) private var appModel
-  @State private var cachedModels: [Repository.ID: RepositoryModel] = [:]
-  @State private var cacheRecency: [Repository.ID] = []
+  /// Least recently used first.
+  @State private var cachedModels: OrderedDictionary<Repository.ID, RepositoryModel> = [:]
   @State private var activeModel: RepositoryModel?
   @State private var loadErrorMessage: String?
   @State private var navigations = NavigationStateCache()
@@ -86,19 +87,19 @@ struct RepositoryWindowRoot: View {
     }
   }
 
+  /// Moves `id` to the most recently used end.
   private func touchCacheEntry(_ id: Repository.ID) {
-    cacheRecency.removeAll { $0 == id }
-    cacheRecency.append(id)
+    guard let model = cachedModels.removeValue(forKey: id) else { return }
+    cachedModels[id] = model
   }
 
   private func insertIntoCache(_ model: RepositoryModel) {
     let id = model.repository.id
+    cachedModels.removeValue(forKey: id)
     cachedModels[id] = model
-    touchCacheEntry(id)
 
-    while cachedModels.count > 6, let evictedID = cacheRecency.first {
-      cacheRecency.removeFirst()
-      guard let evictedModel = cachedModels.removeValue(forKey: evictedID) else { continue }
+    while cachedModels.count > 6 {
+      let (evictedID, evictedModel) = cachedModels.removeFirst()
       evictedModel.stopWatching()
       navigations.remove(evictedID)
     }
