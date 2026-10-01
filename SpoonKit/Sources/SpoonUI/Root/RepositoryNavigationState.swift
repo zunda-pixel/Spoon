@@ -48,6 +48,7 @@ final class RepositoryNavigationState {
     case dropLargeBlobs
     case backfill
     case fetchHistory
+    case maintenance
     case bisectRun
     case fileHistory(path: String)
     case blame(path: String)
@@ -112,6 +113,8 @@ final class RepositoryNavigationState {
         "code-search"
       case .fetchHistory:
         "fetch-history"
+      case .maintenance:
+        "maintenance"
       case .bisectRun:
         "bisect-run"
       case .ignoredFiles:

@@ -265,6 +265,22 @@ public protocol GitSubmoduleClient: Sendable {
   func removeSubmodule(path: String, force: Bool) async throws
 }
 
+/// Object storage upkeep.
+public protocol GitMaintenanceClient: Sendable {
+  func storage() async throws -> RepositoryStorage
+  /// Packs loose objects, drops unreachable ones past git's grace period,
+  /// and compresses packs (`git gc`); `aggressive` recompresses everything,
+  /// which is much slower.
+  func optimize(aggressive: Bool) async throws
+  /// Whether git's scheduled maintenance covers this repository (it is
+  /// listed in the user's `maintenance.repo`).
+  func isBackgroundMaintenanceEnabled() async throws -> Bool
+  /// Starts (`git maintenance start`, which registers the repository and
+  /// installs launchd jobs) or stops (`git maintenance unregister`)
+  /// scheduled maintenance for this repository.
+  func setBackgroundMaintenance(_ enabled: Bool) async throws
+}
+
 /// Sparse-checkout configuration.
 public protocol GitSparseCheckoutClient: Sendable {
   /// Current cone-mode sparse paths; `nil` when sparse checkout is disabled.
@@ -384,6 +400,7 @@ public protocol GitClient:
   GitTagClient,
   GitWorktreeClient,
   GitSubmoduleClient,
+  GitMaintenanceClient,
   GitSparseCheckoutClient,
   GitSequencerClient,
   GitBisectClient,

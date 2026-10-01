@@ -222,6 +222,26 @@ struct LiveGitTests {
     #expect(unreleased.firstContainingTag == nil)
   }
 
+  @Test func optimizePacksLooseObjects() async throws {
+    let root = try await makeTemporaryRepo()
+    defer { try? FileManager.default.removeItem(at: root) }
+    for index in 1...5 {
+      try await LiveRepoFixture.commitFile(
+        "f\(index).txt", content: "\(index)\n", message: "\(index)", in: root, runner: runner)
+    }
+    let client = SystemGitClient(repositoryRoot: root, git: git, runner: runner)
+    let before = try await client.storage()
+    #expect(before.looseObjects > 0)
+    #expect(before.packs == 0)
+
+    try await client.optimize(aggressive: false)
+
+    let after = try await client.storage()
+    #expect(after.looseObjects == 0)
+    #expect(after.packs == 1)
+    #expect(after.packedObjects >= before.looseObjects)
+  }
+
   @Test func statusAndBranchesOnRealRepo() async throws {
     let root = try await makeTemporaryRepo()
     defer { try? FileManager.default.removeItem(at: root) }
