@@ -2,6 +2,7 @@ public import Foundation
 import HTTPTypes
 import HTTPTypesFoundation
 public import MemberwiseInit
+public import Retry
 
 /// Transport seam so tests can replay recorded GraphQL responses.
 public protocol GitHubTransport: Sendable {
@@ -60,13 +61,16 @@ public actor GitHubAPIClient {
   private let transport: any GitHubTransport
   private let tokenProvider: any GitHubTokenProvider
   private let endpoint = URL(string: "https://api.github.com/graphql")!
+  private let backoff: Backoff<ContinuousClock>
 
   public init(
     tokenProvider: any GitHubTokenProvider,
-    transport: any GitHubTransport = URLSessionGitHubTransport()
+    transport: any GitHubTransport = URLSessionGitHubTransport(),
+    retryBackoff: Backoff<ContinuousClock> = .default(baseDelay: .seconds(1), maxDelay: .seconds(8))
   ) {
     self.tokenProvider = tokenProvider
     self.transport = transport
+    self.backoff = retryBackoff
   }
 
   struct GraphQLPayload: Encodable {
@@ -95,25 +99,27 @@ public actor GitHubAPIClient {
     }
 
     let payload = try JSONEncoder().encode(GraphQLPayload(query: query, variables: variables))
-    let (status, body) = try await transport.post(
-      endpoint,
-      headers: [
-        "Authorization": "Bearer \(token)",
-        "Content-Type": "application/json",
-        "User-Agent": "Spoon",
-      ],
-      body: payload
-    )
-
-    switch status {
-    case 200:
-      break
-    case 401:
-      throw GitHubError(kind: .unauthenticated)
-    case 403, 429:
-      throw GitHubError(kind: .rateLimited(resetAt: nil))
-    default:
-      throw GitHubError(kind: .http(status: status))
+    // Queries only read, so a dropped connection or a 5xx can be retried.
+    let body = try await retry(with: NetworkRetry.configuration(backoff: backoff)) {
+      let (status, body) = try await transport.post(
+        endpoint,
+        headers: [
+          "Authorization": "Bearer \(token)",
+          "Content-Type": "application/json",
+          "User-Agent": "Spoon",
+        ],
+        body: payload
+      )
+      switch status {
+      case 200:
+        return body
+      case 401:
+        throw GitHubError(kind: .unauthenticated)
+      case 403, 429:
+        throw GitHubError(kind: .rateLimited(resetAt: nil))
+      default:
+        throw GitHubError(kind: .http(status: status))
+      }
     }
 
     let decoder = JSONDecoder()

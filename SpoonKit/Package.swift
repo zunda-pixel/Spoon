@@ -38,6 +38,7 @@ let package = Package(
     .package(url: "https://github.com/apple/swift-collections.git", from: "1.7.1"),
     .package(url: "https://github.com/apple/swift-algorithms.git", from: "1.2.1"),
     .package(url: "https://github.com/mtj0928/swift-async-operations.git", from: "0.5.0"),
+    .package(url: "https://github.com/fumoboy007/swift-retry.git", from: "0.2.4"),
   ],
   targets: [
     .target(
@@ -54,12 +55,16 @@ let package = Package(
         .product(name: "AsyncAlgorithms", package: "swift-async-algorithms"),
         .product(name: "Algorithms", package: "swift-algorithms"),
         .product(name: "AsyncOperations", package: "swift-async-operations"),
+        .product(name: "DMRetry", package: "swift-retry"),
       ],
       swiftSettings: swiftSettings
     ),
     .testTarget(
       name: "SpoonCoreTests",
-      dependencies: ["SpoonCore"],
+      dependencies: [
+        "SpoonCore",
+        .product(name: "DMRetry", package: "swift-retry"),
+      ],
       swiftSettings: swiftSettings
     ),
     .target(
