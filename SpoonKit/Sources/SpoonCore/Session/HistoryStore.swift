@@ -11,7 +11,14 @@ final class HistoryStore {
   private(set) var errorMessage: String?
 
   private let gitClient: any GitClient
-  private var loadedCommits: [Commit] = []
+  private var loadedCommits: [Commit] = [] {
+    didSet { ancestorCache = nil }
+  }
+  /// Every commit reachable from one descendant within `loadedCommits`.
+  /// History menus ask `isAncestor` for each row, so walking the graph per
+  /// call made large repositories hang.
+  @ObservationIgnored private var ancestorCache:
+    (descendant: ObjectID, loaded: Set<ObjectID>, ancestors: Set<ObjectID>)?
   private var nextHistoryQuery: LogQuery?
   private var additionalRevisions: [ObjectID] = []
   private var hiddenCommitOIDs: Set<ObjectID> = []
@@ -84,22 +91,31 @@ final class HistoryStore {
   }
 
   func isAncestor(_ candidate: ObjectID, of descendant: ObjectID) -> Bool {
-    guard loadedCommits.contains(where: { $0.oid == candidate }) else { return false }
+    let cache: (descendant: ObjectID, loaded: Set<ObjectID>, ancestors: Set<ObjectID>)
+    if let ancestorCache, ancestorCache.descendant == descendant {
+      cache = ancestorCache
+    } else {
+      cache = (descendant, Set(loadedCommits.map(\.oid)), ancestors(of: descendant))
+      ancestorCache = cache
+    }
+    return cache.loaded.contains(candidate) && cache.ancestors.contains(candidate)
+  }
+
+  /// `descendant` and everything it reaches through loaded commits.
+  private func ancestors(of descendant: ObjectID) -> Set<ObjectID> {
     var commitsByOID = Dictionary(
       loadedCommits.map { ($0.oid, $0) },
       uniquingKeysWith: { first, _ in first }
     )
     var pending = [descendant]
     var visited: Set<ObjectID> = []
-
     while let oid = pending.popLast() {
       guard visited.insert(oid).inserted else { continue }
-      if oid == candidate { return true }
       if let commit = commitsByOID.removeValue(forKey: oid) {
         pending.append(contentsOf: commit.parents)
       }
     }
-    return false
+    return visited
   }
 
   /// Loads subsequent pages until `oid` is available or the unified walk ends.
