@@ -1,4 +1,5 @@
 public import Foundation
+import Defaults
 
 extension RepositoryModel {
   /// Stages paths; conflicted ones are marked resolved, so on git 2.56+
@@ -96,8 +97,36 @@ extension RepositoryModel {
     await commit(message: message, options: CommitOptions(amend: amend, signOff: commitSignsOff))
   }
 
+  /// Commits with `options`, crediting `commitCoAuthors` too; they are
+  /// remembered for later and cleared once the commit succeeds.
   public func commit(message: String, options: CommitOptions) async -> Bool {
-    await perform { try await $0.commit(message: message, options: options) }
+    var options = options
+    let coAuthors = commitCoAuthors
+    options.trailers += coAuthors.map(\.trailer)
+    let succeeded = await perform { try await $0.commit(message: message, options: options) }
+    if succeeded, !coAuthors.isEmpty {
+      remember(coAuthors)
+      commitCoAuthors = []
+    }
+    return succeeded
+  }
+
+  /// Co-authors used before, most recent first, for the composer to offer.
+  public var rememberedCoAuthors: [CoAuthor] { Defaults[.coAuthors] }
+
+  public func remember(_ coAuthors: [CoAuthor]) {
+    let ids = Set(coAuthors.map(\.id))
+    Defaults[.coAuthors] = Array((coAuthors + Defaults[.coAuthors].filter { !ids.contains($0.id) }).prefix(20))
+  }
+
+  public func forget(_ coAuthor: CoAuthor) {
+    Defaults[.coAuthors].removeAll { $0.id == coAuthor.id }
+    commitCoAuthors.removeAll { $0.id == coAuthor.id }
+  }
+
+  /// Recent commit authors, as co-author suggestions.
+  public func recentAuthors() async -> [CoAuthor] {
+    (try? await gitClient.recentAuthors(limit: 500)) ?? []
   }
 
   /// The repository's signing settings; `nil` when git config can't be read.

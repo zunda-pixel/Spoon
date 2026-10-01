@@ -28,6 +28,9 @@ extension Defaults.Keys {
   /// The last `git bisect run` command, keyed by repository ID.
   public static let bisectRunCommands = Key<[String: String]>("bisectRunCommands", default: [:])
 
+  /// Co-authors offered in the commit composer, most recently used first.
+  public static let coAuthors = Key<[CoAuthor]>("coAuthors", default: [])
+
   /// Stash local changes around every pull (`git pull --autostash`).
   public static let pullAutostash = Key<Bool>("pullAutostash", default: false)
 
@@ -49,3 +52,6 @@ extension Defaults.Keys {
     default: true
   )
 }
+
+/// Stored as JSON through its Codable conformance.
+extension CoAuthor: Defaults.Serializable {}
