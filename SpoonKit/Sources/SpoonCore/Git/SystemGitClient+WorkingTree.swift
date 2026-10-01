@@ -182,6 +182,32 @@ extension SystemGitClient {
     try await runVoid(["clean", "-f", "-d", "-X", "--"] + paths, timeout: .seconds(300))
   }
 
+  public func skipWorktreePaths() async throws -> [String] {
+    let result = try await run(["ls-files", "-v", "-z"], timeout: .seconds(60))
+    let root = repositoryRoot
+    return result.standardOutputText.split(separator: "\0").compactMap { record in
+      // `S <path>`: S marks the skip-worktree bit (lowercase s would be
+      // assume-unchanged as well).
+      guard record.hasPrefix("S ") || record.hasPrefix("s ") else { return nil }
+      let path = String(record.dropFirst(2))
+      return FileManager.default.fileExists(atPath: root.appending(path: path).path) ? path : nil
+    }.sorted()
+  }
+
+  public func setSkipWorktree(paths: [String], skip: Bool) async throws {
+    guard !paths.isEmpty else { return }
+    try await runVoid(
+      ["update-index", skip ? "--skip-worktree" : "--no-skip-worktree", "--"] + paths)
+    guard skip else { return }
+    // With sparse checkout on, git keeps the bit to its own rules and
+    // silently leaves it off; say so rather than appear to have worked.
+    let result = try await run(["ls-files", "-v", "-z", "--"] + paths)
+    let unset = result.standardOutputText.split(separator: "\0").filter {
+      !($0.hasPrefix("S ") || $0.hasPrefix("s "))
+    }
+    if !unset.isEmpty { throw SkipWorktreeError.managedBySparseCheckout }
+  }
+
   public func isTracked(path: String) async throws -> Bool {
     let result = try await run(["ls-files", "-z", "--", path])
     return !result.standardOutput.isEmpty

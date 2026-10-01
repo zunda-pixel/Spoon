@@ -1,4 +1,4 @@
-import Foundation
+public import Foundation
 
 /// The `.gitignore`-style line that decides whether a path is ignored.
 public struct IgnoreRule: Sendable, Hashable {
@@ -46,4 +46,13 @@ public enum IgnoreStatus: Sendable, Hashable {
   /// A `!pattern` matched last, so the path is not ignored.
   case reincluded(IgnoreRule)
   case notIgnored
+}
+
+public enum SkipWorktreeError: LocalizedError, Sendable {
+  /// Sparse checkout recomputes the skip-worktree bit from its patterns.
+  case managedBySparseCheckout
+
+  public var errorDescription: String? {
+    "Git can't stop tracking changes here while sparse checkout is on, because sparse checkout manages which files git skips."
+  }
 }

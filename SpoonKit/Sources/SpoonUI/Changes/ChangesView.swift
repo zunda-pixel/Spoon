@@ -46,7 +46,7 @@ struct ChangesView: View {
     VStack(spacing: 0) {
       Group {
         if let status = model.status {
-          if status.isClean {
+          if status.isClean, model.skipWorktreePaths.isEmpty {
             ContentUnavailableView(
               "No Changes",
               systemImage: "checkmark.circle",
@@ -141,6 +141,23 @@ struct ChangesView: View {
         showsEmptyDropTarget: !trees.staged.isEmpty
       )
       section("Untracked", tree: trees.untracked, area: .untracked)
+      if !model.skipWorktreePaths.isEmpty {
+        Section("Not Tracking Local Changes") {
+          ForEach(model.skipWorktreePaths, id: \.self) { path in
+            Label(path, systemImage: "eye.slash")
+              .foregroundStyle(.secondary)
+              .lineLimit(1)
+              .truncationMode(.middle)
+              .help("Git ignores local changes to this file (skip-worktree)")
+              .contextMenu {
+                Button("Track Local Changes Again") {
+                  Task { await model.setSkipWorktree(paths: [path], skip: false) }
+                }
+                .disabled(model.isBusy)
+              }
+          }
+        }
+      }
     }
     // Return mirrors double-click: stage/unstage everything selected.
     .onKeyPress(.return) {

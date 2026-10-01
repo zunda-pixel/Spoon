@@ -36,6 +36,11 @@ struct ChangeFileContextMenu: View {
         moveFiles([], staged.map(\.path))
       }
     }
+    let skippable = targets.filter { $0.area == .unstaged }.map(\.path)
+      .filter { path in model.status?.entries.first { $0.path == path }?.staged == nil }
+    if !skippable.isEmpty {
+      stopTrackingButton(paths: skippable.sorted())
+    }
     let plan = RepositoryModel.DiscardPlan(targets)
     if !plan.isEmpty {
       Button(DiscardButtonTitle.make(for: plan), role: .destructive) {
@@ -44,6 +49,20 @@ struct ChangeFileContextMenu: View {
       .disabled(model.isBusy)
     }
     stashButton(paths: Set(targets.filter { $0.area != .conflicted }.map(\.path)).sorted())
+  }
+
+  /// Sets the skip-worktree bit, for a tracked file edited only here.
+  private func stopTrackingButton(paths: [String]) -> some View {
+    Button(
+      paths.count == 1
+        ? "Stop Tracking Local Changes" : "Stop Tracking Local Changes (\(paths.count))"
+    ) {
+      Task { await model.setSkipWorktree(paths: paths, skip: true) }
+    }
+    .disabled(model.isBusy)
+    .help(
+      "Keep the edits but hide them from Changes and commits, e.g. for a config file changed only on this Mac. A pull that changes the file stops until you track it again."
+    )
   }
 
   @ViewBuilder
@@ -66,6 +85,9 @@ struct ChangeFileContextMenu: View {
       Button("Stage") { moveFiles([entry.path], []) }
       Button("Discard Changes…", role: .destructive) {
         confirmingDiscard = RepositoryModel.FileSelection(path: entry.path, area: area)
+      }
+      if entry.staged == nil {
+        stopTrackingButton(paths: [entry.path])
       }
     case .untracked:
       Button("Stage") { moveFiles([entry.path], []) }

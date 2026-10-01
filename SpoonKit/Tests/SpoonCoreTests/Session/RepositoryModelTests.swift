@@ -840,6 +840,25 @@ struct RepositoryModelTests {
     #expect(model.rememberedCoAuthors.map(\.name) == ["Grace"])
   }
 
+  @Test func skipWorktreePathsLoadAndToggle() async {
+    let client = FakeRepositoryGitClient()
+    let oid = makeOID("88888888")
+    await client.configure(
+      status: makeStatus(oid: oid, branch: "main"),
+      branches: [makeBranch("main", oid: oid, isCurrent: true)])
+    await client.setSkipWorktreePaths(["config.json"])
+    let model = makeModel(client)
+
+    await model.refresh()
+    #expect(model.skipWorktreePaths == ["config.json"])
+    await model.setSkipWorktree(paths: ["config.json"], skip: false)
+    await model.setSkipWorktree(paths: ["a", "b"], skip: true)
+    #expect(
+      await client.mutationCalls == [
+        "skip-worktree:false:config.json", "skip-worktree:true:a,b",
+      ])
+  }
+
   @Test func failedMutationErrorSurvivesTheFollowUpRefresh() async {
     let client = FakeRepositoryGitClient()
     let oid = makeOID("88888888")
@@ -1593,6 +1612,12 @@ private actor FakeRepositoryGitClient: GitClient {
   func ignoredPaths() async throws -> [String] { [] }
   func ignoreRules(for paths: [String]) async throws -> [String: IgnoreRule?] { [:] }
   func isTracked(path: String) async throws -> Bool { false }
+  private var currentSkipWorktree: [String] = []
+  func setSkipWorktreePaths(_ paths: [String]) { currentSkipWorktree = paths }
+  func skipWorktreePaths() async throws -> [String] { currentSkipWorktree }
+  func setSkipWorktree(paths: [String], skip: Bool) async throws {
+    mutationCalls.append("skip-worktree:\(skip):\(paths.joined(separator: ","))")
+  }
   func deleteIgnored(paths: [String]) async throws {
     mutationCalls.append("clean-ignored:\(paths.joined(separator: ","))")
   }

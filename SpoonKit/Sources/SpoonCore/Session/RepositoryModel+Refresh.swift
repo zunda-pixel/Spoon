@@ -19,6 +19,8 @@ public struct RepositoryGitSnapshot: Sendable, Hashable {
   public var isShallow: Bool
   /// Conflicted paths rerere hasn't resolved; `nil` when it isn't tracking.
   public var rerereRemaining: Set<String>?
+  /// Tracked files whose local changes git is told to ignore.
+  public var skipWorktreePaths: [String]
 
   public init(
     status: WorkingTreeStatus,
@@ -34,7 +36,8 @@ public struct RepositoryGitSnapshot: Sendable, Hashable {
     capabilities: GitCapabilities,
     partialCloneRemote: String? = nil,
     isShallow: Bool = false,
-    rerereRemaining: Set<String>? = nil
+    rerereRemaining: Set<String>? = nil,
+    skipWorktreePaths: [String] = []
   ) {
     self.status = status
     self.branches = branches
@@ -50,6 +53,7 @@ public struct RepositoryGitSnapshot: Sendable, Hashable {
     self.partialCloneRemote = partialCloneRemote
     self.isShallow = isShallow
     self.rerereRemaining = rerereRemaining
+    self.skipWorktreePaths = skipWorktreePaths
   }
 
   static func load(from gitClient: any GitClient) async throws -> Self {
@@ -69,6 +73,7 @@ public struct RepositoryGitSnapshot: Sendable, Hashable {
     async let partialCloneRemote = try? gitClient.partialCloneRemote()
     async let isShallow = try? gitClient.isShallowRepository()
     async let rerereRemaining = try? gitClient.rerereRemaining()
+    async let skipWorktreePaths = try? gitClient.skipWorktreePaths()
 
     let loadedRemotes = try await remotes
     let remoteBranchesByRemote = try await loadRemoteBranches(
@@ -90,7 +95,8 @@ public struct RepositoryGitSnapshot: Sendable, Hashable {
       capabilities: capabilities,
       partialCloneRemote: partialCloneRemote ?? nil,
       isShallow: isShallow ?? false,
-      rerereRemaining: rerereRemaining ?? nil
+      rerereRemaining: rerereRemaining ?? nil,
+      skipWorktreePaths: skipWorktreePaths ?? []
     )
   }
 
@@ -176,6 +182,7 @@ extension RepositoryModel {
     gitCapabilities = snapshot.capabilities
     partialCloneRemote = snapshot.partialCloneRemote
     isShallow = snapshot.isShallow
+    skipWorktreePaths = snapshot.skipWorktreePaths
     rerereResolvedPaths =
       snapshot.rerereRemaining.map { remaining in
         Set(snapshot.status.conflictedEntries.map(\.path)).subtracting(remaining)
