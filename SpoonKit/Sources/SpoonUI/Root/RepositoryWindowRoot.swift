@@ -11,12 +11,20 @@ struct RepositoryWindowRoot: View {
   @State private var cacheRecency: [Repository.ID] = []
   @State private var activeModel: RepositoryModel?
   @State private var loadErrorMessage: String?
+  @State private var navigations = NavigationStateCache()
 
   var body: some View {
     Group {
-      if let model = cachedModels[repositoryID] {
-        RepositorySplitView(model: model, switchRepository: switchRepository)
-          .id(repositoryID)
+      // While another worktree's model loads, keep showing the current one
+      // so the window, split view, and toolbar stay up instead of being
+      // torn down and rebuilt on every switch.
+      if let model = cachedModels[repositoryID] ?? activeModel, loadErrorMessage == nil {
+        RepositorySplitView(
+          model: model,
+          navigation: navigations.state(for: model.repository.id),
+          isSwitching: cachedModels[repositoryID] == nil,
+          switchRepository: switchRepository
+        )
       } else if let loadErrorMessage {
         ContentUnavailableView(
           "Could Not Open Repository",
@@ -92,24 +100,50 @@ struct RepositoryWindowRoot: View {
       cacheRecency.removeFirst()
       guard let evictedModel = cachedModels.removeValue(forKey: evictedID) else { continue }
       evictedModel.stopWatching()
+      navigations.remove(evictedID)
     }
+  }
+}
+
+/// Navigation state per repository, kept while its model is cached, so
+/// switching worktrees comes back to where each one was left.
+@MainActor
+final class NavigationStateCache {
+  private var states: [Repository.ID: RepositoryNavigationState] = [:]
+
+  func state(for id: Repository.ID) -> RepositoryNavigationState {
+    if let state = states[id] { return state }
+    let state = RepositoryNavigationState()
+    states[id] = state
+    return state
+  }
+
+  func remove(_ id: Repository.ID) {
+    states[id] = nil
   }
 }
 
 @MainActor
 struct RepositorySplitView: View {
   let model: RepositoryModel
+  @Bindable var navigation: RepositoryNavigationState
+  /// Another worktree's model is loading; this one stays on screen until
+  /// it is ready.
+  let isSwitching: Bool
   let switchRepository: (Repository.ID) -> Void
-  @State private var navigation = RepositoryNavigationState()
   @State private var switchWorktreeErrorMessage: String?
 
   var body: some View {
+    // The split view and toolbar persist across worktree switches; each
+    // column's contents are keyed by repository so per-view state (search
+    // text, confirmations, loaded diffs) never carries over.
     NavigationSplitView {
       RepoSidebarView(
         model: model,
         navigation: navigation,
         openWorktree: { switchToWorktree(at: $0.path) }
       )
+      .id(model.repository.id)
       .navigationSplitViewColumnWidth(min: 220, ideal: 260)
     } content: {
       RepositoryContentColumn(
@@ -117,6 +151,14 @@ struct RepositorySplitView: View {
         navigation: navigation,
         openWorktree: { switchToWorktree(at: $0.path) }
       )
+      .id(model.repository.id)
+      .overlay {
+        if isSwitching {
+          ProgressView()
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(.background.opacity(0.6))
+        }
+      }
       // Inset the column itself: split view columns extend under the
       // toolbar and the floating sidebar, so a window-level inset overlapped
       // the sidebar and the toolbar area.
@@ -133,6 +175,7 @@ struct RepositorySplitView: View {
       .navigationSplitViewColumnWidth(min: 300, ideal: 380)
     } detail: {
       RepositoryDetailColumn(model: model, navigation: navigation)
+        .id(model.repository.id)
     }
     .alert(
       "First Bad Commit Found",
