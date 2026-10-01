@@ -1,5 +1,6 @@
-public import Foundation
+import AsyncOperations
 import Defaults
+public import Foundation
 public import MemberwiseInit
 
 extension RepositoryModel {
@@ -189,8 +190,9 @@ extension RepositoryModel {
     let remoteNames = pushToRemotes ? remotes.map(\.name) : []
     await perform {
       try await $0.createTag(name: name, at: target, message: message, signing: signing)
-      for remoteName in remoteNames {
-        try await $0.pushTag(name: name, to: remoteName)
+      let gitClient = $0
+      try await remoteNames.asyncForEach(numberOfConcurrentTasks: UInt(max(1, remoteNames.count))) {
+        try await gitClient.pushTag(name: name, to: $0)
       }
     }
   }
@@ -198,13 +200,12 @@ extension RepositoryModel {
   /// Verifies every signed tag on `oid`, in name order; unverifiable
   /// results are kept so the UI can say so.
   public func verifiedTags(at oid: ObjectID) async -> [(tag: Tag, signature: CommitSignature)] {
-    var results: [(tag: Tag, signature: CommitSignature)] = []
-    for tag in tags.filter({ $0.target == oid && $0.isSigned }).sorted(by: { $0.name < $1.name }) {
-      if let signature = try? await gitClient.verifyTag(name: tag.name) {
-        results.append((tag, signature))
+    let gitClient = gitClient
+    return await tags.filter({ $0.target == oid && $0.isSigned }).sorted(by: { $0.name < $1.name })
+      .asyncCompactMap(numberOfConcurrentTasks: concurrentGitReads) { tag in
+        guard let signature = try? await gitClient.verifyTag(name: tag.name) else { return nil }
+        return (tag, signature)
       }
-    }
-    return results
   }
 
   public func deleteTag(name: String) async {

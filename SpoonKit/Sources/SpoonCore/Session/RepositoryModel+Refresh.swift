@@ -1,3 +1,4 @@
+import AsyncOperations
 import Foundation
 public import MemberwiseInit
 
@@ -72,22 +73,10 @@ public struct RepositoryGitSnapshot: Sendable, Hashable {
     for remotes: [Remote],
     from gitClient: any GitClient
   ) async throws -> [String: [Branch]] {
-    try await withThrowingTaskGroup(
-      of: (String, [Branch]).self,
-      returning: [String: [Branch]].self
-    ) { group in
-      for remote in remotes {
-        group.addTask {
-          (remote.name, try await gitClient.remoteBranches(of: remote.name))
-        }
-      }
-
-      var branchesByRemote: [String: [Branch]] = [:]
-      for try await (remoteName, branches) in group {
-        branchesByRemote[remoteName] = branches
-      }
-      return branchesByRemote
+    let branches = try await remotes.asyncMap(numberOfConcurrentTasks: concurrentGitReads) {
+      ($0.name, try await gitClient.remoteBranches(of: $0.name))
     }
+    return Dictionary(branches, uniquingKeysWith: { _, last in last })
   }
 }
 
