@@ -34,6 +34,7 @@ let package = Package(
     .package(url: "https://github.com/apple/swift-http-types.git", from: "1.0.0"),
     .package(url: "https://github.com/swiftlang/swift-subprocess.git", from: "1.0.0"),
     .package(url: "https://github.com/apple/swift-async-algorithms.git", from: "1.0.0"),
+    .package(url: "https://github.com/usagimaru/MacAppSettingsUI.git", from: "2.1.0"),
   ],
   targets: [
     .target(
@@ -75,6 +76,7 @@ let package = Package(
       name: "SpoonUI",
       dependencies: [
         .target(name: "SpoonCore"),
+        .product(name: "MacAppSettingsUI", package: "MacAppSettingsUI"),
       ],
       swiftSettings: swiftSettings
     ),
