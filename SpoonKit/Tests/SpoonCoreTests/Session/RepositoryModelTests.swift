@@ -795,6 +795,29 @@ struct RepositoryModelTests {
     Defaults[.bisectRunCommands][model.repository.id] = nil
   }
 
+  @Test func discardingASelectionRevertsEditsAndDeletesUntrackedFiles() async {
+    let client = FakeRepositoryGitClient()
+    let model = makeModel(client)
+    let plan = RepositoryModel.DiscardPlan([
+      .init(path: "b.swift", area: .unstaged), .init(path: "a.swift", area: .unstaged),
+      .init(path: "new.txt", area: .untracked), .init(path: "staged.swift", area: .staged),
+      .init(path: "conflict.swift", area: .conflicted),
+    ])
+
+    #expect(plan.count == 3)
+    #expect(plan.question == "Discard changes to 2 files and delete 1 untracked file?")
+    await model.discard(plan)
+    #expect(await client.mutationCalls == ["restore:a.swift,b.swift", "clean:new.txt"])
+
+    #expect(
+      RepositoryModel.DiscardPlan([.init(path: "x", area: .untracked)]).question
+        == "Delete 1 untracked file?")
+    #expect(
+      RepositoryModel.DiscardPlan([.init(path: "x", area: .unstaged)]).question
+        == "Discard changes to 1 file?")
+    #expect(RepositoryModel.DiscardPlan([.init(path: "x", area: .staged)]).isEmpty)
+  }
+
   @Test func failedMutationErrorSurvivesTheFollowUpRefresh() async {
     let client = FakeRepositoryGitClient()
     let oid = makeOID("88888888")
@@ -1536,11 +1559,15 @@ private actor FakeRepositoryGitClient: GitClient {
   func applyPatch(_ patch: String, reverse: Bool, toIndex: Bool) async throws {
     throw Failure.unimplemented
   }
-  func discardWorkingTree(paths: [String]) async throws { throw Failure.unimplemented }
+  func discardWorkingTree(paths: [String]) async throws {
+    mutationCalls.append("restore:" + paths.joined(separator: ","))
+  }
   func restoreFile(path: String, from revision: ObjectID) async throws {
     mutationCalls.append("restore:\(path):\(revision.rawValue)")
   }
-  func deleteUntracked(paths: [String]) async throws { throw Failure.unimplemented }
+  func deleteUntracked(paths: [String]) async throws {
+    mutationCalls.append("clean:" + paths.joined(separator: ","))
+  }
   func ignoredPaths() async throws -> [String] { [] }
   func ignoreRules(for paths: [String]) async throws -> [String: IgnoreRule?] { [:] }
   func isTracked(path: String) async throws -> Bool { false }

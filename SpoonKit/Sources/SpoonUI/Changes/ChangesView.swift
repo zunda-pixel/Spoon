@@ -32,6 +32,7 @@ struct ChangesView: View {
   }
 
   @State private var confirmingDiscard: RepositoryModel.FileSelection?
+  @State private var confirmingMultiDiscard: RepositoryModel.DiscardPlan?
   @State private var confirmingConflictResolution: ConflictResolutionRequest?
   /// The first click of a double-click collapses a multi-selection to the
   /// clicked row (List behavior), so remember the just-collapsed selection
@@ -76,6 +77,7 @@ struct ChangesView: View {
         recentMultiSelection = (previous, .now)
       }
     }
+    .discardConfirmation($confirmingMultiDiscard, model: model)
     .confirmationDialog(
       confirmingDiscard?.area == .untracked
         ? "Delete \(confirmingDiscard?.path ?? "")?"
@@ -233,6 +235,7 @@ struct ChangesView: View {
           area: area,
           targets: actionTargets(for: entry, area: area),
           confirmingDiscard: $confirmingDiscard,
+          confirmingMultiDiscard: $confirmingMultiDiscard,
           confirmingConflictResolution: $confirmingConflictResolution,
           moveFiles: moveFiles
         )

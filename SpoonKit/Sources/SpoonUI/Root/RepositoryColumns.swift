@@ -111,10 +111,12 @@ struct RepositoryDetailColumn: View {
 struct MultiSelectionActionsView: View {
   let model: RepositoryModel
   let selections: Set<RepositoryModel.FileSelection>
+  @State private var confirmingDiscard: RepositoryModel.DiscardPlan?
 
   var body: some View {
     let stageable = selections.filter { $0.area != .staged }
     let staged = selections.filter { $0.area == .staged }
+    let discardPlan = RepositoryModel.DiscardPlan(selections)
 
     VStack(spacing: 14) {
       Image(systemName: "doc.on.doc")
@@ -133,9 +135,16 @@ struct MultiSelectionActionsView: View {
             Task { await model.unstage(paths: staged.map(\.path)) }
           }
         }
+        if !discardPlan.isEmpty {
+          Button(DiscardButtonTitle.make(for: discardPlan), role: .destructive) {
+            confirmingDiscard = discardPlan
+          }
+          .help("Revert unstaged changes and delete untracked files; staged changes are kept")
+        }
       }
       .disabled(model.isBusy)
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity)
+    .discardConfirmation($confirmingDiscard, model: model)
   }
 }
