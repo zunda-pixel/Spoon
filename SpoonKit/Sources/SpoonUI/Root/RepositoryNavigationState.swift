@@ -55,6 +55,7 @@ final class RepositoryNavigationState {
     case lineHistory(path: String, lines: ClosedRange<Int>)
     case codeSearch
     case ignoredFiles
+    case contributors
     case repositorySettings
     case addRemote
     case addSubmodule
@@ -119,6 +120,8 @@ final class RepositoryNavigationState {
         "bisect-run"
       case .ignoredFiles:
         "ignored-files"
+      case .contributors:
+        "contributors"
       case .repositorySettings:
         "repository-settings"
       case .stashBranch(let stash):

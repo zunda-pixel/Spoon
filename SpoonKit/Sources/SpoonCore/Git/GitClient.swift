@@ -107,6 +107,9 @@ public protocol GitHistoryClient: Sendable {
   func blameIgnoreRevsFiles() async throws -> [String]
   /// Distinct authors of the most recent `limit` commits, newest first.
   func recentAuthors(limit: Int) async throws -> [CoAuthor]
+  /// Everyone who authored a commit on HEAD's history, or on any branch or
+  /// tag with `allReferences`, most commits first (`git shortlog -sne`).
+  func contributors(allReferences: Bool) async throws -> [Contributor]
   /// The commits, newest first, that changed `lines` (1-based, inclusive)
   /// of `path` as it is at HEAD, each with the diff of just those lines,
   /// following them as they move (`git log -L`). At most `limit` commits.

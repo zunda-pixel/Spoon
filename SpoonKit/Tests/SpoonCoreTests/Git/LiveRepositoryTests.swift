@@ -11,6 +11,33 @@ struct LiveRepositoryTests {
     LiveRepoFixture.makeClient(for: root, runner: runner)
   }
 
+  /// One person committing under two names and addresses, joined by a
+  /// .mailmap, shows up as one author everywhere Spoon lists authors.
+  @Test func mailmapFoldsAuthorsInHistoryAndContributors() async throws {
+    let root = try await LiveRepoFixture.makeTemporaryRepo(runner: runner)
+    defer { try? FileManager.default.removeItem(at: root) }
+    for (index, author) in ["Ada Lovelace <ada@example.com>", "ada <ada@old.example>", "Grace Hopper <grace@example.com>"]
+      .enumerated()
+    {
+      try Data("\(index)\n".utf8).write(to: root.appending(path: "file\(index).txt"))
+      try await LiveRepoFixture.run(["add", "."], in: root, runner: runner)
+      try await LiveRepoFixture.run(
+        ["commit", "-m", "commit \(index)", "--author=\(author)"], in: root, runner: runner)
+    }
+    try Data("Ada Lovelace <ada@example.com> <ada@old.example>\n".utf8)
+      .write(to: root.appending(path: ".mailmap"))
+    let client = makeClient(root)
+
+    let authors = try await client.log(LogQuery()).commits.map { "\($0.authorName) <\($0.authorEmail)>" }
+    #expect(authors == ["Grace Hopper <grace@example.com>", "Ada Lovelace <ada@example.com>", "Ada Lovelace <ada@example.com>"])
+    #expect(
+      try await client.contributors(allReferences: false) == [
+        Contributor(name: "Ada Lovelace", email: "ada@example.com", commitCount: 2),
+        Contributor(name: "Grace Hopper", email: "grace@example.com", commitCount: 1),
+      ])
+    #expect(try await client.recentAuthors(limit: 10).map(\.name) == ["Grace Hopper", "Ada Lovelace"])
+  }
+
   @Test func repositoryPathsLocateLinkedWorktreeMetadata() async throws {
     let root = try await LiveRepoFixture.makeTemporaryRepo(
       commits: [.init(file: "base.txt", content: "base\n", message: "base")],
