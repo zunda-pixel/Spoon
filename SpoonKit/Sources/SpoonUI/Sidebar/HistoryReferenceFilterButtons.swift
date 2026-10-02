@@ -5,7 +5,6 @@ import SwiftUI
 struct HistoryReferenceFilterButtons: View {
   let model: RepositoryModel
   let referenceID: String
-  @Environment(\.backgroundProminence) private var backgroundProminence
 
   var body: some View {
     HStack(spacing: 2) {
@@ -37,10 +36,9 @@ struct HistoryReferenceFilterButtons: View {
     .fixedSize()
   }
 
-  /// On a selected row the accent color is the highlight itself, so an
-  /// active button switches to the primary color there.
+  /// An active button shows its filled symbol in the primary color: the
+  /// accent color would vanish into a selected row's highlight.
   private func style(isOn: Bool) -> AnyShapeStyle {
-    guard isOn else { return AnyShapeStyle(.secondary) }
-    return backgroundProminence == .increased ? AnyShapeStyle(.primary) : AnyShapeStyle(.tint)
+    isOn ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary)
   }
 }
