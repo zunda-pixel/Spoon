@@ -75,6 +75,9 @@ public protocol GitWorkingTreeClient: Sendable {
   /// Whether and how git signs new commits here (`commit.gpgSign`,
   /// `gpg.format`, `user.signingKey`).
   func commitSigningConfiguration() async throws -> CommitSigningConfiguration
+  /// The file `commit.template` names, or `nil` when the setting is unset.
+  /// Throws when it names a file that can't be read.
+  func commitTemplate() async throws -> CommitTemplate?
   /// Every value of the settings Spoon edits, from every config file.
   func repositoryConfig() async throws -> RepositoryConfig
   /// Sets `setting` in this repository's `.git/config`, or removes it there

@@ -138,6 +138,12 @@ extension RepositoryModel {
   }
 
   /// The repository's signing settings; `nil` when git config can't be read.
+  /// The repository's `commit.template`, or `nil` when there is none or
+  /// it can't be read.
+  public func commitTemplate() async -> CommitTemplate? {
+    try? await gitClient.commitTemplate()
+  }
+
   public func commitSigningConfiguration() async -> CommitSigningConfiguration? {
     try? await gitClient.commitSigningConfiguration()
   }
