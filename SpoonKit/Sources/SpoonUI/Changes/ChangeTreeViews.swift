@@ -25,10 +25,17 @@ struct ChangeTreeNodeView<Row: View>: View {
         Button {
           isExpanded(node).wrappedValue.toggle()
         } label: {
-          Label(node.name, systemImage: "folder")
-            .foregroundStyle(.secondary)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .contentShape(Rectangle())
+          Label {
+            Text(node.name)
+              .foregroundStyle(.secondary)
+          } icon: {
+            // Folder rows carry no selection tag, so the accent color
+            // never meets a selection highlight.
+            Image(systemName: "folder.fill")
+              .foregroundStyle(.tint)
+          }
+          .frame(maxWidth: .infinity, alignment: .leading)
+          .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .accessibilityLabel(node.name)
@@ -37,6 +44,7 @@ struct ChangeTreeNodeView<Row: View>: View {
         .dropDestination(for: ChangePathsPayload.self) { items, _ in
           onDrop(items)
         }
+        .listRowSeparator(.hidden)
       }
     }
   }
