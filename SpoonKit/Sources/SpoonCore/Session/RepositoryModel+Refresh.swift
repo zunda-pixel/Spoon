@@ -89,13 +89,18 @@ extension RepositoryModel {
   /// Refreshes local Git state without waiting for remote pull request synchronization.
   public func refreshGitState() async {
     if let gitRefreshTask {
+      // Joining callers share one extra pass rather than queueing their own.
+      gitRefreshNeedsRerun = true
       await gitRefreshTask.value
       return
     }
 
     let task = Task { @MainActor [weak self] in
       guard let self else { return }
-      await self.performGitStateRefresh()
+      repeat {
+        self.gitRefreshNeedsRerun = false
+        await self.performGitStateRefresh()
+      } while self.gitRefreshNeedsRerun && !Task.isCancelled
     }
     gitRefreshTask = task
     await task.value
