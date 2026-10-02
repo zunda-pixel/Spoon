@@ -110,6 +110,11 @@ public protocol GitHistoryClient: Sendable {
   func blameIgnoreRevsFiles() async throws -> [String]
   /// Distinct authors of the most recent `limit` commits, newest first.
   func recentAuthors(limit: Int) async throws -> [CoAuthor]
+  /// Writes the files of `revision` to `destination` as one archive, every
+  /// path under the `prefix/` folder (`git archive`).
+  func archive(
+    _ revision: String, format: ArchiveFormat, prefix: String, to destination: URL
+  ) async throws
   /// Everyone who authored a commit on HEAD's history, or on any branch or
   /// tag with `allReferences`, most commits first (`git shortlog -sne`).
   func contributors(allReferences: Bool) async throws -> [Contributor]

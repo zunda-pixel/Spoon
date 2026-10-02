@@ -1,5 +1,5 @@
 import Defaults
-import Foundation
+public import Foundation
 
 extension RepositoryModel {
   /// The commits that changed `lines` of `path` at HEAD, newest first.
@@ -317,5 +317,19 @@ extension RepositoryModel {
   public func contributors(allReferences: Bool) async throws -> [Contributor] {
     guard status?.headOID != nil else { return [] }
     return try await gitClient.contributors(allReferences: allReferences)
+  }
+
+  /// Saves the files at `revision` as an archive at `destination`, in the
+  /// format its extension names, under a `<repository>-<label>` folder.
+  @discardableResult
+  public func exportArchive(
+    revision: String, label: String, to destination: URL
+  ) async -> Bool {
+    let prefix = "\(repository.name)-\(label)"
+    return await perform {
+      try await $0.archive(
+        revision, format: ArchiveFormat(fileName: destination.lastPathComponent), prefix: prefix,
+        to: destination)
+    }
   }
 }

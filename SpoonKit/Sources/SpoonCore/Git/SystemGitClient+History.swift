@@ -1,5 +1,5 @@
 import Algorithms
-import Foundation
+public import Foundation
 
 extension SystemGitClient {
 
@@ -70,6 +70,17 @@ extension SystemGitClient {
       return CoAuthor(name: String(fields[0]), email: String(fields[1]))
     }
     .uniqued(on: \.id)
+  }
+
+  public func archive(
+    _ revision: String, format: ArchiveFormat, prefix: String, to destination: URL
+  ) async throws {
+    try await runVoid(
+      [
+        "archive", "--format=\(format.rawValue)", "--prefix=\(prefix)/",
+        "--output=\(destination.path(percentEncoded: false))", revision, "--",
+      ],
+      timeout: .seconds(600))
   }
 
   public func contributors(allReferences: Bool) async throws -> [Contributor] {

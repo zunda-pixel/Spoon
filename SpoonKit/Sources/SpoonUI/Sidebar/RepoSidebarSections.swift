@@ -207,6 +207,10 @@ struct TagContextMenu: View {
       }
     }
     .disabled(model.remotes.isEmpty || model.isBusy)
+    Button("Export Archive…") {
+      exportArchive(model: model, revision: "refs/tags/\(tag.name)", label: tag.name)
+    }
+    .disabled(model.isBusy)
     Divider()
     Button("Delete Tag…", role: .destructive) { navigation.deletingTag = tag }
       .disabled(model.isBusy)
