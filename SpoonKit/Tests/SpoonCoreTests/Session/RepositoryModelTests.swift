@@ -1395,6 +1395,19 @@ struct RepositoryModelTests {
     #expect(await client.mutationCalls == ["autosquash:dddd4444"])
   }
 
+  @Test func exportArchiveNamesTheFolderAfterRepositoryAndLabel() async {
+    let client = FakeRepositoryGitClient()
+    let model = makeModel(client)
+    let destination = URL(filePath: "/tmp/out/demo-v1.tar.gz")
+
+    await model.exportArchive(revision: "refs/tags/v1", label: "v1", to: destination)
+
+    #expect(
+      await client.mutationCalls == [
+        "archive:refs/tags/v1:tar.gz:\(model.repository.name)-v1:demo-v1.tar.gz"
+      ])
+  }
+
   @Test func autosquashMovesStackedBranchesUnlessTurnedOff() async throws {
     let client = FakeRepositoryGitClient()
     let head = makeOID("aaaa1111")
@@ -1730,6 +1743,11 @@ private actor FakeRepositoryGitClient: GitClient {
   }
   func contributors(allReferences: Bool) async throws -> [Contributor] { [] }
   func commitTemplate() async throws -> CommitTemplate? { nil }
+  func archive(
+    _ revision: String, format: ArchiveFormat, prefix: String, to destination: URL
+  ) async throws {
+    mutationCalls.append("archive:\(revision):\(format.rawValue):\(prefix):\(destination.lastPathComponent)")
+  }
   private var stacked: [StackedBranch] = []
   func setStackedBranches(_ branches: [StackedBranch]) { stacked = branches }
   func stackedBranches(after base: ObjectID?) async throws -> [StackedBranch] { stacked }

@@ -8,6 +8,8 @@ struct RevisionContextMenu: View {
   let oid: ObjectID
   let startPoint: String
   let targetDescription: String
+  /// Names the revision in an exported archive's file and folder.
+  var archiveLabel: String? = nil
 
   var body: some View {
     Button("Switch to Commit (Detached)") {
@@ -22,5 +24,9 @@ struct RevisionContextMenu: View {
       navigation.present(.reset(target: oid, description: targetDescription))
     }
     .disabled(model.isBusy || model.isSequencing)
+    Button("Export Archive…") {
+      exportArchive(model: model, revision: oid.rawValue, label: archiveLabel ?? oid.shortened)
+    }
+    .disabled(model.isBusy)
   }
 }
