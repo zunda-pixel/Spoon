@@ -24,6 +24,31 @@ struct RebasePlanTests {
     )
   }
 
+  @Test func stackedBranchesGetAnUpdateRefLineAfterTheirTip() {
+    var plan = plan([
+      (.pick, "aaaa1111", "first"),
+      (.drop, "bbbb2222", "second"),
+      (.pick, "cccc3333", "third"),
+    ])
+    plan.stackedBranches = [
+      StackedBranch(name: "stack/one", tip: ObjectID(rawValue: "aaaa1111")!),
+      StackedBranch(name: "stack/two", tip: ObjectID(rawValue: "bbbb2222")!),
+    ]
+    #expect(
+      plan.todoFileContents() == """
+        pick aaaa1111 first
+        update-ref refs/heads/stack/one
+        drop bbbb2222 second
+        update-ref refs/heads/stack/two
+        pick cccc3333 third
+
+        """
+    )
+
+    plan.updatesStackedBranches = false
+    #expect(!plan.todoFileContents().contains("update-ref"))
+  }
+
   @Test func todoRendersOldestFirstWithExplicitDrops() {
     let plan = plan([
       (.pick, "aaaa1111", "first"),

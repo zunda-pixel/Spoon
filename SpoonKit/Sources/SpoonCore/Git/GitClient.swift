@@ -81,7 +81,7 @@ public protocol GitWorkingTreeClient: Sendable {
   /// when `value` is `nil` so the user's or system value applies again.
   func setRepositoryConfig(_ setting: RepositorySetting, to value: String?) async throws
   /// Commits the staged changes as `fixup! <subject of oid>`, to be folded
-  /// into that commit later by `autosquash(onto:)`.
+  /// into that commit later by `autosquash(onto:updateRefs:)`.
   func commitFixup(for oid: ObjectID) async throws
   func reset(to target: ObjectID, mode: ResetMode) async throws
 }
@@ -296,8 +296,13 @@ public protocol GitSequencerClient: Sendable {
   func interactiveRebase(_ plan: RebasePlan) async throws
   /// Rebases the commits after `base` so each `fixup!`, `squash!`, and
   /// `amend!` commit is folded into its target (`rebase -i --autosquash`,
-  /// accepting git's generated todo list). May pause on conflicts.
-  func autosquash(onto base: ObjectID) async throws
+  /// accepting git's generated todo list). With `updateRefs`, branches
+  /// pointing into the range move too. May pause on conflicts.
+  func autosquash(onto base: ObjectID, updateRefs: Bool) async throws
+  /// Local branches other than HEAD's whose tips are commits a rebase of
+  /// `base..HEAD` would rewrite (all of HEAD's history when `base` is nil).
+  /// Branches checked out in a worktree are left out: git can't move them.
+  func stackedBranches(after base: ObjectID?) async throws -> [StackedBranch]
   /// Applies one commit onto HEAD, keeping its original message.
   func cherryPick(_ oid: ObjectID) async throws
   /// Adds one inverse commit with git's default revert message.

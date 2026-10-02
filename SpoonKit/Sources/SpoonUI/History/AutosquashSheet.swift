@@ -39,6 +39,19 @@ struct AutosquashSheet: View {
           }
           .frame(height: min(CGFloat(plan.fixups.count) * 24 + 16, 200))
           .accessibilityLabel("Fixup commits")
+          if !plan.stackedBranches.isEmpty {
+            StackedBranchesToggle(
+              branches: plan.stackedBranches,
+              isOn: Binding(
+                get: { plan.updatesStackedBranches },
+                set: { newValue in
+                  var updated = plan
+                  updated.updatesStackedBranches = newValue
+                  loadState = .loaded(updated)
+                }
+              )
+            )
+          }
           Text("If a commit conflicts, the rebase pauses so you can resolve it.")
             .font(.caption)
             .foregroundStyle(.secondary)

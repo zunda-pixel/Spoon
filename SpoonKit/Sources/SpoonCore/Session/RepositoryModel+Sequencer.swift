@@ -18,9 +18,13 @@ extension RepositoryModel {
     let page = try await gitClient.log(LogQuery(reference: reference, maxCount: 1000))
     guard !page.hasMore else { throw RebaseSetupError.rangeTooLarge }
     guard !page.commits.contains(where: \.isMerge) else { throw RebaseSetupError.mergeInRange }
+    let rewritten = Set(page.commits.map(\.oid))
+    let stacked = try await gitClient.stackedBranches(after: baseOID)
+      .filter { rewritten.contains($0.tip) }
     return RebasePlan(
       steps: page.commits.reversed().map { RebaseStep(action: .pick, commit: $0) },
-      baseOID: baseOID
+      baseOID: baseOID,
+      stackedBranches: stacked
     )
   }
 
@@ -135,13 +139,18 @@ extension RepositoryModel {
     return AutosquashPlan(
       base: base,
       baseReference: baseReference,
-      fixups: page.commits.filter(AutosquashPlan.isFixup)
+      fixups: page.commits.filter(AutosquashPlan.isFixup),
+      stackedBranches: try await gitClient.stackedBranches(after: base)
     )
   }
 
   @discardableResult
   public func autosquash(_ plan: AutosquashPlan) async -> Bool {
-    await perform { try await $0.autosquash(onto: plan.base) }
+    await perform {
+      try await $0.autosquash(
+        onto: plan.base,
+        updateRefs: plan.updatesStackedBranches && !plan.stackedBranches.isEmpty)
+    }
   }
 
   /// Cherry-picks `commits` onto HEAD oldest first, whatever order they

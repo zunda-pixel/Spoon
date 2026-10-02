@@ -64,6 +64,9 @@ public struct GitCapabilities: Sendable, Hashable {
   /// `git history drop` (2.56+).
   public var supportsHistoryDrop: Bool { supports(GitVersion(2, 56)) }
 
+  /// `git rebase --update-refs` and `update-ref` todo lines (2.38+).
+  public var supportsRebaseUpdateRefs: Bool { supports(GitVersion(2, 38)) }
+
   /// `git repo info` path keys such as `path.gitdir.absolute` (2.56+).
   public var supportsRepoInfoPaths: Bool { supports(GitVersion(2, 56)) }
 

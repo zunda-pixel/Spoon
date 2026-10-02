@@ -844,7 +844,7 @@ struct LiveRepositoryTests {
     try await client.commitFixup(for: addA.oid)
     #expect(try await client.log(LogQuery(maxCount: 1)).commits.first?.subject == "fixup! Add a")
 
-    try await client.autosquash(onto: base.oid)
+    try await client.autosquash(onto: base.oid, updateRefs: false)
 
     let after = try await client.log(LogQuery(maxCount: 3)).commits
     #expect(after.map(\.subject) == ["Add b", "Add a", "base"])
