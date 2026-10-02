@@ -11,6 +11,8 @@ struct BranchRowView: View {
   var historyReferenceID: String?
   var historyModel: RepositoryModel?
   @State private var isHovered = false
+  /// `.increased` on a selected row, whose highlight is the accent color.
+  @Environment(\.backgroundProminence) private var backgroundProminence
 
   private func worktreeSymbol(_ worktree: Worktree) -> String {
     if worktree.isPrunable { return "folder.badge.questionmark" }
@@ -71,7 +73,7 @@ struct BranchRowView: View {
       }
     } icon: {
       Image(systemName: branch.isCurrent ? "checkmark.circle.fill" : "arrow.trianglehead.branch")
-        .foregroundStyle(branch.isCurrent ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))
+        .foregroundStyle(currentBranchIconStyle)
     }
     .help(branch.subject)
     .accessibilityElement(children: .ignore)
@@ -79,6 +81,13 @@ struct BranchRowView: View {
     .accessibilityValue(accessibilityValue)
     .accessibilityHint(
       "Select to move to this branch in history; open the context menu for branch actions")
+  }
+
+  /// The accent color marks the current branch, except on a selected row,
+  /// where it would vanish into the accent-colored highlight.
+  private var currentBranchIconStyle: AnyShapeStyle {
+    guard branch.isCurrent else { return AnyShapeStyle(.secondary) }
+    return backgroundProminence == .increased ? AnyShapeStyle(.primary) : AnyShapeStyle(.tint)
   }
 
   private var accessibilityValue: String {
