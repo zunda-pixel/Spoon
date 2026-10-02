@@ -70,8 +70,15 @@ struct BranchRowView: View {
         }
       }
     } icon: {
-      Image(systemName: branch.isCurrent ? "checkmark.circle.fill" : "arrow.trianglehead.branch")
-        .foregroundStyle(branch.isCurrent ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))
+      // The current branch's checkmark keeps the sidebar's own icon color,
+      // the accent color that turns white on a selected row; an explicit
+      // tint would stay blue and vanish into the selection highlight.
+      if branch.isCurrent {
+        Image(systemName: "checkmark.circle.fill")
+      } else {
+        Image(systemName: "arrow.trianglehead.branch")
+          .foregroundStyle(.secondary)
+      }
     }
     .help(branch.subject)
     .accessibilityElement(children: .ignore)

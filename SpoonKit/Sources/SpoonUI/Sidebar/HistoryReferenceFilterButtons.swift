@@ -15,8 +15,7 @@ struct HistoryReferenceFilterButtons: View {
       }
       .buttonStyle(.borderless)
       .foregroundStyle(
-        model.isHistoryReferenceFocused(referenceID)
-          ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary)
+        style(isOn: model.isHistoryReferenceFocused(referenceID))
       )
       .help(model.isHistoryReferenceFocused(referenceID) ? "Stop showing only this reference" : "Show only this reference")
       .accessibilityLabel(model.isHistoryReferenceFocused(referenceID) ? "Stop showing only this reference" : "Show only this reference")
@@ -28,13 +27,18 @@ struct HistoryReferenceFilterButtons: View {
       }
       .buttonStyle(.borderless)
       .foregroundStyle(
-        model.isHistoryReferenceHidden(referenceID)
-          ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary)
+        style(isOn: model.isHistoryReferenceHidden(referenceID))
       )
       .help(model.isHistoryReferenceHidden(referenceID) ? "Show this reference in history" : "Hide this reference from history")
       .accessibilityLabel(model.isHistoryReferenceHidden(referenceID) ? "Show this reference in history" : "Hide this reference from history")
     }
     .font(.caption)
     .fixedSize()
+  }
+
+  /// An active button shows its filled symbol in the primary color: the
+  /// accent color would vanish into a selected row's highlight.
+  private func style(isOn: Bool) -> AnyShapeStyle {
+    isOn ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary)
   }
 }
