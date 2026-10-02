@@ -6,7 +6,8 @@ public enum GitLogParser {
   /// Unit-separator (0x1F) between fields; `-z` NUL-terminates records.
   /// Subjects cannot contain NUL, and 0x1F is vanishingly rare in practice —
   /// the parser tolerates extra separators by treating the tail as subject.
-  public static let logFormat = "%H%x1f%P%x1f%an%x1f%ae%x1f%at%x1f%ct%x1f%s"
+  /// `%aN` / `%aE` apply `.mailmap`, so one person shows under one name.
+  public static let logFormat = "%H%x1f%P%x1f%aN%x1f%aE%x1f%at%x1f%ct%x1f%s"
 
   public struct ParseError: Error, Sendable {
     public var record: String

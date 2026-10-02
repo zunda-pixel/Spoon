@@ -42,6 +42,8 @@ struct RepositorySheetHost: ViewModifier {
         RepositorySettingsSheet(model: model)
       case .ignoredFiles:
         IgnoredFilesSheet(model: model)
+      case .contributors:
+        ContributorsSheet(model: model)
       case .codeSearch:
         CodeSearchSheet(model: model, navigation: navigation)
       case .addRemote:

@@ -132,6 +132,11 @@ public struct SpoonCommands: Commands {
       }
       .disabled(model == nil || navigation == nil)
 
+      Button("Contributors…") {
+        navigation?.present(.contributors)
+      }
+      .disabled(model == nil || navigation == nil)
+
       Button("Apply Patches…") {
         chooseAndApplyPatches()
       }

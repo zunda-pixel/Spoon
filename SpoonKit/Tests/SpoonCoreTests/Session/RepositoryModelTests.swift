@@ -1728,6 +1728,7 @@ private actor FakeRepositoryGitClient: GitClient {
   func commitFixup(for oid: ObjectID) async throws {
     mutationCalls.append("fixup-commit:\(oid.rawValue)")
   }
+  func contributors(allReferences: Bool) async throws -> [Contributor] { [] }
   private var stacked: [StackedBranch] = []
   func setStackedBranches(_ branches: [StackedBranch]) { stacked = branches }
   func stackedBranches(after base: ObjectID?) async throws -> [StackedBranch] { stacked }

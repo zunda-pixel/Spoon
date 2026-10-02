@@ -312,4 +312,10 @@ extension RepositoryModel {
       clearError()
     }
   }
+
+  /// Authors with their commit counts; empty before the first commit.
+  public func contributors(allReferences: Bool) async throws -> [Contributor] {
+    guard status?.headOID != nil else { return [] }
+    return try await gitClient.contributors(allReferences: allReferences)
+  }
 }

@@ -1,7 +1,7 @@
 public import Foundation
 
 public enum GitReflogParser {
-  public static let format = "%H%x1f%gd%x1f%gs%x1f%an%x1f%ae%x1f%at"
+  public static let format = "%H%x1f%gd%x1f%gs%x1f%aN%x1f%aE%x1f%at"
 
   public struct ParseError: Error, Sendable {
     public var record: String

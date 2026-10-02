@@ -63,13 +63,20 @@ extension SystemGitClient {
 
   public func recentAuthors(limit: Int) async throws -> [CoAuthor] {
     let result = try await run(
-      ["log", "--all", "--max-count=\(limit)", "-z", "--format=%an%x1f%ae"], timeout: .seconds(30))
+      ["log", "--all", "--max-count=\(limit)", "-z", "--format=%aN%x1f%aE"], timeout: .seconds(30))
     return result.standardOutputText.split(separator: "\0").compactMap { record in
       let fields = record.split(separator: "\u{1f}", omittingEmptySubsequences: false)
       guard fields.count == 2, !fields[0].isEmpty, !fields[1].isEmpty else { return nil }
       return CoAuthor(name: String(fields[0]), email: String(fields[1]))
     }
     .uniqued(on: \.id)
+  }
+
+  public func contributors(allReferences: Bool) async throws -> [Contributor] {
+    let result = try await run(
+      ["shortlog", "--summary", "--numbered", "--email", allReferences ? "--all" : "HEAD", "--"],
+      timeout: .seconds(60))
+    return Contributor.parse(result.standardOutputText)
   }
 
   public func blameIgnoreRevsFiles() async throws -> [String] {
