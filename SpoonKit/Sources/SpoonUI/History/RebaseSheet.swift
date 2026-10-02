@@ -77,6 +77,9 @@ struct RebaseSheet: View {
               Text(step.commit.subject)
                 .lineLimit(1)
                 .truncationMode(.tail)
+              ForEach(value.stackedBranches.filter { $0.tip == step.commit.oid }) { branch in
+                StackedBranchBadge(name: branch.name, moves: value.updatesStackedBranches)
+              }
             }
             if step.action == .reword {
               TextField(
@@ -104,6 +107,11 @@ struct RebaseSheet: View {
       Text("Drag rows to reorder commits.")
         .font(.caption)
         .foregroundStyle(.secondary)
+
+      if !value.stackedBranches.isEmpty {
+        StackedBranchesToggle(
+          branches: value.stackedBranches, isOn: plan.updatesStackedBranches)
+      }
 
       if let validationMessage = validationMessage(for: value) {
         Text(validationMessage)

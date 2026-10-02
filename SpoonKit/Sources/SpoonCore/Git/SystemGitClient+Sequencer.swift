@@ -22,6 +22,7 @@ extension SystemGitClient {
     }
 
     var arguments = ["rebase", "--interactive"]
+    arguments += await updateRefsArguments(plan.movesStackedBranches)
     if let base = plan.baseOID {
       arguments.append(base.rawValue)
     } else {
@@ -42,14 +43,42 @@ extension SystemGitClient {
     )
   }
 
-  public func autosquash(onto base: ObjectID) async throws {
-    // `true` accepts the todo list git generates; squash! message editors
-    // keep the combined message as git proposes it.
+  public func autosquash(onto base: ObjectID, updateRefs: Bool) async throws {
+    // `true` accepts the todo list git generates, update-ref lines included;
+    // squash! message editors keep the combined message as git proposes it.
     try await runVoid(
-      ["rebase", "--interactive", "--autosquash", base.rawValue],
+      ["rebase", "--interactive", "--autosquash"] + (await updateRefsArguments(updateRefs))
+        + [base.rawValue],
       extraEnvironment: ["GIT_SEQUENCE_EDITOR": "true", "GIT_EDITOR": "true"],
       timeout: .seconds(300)
     )
+  }
+
+  public func stackedBranches(after base: ObjectID?) async throws -> [StackedBranch] {
+    guard await capabilities().supportsRebaseUpdateRefs else { return [] }
+    var arguments = [
+      "for-each-ref", "refs/heads", "--merged=HEAD",
+      "--format=%(objectname)%00%(worktreepath)%00%(refname:short)",
+    ]
+    if let base {
+      arguments.append("--contains=\(base.rawValue)")
+    }
+    let result = try await run(arguments, timeout: .seconds(30))
+    return result.standardOutputText.split(whereSeparator: \.isNewline).compactMap { line in
+      let fields = line.split(separator: "\0", omittingEmptySubsequences: false)
+      // A branch checked out anywhere, HEAD's own included, has a worktree path.
+      guard fields.count == 3, fields[1].isEmpty,
+        let tip = ObjectID(rawValue: String(fields[0])), tip != base
+      else { return nil }
+      return StackedBranch(name: String(fields[2]), tip: tip)
+    }
+  }
+
+  /// Explicit either way, so a `rebase.updateRefs` setting can't add or drop
+  /// update-ref lines behind Spoon's back. Omitted where git predates them.
+  private func updateRefsArguments(_ updateRefs: Bool) async -> [String] {
+    guard await capabilities().supportsRebaseUpdateRefs else { return [] }
+    return [updateRefs ? "--update-refs" : "--no-update-refs"]
   }
 
   public func cherryPick(_ oid: ObjectID) async throws {

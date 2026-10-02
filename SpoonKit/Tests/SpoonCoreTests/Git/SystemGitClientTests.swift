@@ -1016,14 +1016,17 @@ struct SystemGitClientTests {
 
   @Test func interactiveRebaseSendsArgvAndEnvironment() async throws {
     let runner = FakeCommandRunner()
-    runner.stub(arguments: baseFlags + ["rebase", "--interactive", "beef0000"])
+    runner.stub(arguments: baseFlags + ["version"], stdout: "git version 2.56.0\n")
+    // Explicit, so a rebase.updateRefs setting can't add lines to Spoon's todo.
+    runner.stub(arguments: baseFlags + ["rebase", "--interactive", "--no-update-refs", "beef0000"])
     let plan = RebasePlan(
       steps: [RebaseStep(action: .pick, commit: makeCommit("aaaa1111"))],
       baseOID: ObjectID(rawValue: "beef0000")
     )
     try await makeClient(runner).interactiveRebase(plan)
 
-    let command = try #require(runner.invocations.first)
+    let command = try #require(runner.invocations.last)
+    #expect(command.arguments.suffix(3) == ["--interactive", "--no-update-refs", "beef0000"])
     #expect(command.environment["GIT_SEQUENCE_EDITOR"] == #"cp -f "$SPOON_REBASE_TODO""#)
     #expect(command.environment["GIT_EDITOR"] == "true")
     let todoPath = try #require(command.environment["SPOON_REBASE_TODO"])
@@ -1035,13 +1038,15 @@ struct SystemGitClientTests {
 
   @Test func rootRebaseUsesRootFlag() async throws {
     let runner = FakeCommandRunner()
+    // Before git 2.38 neither update-refs flag exists, so neither is sent.
+    runner.stub(arguments: baseFlags + ["version"], stdout: "git version 2.37.0\n")
     runner.stub(arguments: baseFlags + ["rebase", "--interactive", "--root"])
     let plan = RebasePlan(
       steps: [RebaseStep(action: .pick, commit: makeCommit("aaaa1111"))],
       baseOID: nil
     )
     try await makeClient(runner).interactiveRebase(plan)
-    #expect(runner.invocations.count == 1)
+    #expect(runner.invocations.last?.arguments.suffix(2) == ["--interactive", "--root"])
   }
 
   @Test func sequencerControlsSendExactArgv() async throws {

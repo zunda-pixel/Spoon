@@ -65,6 +65,72 @@ struct LiveSequencerTests {
     #expect(try await client.sequencerState() == nil)
   }
 
+  /// main: base → one (stack/one) → two (stack/two, checked out). A stacked
+  /// branch moves to its rewritten commit only when the plan asks for it.
+  @Test func interactiveRebaseMovesStackedBranchesOnlyWhenAsked() async throws {
+    for moves in [true, false] {
+      let root = try await LiveRepoFixture.makeTemporaryRepo(
+        commits: [.init(file: "base.txt", content: "base\n", message: "base")], runner: runner)
+      defer { try? FileManager.default.removeItem(at: root) }
+      let client = makeClient(root)
+      try await arrange(["switch", "-c", "stack/one"], in: root)
+      try await commitFile("one.txt", "one\n", message: "one", in: root)
+      try await arrange(["switch", "-c", "stack/two"], in: root)
+      try await commitFile("two.txt", "two\n", message: "two", in: root)
+      // Checked out elsewhere, so git couldn't move it: never offered.
+      let elsewhere = URL.temporaryDirectory.appending(path: "spoon-wt-\(UUID().uuidString)")
+      defer { try? FileManager.default.removeItem(at: elsewhere) }
+      try await arrange(["worktree", "add", "-b", "stack/busy", elsewhere.path, "HEAD~1"], in: root)
+
+      let commits = try await client.log(LogQuery()).commits
+      var plan = try plan(from: commits, oldest: "one", actions: ["one": .reword])
+      plan.steps[0].newMessage = "one, reworded"
+      plan.stackedBranches = try await client.stackedBranches(after: plan.baseOID)
+      #expect(plan.stackedBranches.map(\.name) == ["stack/one"])
+      plan.updatesStackedBranches = moves
+      let oldOne = plan.stackedBranches[0].tip
+      try await client.interactiveRebase(plan)
+
+      let one = try await client.run(["log", "-1", "--format=%H %s", "stack/one"])
+        .standardOutputText.trimmingCharacters(in: .whitespacesAndNewlines)
+      let twoParent = try await client.run(["rev-parse", "stack/two~1"])
+        .standardOutputText.trimmingCharacters(in: .whitespacesAndNewlines)
+      if moves {
+        #expect(one.hasSuffix(" one, reworded"))
+        #expect(one.hasPrefix(twoParent))
+      } else {
+        #expect(one == "\(oldOne.rawValue) one")
+        #expect(twoParent != oldOne.rawValue)
+      }
+    }
+  }
+
+  @Test func autosquashMovesStackedBranchesWithUpdateRefs() async throws {
+    let root = try await LiveRepoFixture.makeTemporaryRepo(
+      commits: [.init(file: "base.txt", content: "base\n", message: "base")], runner: runner)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let client = makeClient(root)
+    let base = try await client.run(["rev-parse", "HEAD"]).standardOutputText
+      .trimmingCharacters(in: .whitespacesAndNewlines)
+    try await arrange(["switch", "-c", "stack/one"], in: root)
+    try await commitFile("one.txt", "one\n", message: "one", in: root)
+    try await arrange(["switch", "-c", "stack/two"], in: root)
+    try await commitFile("two.txt", "two\n", message: "two", in: root)
+    try await commitFile("one.txt", "one fixed\n", message: "fixup! one", in: root)
+
+    let baseOID = try #require(ObjectID(rawValue: base))
+    #expect(try await client.stackedBranches(after: baseOID).map(\.name) == ["stack/one"])
+    try await client.autosquash(onto: baseOID, updateRefs: true)
+
+    let subjects = try await client.log(LogQuery()).commits.map(\.subject)
+    #expect(subjects == ["two", "one", "base"])
+    let oneTip = try await client.run(["rev-parse", "stack/one"]).standardOutputText
+    let twoParent = try await client.run(["rev-parse", "stack/two~1"]).standardOutputText
+    #expect(oneTip == twoParent)
+    let fixed = try await client.run(["show", "stack/one:one.txt"]).standardOutputText
+    #expect(fixed == "one fixed\n")
+  }
+
   @Test func rewordAndFixupRewriteHistory() async throws {
     let root = try await makeThreeCommitRepo()
     defer { try? FileManager.default.removeItem(at: root) }

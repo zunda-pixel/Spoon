@@ -46,6 +46,16 @@ public struct RebaseStep: Sendable, Hashable, Identifiable {
   public var id: String { commit.id }
 }
 
+/// A local branch whose tip is one of the commits a rebase rewrites, such as
+/// a lower layer of a stack. `rebase --update-refs` moves it along.
+@MemberwiseInit(.public)
+public struct StackedBranch: Sendable, Hashable, Identifiable {
+  public var name: String
+  public var tip: ObjectID
+
+  public var id: String { name }
+}
+
 /// A complete headless `rebase -i` plan. `steps` are oldest-first — exactly
 /// the todo-file order.
 @MemberwiseInit(.public)
@@ -53,6 +63,15 @@ public struct RebasePlan: Sendable, Hashable {
   public var steps: [RebaseStep]
   /// Commit rebased onto (parent of the oldest step); `nil` means `--root`.
   public var baseOID: ObjectID?
+  /// Other branches pointing into the rewritten range.
+  public var stackedBranches: [StackedBranch] = []
+  /// Move `stackedBranches` to the rewritten commits (`--update-refs`).
+  public var updatesStackedBranches: Bool = true
+
+  /// Whether the todo list carries `update-ref` lines.
+  public var movesStackedBranches: Bool {
+    updatesStackedBranches && !stackedBranches.isEmpty
+  }
 
   public enum ValidationError: Sendable, Hashable {
     /// No steps, or every step is a drop.
@@ -86,16 +105,27 @@ public struct RebasePlan: Sendable, Hashable {
 
   /// `<action> <full-oid> <subject>` per step. Drops are explicit lines, not
   /// omissions, so `rebase.missingCommitsCheck = error` setups keep working.
+  /// A stacked branch's `update-ref` line follows the step for its tip, as in
+  /// the todo list `rebase --update-refs` generates, so it lands on whatever
+  /// that step leaves at HEAD.
   public func todoFileContents() -> String {
     steps.enumerated().map { index, step in
+      var lines: String
       if step.action == .reword {
-        return """
+        lines = """
           pick \(step.commit.oid.rawValue) \(step.commit.subject)
           exec git commit --amend -F "$SPOON_REWORD_DIR/\(index)"
 
           """
+      } else {
+        lines = "\(step.action.rawValue) \(step.commit.oid.rawValue) \(step.commit.subject)\n"
       }
-      return "\(step.action.rawValue) \(step.commit.oid.rawValue) \(step.commit.subject)\n"
+      if movesStackedBranches {
+        for branch in stackedBranches where branch.tip == step.commit.oid {
+          lines += "update-ref refs/heads/\(branch.name)\n"
+        }
+      }
+      return lines
     }.joined()
   }
 }
@@ -109,6 +139,10 @@ public struct AutosquashPlan: Sendable, Hashable {
   public var baseReference: String
   /// Fixup commits, newest first.
   public var fixups: [Commit]
+  /// Other branches pointing into the rewritten range.
+  public var stackedBranches: [StackedBranch] = []
+  /// Move `stackedBranches` to the rewritten commits (`--update-refs`).
+  public var updatesStackedBranches: Bool = true
 
   static func isFixup(_ commit: Commit) -> Bool {
     ["fixup! ", "squash! ", "amend! "].contains { commit.subject.hasPrefix($0) }

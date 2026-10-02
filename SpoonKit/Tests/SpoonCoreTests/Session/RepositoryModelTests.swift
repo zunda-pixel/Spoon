@@ -1395,6 +1395,32 @@ struct RepositoryModelTests {
     #expect(await client.mutationCalls == ["autosquash:dddd4444"])
   }
 
+  @Test func autosquashMovesStackedBranchesUnlessTurnedOff() async throws {
+    let client = FakeRepositoryGitClient()
+    let head = makeOID("aaaa1111")
+    let base = makeOID("dddd4444")
+    var fixup = makeCommit("aaaa1111", subject: "fixup! Add a")
+    fixup.parents = [base]
+    await client.configure(
+      status: makeStatus(oid: head, branch: "topic"),
+      branches: [makeBranch("topic", oid: head, isCurrent: true)],
+      logPages: [0: LogPage(commits: [fixup], hasMore: false)],
+      mergeBases: ["main...aaaa1111": base]
+    )
+    await client.setStackedBranches([StackedBranch(name: "lower", tip: makeOID("eeee5555"))])
+    let model = makeModel(client)
+    await model.refresh()
+
+    var plan = try await model.autosquashPlan()
+    #expect(plan.stackedBranches.map(\.name) == ["lower"])
+    await model.autosquash(plan)
+    plan.updatesStackedBranches = false
+    await model.autosquash(plan)
+
+    #expect(
+      await client.mutationCalls == ["autosquash:dddd4444:update-refs", "autosquash:dddd4444"])
+  }
+
   @Test func multiCommitPicksRunOldestFirstAndRevertsNewestFirst() async {
     let client = FakeRepositoryGitClient()
     let head = makeOID("aaaa1111")
@@ -1702,8 +1728,11 @@ private actor FakeRepositoryGitClient: GitClient {
   func commitFixup(for oid: ObjectID) async throws {
     mutationCalls.append("fixup-commit:\(oid.rawValue)")
   }
-  func autosquash(onto base: ObjectID) async throws {
-    mutationCalls.append("autosquash:\(base.rawValue)")
+  private var stacked: [StackedBranch] = []
+  func setStackedBranches(_ branches: [StackedBranch]) { stacked = branches }
+  func stackedBranches(after base: ObjectID?) async throws -> [StackedBranch] { stacked }
+  func autosquash(onto base: ObjectID, updateRefs: Bool) async throws {
+    mutationCalls.append("autosquash:\(base.rawValue)\(updateRefs ? ":update-refs" : "")")
   }
   func reset(to target: ObjectID, mode: ResetMode) async throws { throw Failure.unimplemented }
   func commitDetail(_ oid: ObjectID, options: DiffOptions) async throws -> CommitDetail {
