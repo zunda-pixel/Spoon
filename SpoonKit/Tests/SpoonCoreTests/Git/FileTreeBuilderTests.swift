@@ -80,6 +80,19 @@ struct FileTreeBuilderTests {
     #expect(trees.staged.first?.path == trees.unstaged.first?.path)
   }
 
+  @Test func refoldingGivesMovedNodesNewIDs() {
+    let folded = FileTreeBuilder.build([entry("Kit/App/TabBar/Main.swift")])
+    let split = FileTreeBuilder.build([
+      entry("Kit/App/TabBar/Main.swift"), entry("Kit/Features/Home.swift"),
+    ])
+
+    // Kit/App/TabBar and its file move under a new Kit row; reusing their
+    // IDs would move rows across parents in the outline.
+    #expect(Set(allIDs(folded)).isDisjoint(with: allIDs(split)))
+    #expect(Set(allIDs(split)).count == allIDs(split).count)
+    #expect(split.first?.children?.first?.path == folded.first?.path)
+  }
+
   private func allIDs(_ nodes: [FileTreeNode]) -> [String] {
     nodes.flatMap { [$0.id] + allIDs($0.children ?? []) }
   }

@@ -12,11 +12,13 @@ public struct FileTreeNode: Sendable, Hashable, Identifiable {
   public var entry: FileStatusEntry?
   /// nil for files, the sorted children for directories.
   public var children: [FileTreeNode]?
-  /// Distinguishes trees shown in one list: the same folder or file can be in
-  /// several areas at once (e.g. partly staged), and list rows need unique IDs.
-  public var namespace: String = ""
-
-  public var id: String { namespace.isEmpty ? path : "\(namespace)|\(path)" }
+  /// The row's identity: its area namespace (the same folder or file can be
+  /// in several areas at once, e.g. partly staged) and the display names of
+  /// its ancestors, joined by `//`, which a Git path never contains. When
+  /// folding changes, a node that moves under another parent gets a new
+  /// identity, so the outline removes and inserts its row instead of moving
+  /// it across parents, which leaves stale rows drawn over each other.
+  public var id: String
 }
 
 /// The Changes list's four area trees for one status snapshot, built once
@@ -61,7 +63,7 @@ public enum FileTreeBuilder {
       }
       directory.files.append((fileName, entry))
     }
-    return nodes(of: root, pathPrefix: "", namespace: namespace)
+    return nodes(of: root, pathPrefix: "", idPrefix: namespace.isEmpty ? "" : "\(namespace)|")
   }
 
   /// The files of `nodes` in depth-first display order — the flat order
@@ -91,7 +93,7 @@ public enum FileTreeBuilder {
   }
 
   private static func nodes(
-    of directory: Directory, pathPrefix: String, namespace: String
+    of directory: Directory, pathPrefix: String, idPrefix: String
   ) -> [FileTreeNode] {
     var result: [FileTreeNode] = []
     for (name, subdirectory) in directory.subdirectories.sorted(by: { compare($0.key, $1.key) }) {
@@ -105,19 +107,20 @@ public enum FileTreeBuilder {
         current = only.value
       }
       let path = pathPrefix + foldedName
+      let id = idPrefix + foldedName
       result.append(
         FileTreeNode(
           name: foldedName,
           path: path,
-          children: nodes(of: current, pathPrefix: path + "/", namespace: namespace),
-          namespace: namespace
+          children: nodes(of: current, pathPrefix: path + "/", idPrefix: id + "//"),
+          id: id
         )
       )
     }
     for (name, entry) in directory.files.sorted(by: { compare($0.name, $1.name) }) {
       result.append(
         FileTreeNode(
-          name: name, path: entry.path, entry: entry, children: nil, namespace: namespace)
+          name: name, path: entry.path, entry: entry, children: nil, id: idPrefix + name)
       )
     }
     return result
