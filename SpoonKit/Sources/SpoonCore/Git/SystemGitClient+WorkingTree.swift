@@ -277,6 +277,32 @@ extension SystemGitClient {
       try result.checkSuccess(of: command).standardOutputText)
   }
 
+  public func commitTemplate() async throws -> CommitTemplate? {
+    guard let path = try await configValue("commit.template", path: true) else { return nil }
+    // git reads a relative path from the directory it runs in, the root here.
+    let url = path.hasPrefix("/") ? URL(filePath: path) : repositoryRoot.appending(path: path)
+    let text = try await Task.detached { try String(contentsOf: url, encoding: .utf8) }.value
+    // core.commentChar can be "auto"; git then picks a character per message.
+    let commentCharacter = try await configValue("core.commentChar", path: false)
+      .flatMap { $0.count == 1 ? $0.first : nil } ?? "#"
+    return CommitTemplate.parse(text, path: path, commentCharacter: commentCharacter)
+  }
+
+  /// One config value, `nil` when unset (`git config --get` exits 1).
+  private func configValue(_ key: String, path: Bool) async throws -> String? {
+    let command = GitCommand.make(
+      git: git,
+      repository: repositoryRoot,
+      arguments: ["config"] + (path ? ["--path"] : []) + ["--get", key],
+      timeout: .seconds(10)
+    )
+    let result = try await runner.run(command)
+    if result.exitCode == 1 { return nil }
+    let value = try result.checkSuccess(of: command).standardOutputText
+      .trimmingCharacters(in: .newlines)
+    return value.isEmpty ? nil : value
+  }
+
   public func reset(to target: ObjectID, mode: ResetMode) async throws {
     try await runVoid(["reset", "--\(mode.rawValue)", target.rawValue])
   }

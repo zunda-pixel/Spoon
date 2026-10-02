@@ -11,6 +11,8 @@ struct CommitComposerView: View {
   /// `nil` until loaded, or when git config can't be read.
   @State private var signing: CommitSigningConfiguration?
   @State private var recentAuthors: [CoAuthor] = []
+  /// The repository's `commit.template`, which starts every new message.
+  @State private var template: CommitTemplate?
   @State private var addingCoAuthor = false
 
   init(model: RepositoryModel) {
@@ -37,6 +39,10 @@ struct CommitComposerView: View {
           }
         }
 
+      if let template {
+        templateHint(template)
+      }
+
       if !model.commitCoAuthors.isEmpty {
         CoAuthorChips(model: model)
       }
@@ -57,6 +63,12 @@ struct CommitComposerView: View {
     .task(id: model.configGeneration) {
       signing = await model.commitSigningConfiguration()
       sign = signing?.signsByDefault ?? false
+      let previous = template
+      template = await model.commitTemplate()
+      // Start from the template, unless the user already typed something.
+      if !amend, message.isEmpty || message == previous?.body {
+        message = template?.body ?? ""
+      }
     }
     .task { recentAuthors = await model.recentAuthors() }
     .sheet(isPresented: $addingCoAuthor) {
@@ -160,7 +172,7 @@ struct CommitComposerView: View {
     Button("Commit") {
       Task {
         if await model.commit(message: message, options: commitOptions) {
-          message = ""
+          message = template?.body ?? ""
           amend = false
           sign = signing?.signsByDefault ?? false
         }
@@ -189,8 +201,42 @@ struct CommitComposerView: View {
     )
   }
 
+  /// git refuses a message left exactly as the template, and so does Spoon.
+  private var isUnchangedTemplate: Bool {
+    guard let body = template?.body, !body.isEmpty else { return false }
+    return message.trimmingCharacters(in: .whitespacesAndNewlines)
+      == body.trimmingCharacters(in: .whitespacesAndNewlines)
+  }
+
+  private func templateHint(_ template: CommitTemplate) -> some View {
+    HStack(alignment: .firstTextBaseline, spacing: 6) {
+      Image(systemName: "doc.text")
+        .accessibilityHidden(true)
+      VStack(alignment: .leading, spacing: 2) {
+        if isUnchangedTemplate {
+          Text("Fill in the template before committing.")
+            .foregroundStyle(.orange)
+        }
+        ForEach(Array(template.comments.prefix(2).enumerated()), id: \.offset) { _, line in
+          Text(line)
+        }
+      }
+      Spacer(minLength: 4)
+      if !template.body.isEmpty, message != template.body {
+        Button("Use Template") { message = template.body }
+          .buttonStyle(.link)
+          .help("Replace the message with the commit template")
+      }
+    }
+    .font(.caption)
+    .foregroundStyle(.secondary)
+    .lineLimit(2)
+    .help(
+      (["Commit template: \(template.path)"] + template.comments).joined(separator: "\n"))
+  }
+
   private var canCommit: Bool {
-    guard !model.isBusy else { return false }
+    guard !model.isBusy, !isUnchangedTemplate else { return false }
     let hasMessage = !message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     let hasStaged =
       !(model.status?.stagedEntries.isEmpty ?? true)
