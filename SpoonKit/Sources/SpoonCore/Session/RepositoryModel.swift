@@ -75,6 +75,9 @@ public final class RepositoryModel {
   let aiStore: AIStore
   var watchTask: Task<Void, Never>?
   var gitRefreshTask: Task<Void, Never>?
+  /// Set when a refresh is requested while one runs: that run may have read
+  /// the repository before the change, so it reads once more.
+  var gitRefreshNeedsRerun = false
 
   public init(repository: Repository, gitClient: any GitClient, gitHub: GitHubAPIClient? = nil) {
     self.repository = repository

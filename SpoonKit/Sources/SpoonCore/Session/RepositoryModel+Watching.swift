@@ -1,6 +1,8 @@
 extension RepositoryModel {
   /// Auto-refreshes on repository changes. Self-inflicted events are
-  /// suppressed while a mutation runs; `perform` refreshes afterwards.
+  /// suppressed while a mutation runs; `perform` refreshes afterwards. A
+  /// change during a refresh makes that refresh read again, since it may
+  /// have read the repository before the change.
   public func startWatching() {
     guard watchTask == nil else { return }
     let root = repository.rootURL
@@ -15,7 +17,7 @@ extension RepositoryModel {
         }
       for await _ in RepoWatcher.changes(in: layout) {
         guard let self else { break }
-        if self.isBusy || self.isRefreshing { continue }
+        if self.isBusy { continue }
         await self.refresh()
       }
     }

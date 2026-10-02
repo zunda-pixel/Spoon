@@ -87,6 +87,43 @@ struct RepositoryModelTests {
     #expect(model.lastErrorMessage == FakeRepositoryGitClient.Failure.refresh.localizedDescription)
   }
 
+  @Test func refreshRequestedDuringARefreshReadsAgain() async {
+    let client = FakeRepositoryGitClient()
+    let oid = makeOID("14141414")
+    let branches = [makeBranch("main", oid: oid, isCurrent: true)]
+    await client.configure(
+      status: WorkingTreeStatus(
+        headOID: oid, headBranch: "main",
+        entries: [FileStatusEntry(path: "a.txt", isUntracked: true)]
+      ),
+      branches: branches
+    )
+    let model = makeModel(client)
+    await client.holdStatus()
+
+    let running = Task { await model.refreshGitState() }
+    while await client.statusCallCount < 1 { await Task.yield() }
+    // The file changes after the running refresh read the status.
+    await client.configure(
+      status: WorkingTreeStatus(
+        headOID: oid, headBranch: "main",
+        entries: [
+          FileStatusEntry(path: "a.txt", isUntracked: true),
+          FileStatusEntry(path: "b.txt", isUntracked: true),
+        ]
+      ),
+      branches: branches
+    )
+    let joining = Task { await model.refreshGitState() }
+    while !model.gitRefreshNeedsRerun { await Task.yield() }
+    await client.releaseStatus()
+    await running.value
+    await joining.value
+
+    #expect(model.status?.untrackedEntries.map(\.path) == ["a.txt", "b.txt"])
+    #expect(await client.statusCallCount == 2)
+  }
+
   @Test func mutationRefreshesTheWorkingTree() async {
     let client = FakeRepositoryGitClient()
     let oid = makeOID("22222222")
@@ -1635,7 +1672,27 @@ private actor FakeRepositoryGitClient: GitClient {
     shouldFailWorktreeMutations = failWorktreeMutations
   }
 
-  func status() async throws -> WorkingTreeStatus { currentStatus }
+  private var holdsStatus = false
+  private var heldStatusReads: [CheckedContinuation<Void, Never>] = []
+  private(set) var statusCallCount = 0
+
+  /// Parks later status reads after they read, as a slow `git status` would.
+  func holdStatus() { holdsStatus = true }
+
+  func releaseStatus() {
+    holdsStatus = false
+    heldStatusReads.forEach { $0.resume() }
+    heldStatusReads = []
+  }
+
+  func status() async throws -> WorkingTreeStatus {
+    statusCallCount += 1
+    let snapshot = currentStatus
+    if holdsStatus {
+      await withCheckedContinuation { heldStatusReads.append($0) }
+    }
+    return snapshot
+  }
 
   func branches() async throws -> [Branch] {
     if shouldFailBranches { throw Failure.refresh }
