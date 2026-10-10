@@ -6,13 +6,12 @@ import SwiftUI
 struct BranchesSidebarSection: View {
   let model: RepositoryModel
   let navigation: RepositoryNavigationState
+  @Bindable var expansion: SidebarExpansionState
   let searchText: String
   let openWorktree: (Worktree) -> Void
-  @State private var isExpanded = true
-  @State private var expandedFolderPaths: Set<String> = []
 
   var body: some View {
-    Section(isExpanded: $isExpanded) {
+    Section(isExpanded: $expansion.branches) {
       if filteredBranches.isEmpty, searchText.hasSidebarSearchQuery {
         Label("No matching branches", systemImage: "magnifyingglass")
           .foregroundStyle(.tertiary)
@@ -23,7 +22,7 @@ struct BranchesSidebarSection: View {
           model: model,
           navigation: navigation,
           isSearching: searchText.hasSidebarSearchQuery,
-          expandedFolderPaths: $expandedFolderPaths,
+          expandedFolderPaths: $expansion.branchFolderPaths,
           openWorktree: openWorktree
         )
       }
@@ -32,11 +31,11 @@ struct BranchesSidebarSection: View {
     }
     .onChange(of: model.currentBranch?.name, initial: true) {
       guard let currentBranchName = model.currentBranch?.name else { return }
-      expandedFolderPaths.formUnion(BranchTreeNode.folderPaths(in: currentBranchName))
+      expansion.revealBranch(named: currentBranchName)
     }
     .onChange(of: searchText) {
       if searchText.hasSidebarSearchQuery {
-        isExpanded = true
+        expansion.branches = true
       }
     }
   }

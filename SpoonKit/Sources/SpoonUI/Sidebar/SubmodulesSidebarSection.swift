@@ -6,13 +6,13 @@ import SwiftUI
 struct SubmodulesSidebarSection: View {
   let model: RepositoryModel
   let navigation: RepositoryNavigationState
+  @Bindable var expansion: SidebarExpansionState
   let searchText: String
-  @State private var isExpanded = true
   @State private var pending: PendingSubmoduleAction?
 
   var body: some View {
     if !model.submodules.isEmpty {
-      Section(isExpanded: $isExpanded) {
+      Section(isExpanded: $expansion.submodules) {
         if filteredSubmodules.isEmpty {
           Label("No matching submodules", systemImage: "magnifyingglass")
             .foregroundStyle(.tertiary)
@@ -33,7 +33,7 @@ struct SubmodulesSidebarSection: View {
       }
       .onChange(of: searchText) {
         if searchText.hasSidebarSearchQuery {
-          isExpanded = true
+          expansion.submodules = true
         }
       }
       .confirmationDialog(

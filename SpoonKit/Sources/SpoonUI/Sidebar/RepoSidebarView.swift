@@ -1,10 +1,34 @@
 import SpoonCore
 import SwiftUI
 
+/// Which sidebar sections, remotes, and branch folders are expanded.
+/// Worktrees of one repository share its branches, remotes, and tags, so
+/// the window keeps this across worktree switches while the rest of the
+/// sidebar's state starts over.
+@MainActor
+@Observable
+final class SidebarExpansionState {
+  var branches = true
+  var branchFolderPaths: Set<String> = []
+  var stashes = true
+  var remotes = true
+  var remoteNames: Set<String> = []
+  var remoteFolderPaths: Set<String> = []
+  var submodules = true
+  var tags = false
+
+  /// Expands the folders holding `branchName`, leaving every other folder
+  /// as the user left it.
+  func revealBranch(named branchName: String) {
+    branchFolderPaths.formUnion(BranchTreeNode.folderPaths(in: branchName))
+  }
+}
+
 @MainActor
 struct RepoSidebarView: View {
   let model: RepositoryModel
   @Bindable var navigation: RepositoryNavigationState
+  let expansion: SidebarExpansionState
   let openWorktree: (Worktree) -> Void
   @State private var removingRemote: Remote?
   @State private var removingWorktree: Worktree?
@@ -17,13 +41,20 @@ struct RepoSidebarView: View {
       BranchesSidebarSection(
         model: model,
         navigation: navigation,
+        expansion: expansion,
         searchText: searchText,
         openWorktree: openWorktree
       )
-      StashesSidebarSection(model: model, navigation: navigation, searchText: searchText)
+      StashesSidebarSection(
+        model: model,
+        navigation: navigation,
+        expansion: expansion,
+        searchText: searchText
+      )
       RemotesSidebarSection(
         model: model,
         navigation: navigation,
+        expansion: expansion,
         removingRemote: $removingRemote,
         removingWorktree: $removingWorktree,
         deletingRemoteBranch: $deletingRemoteBranch,
@@ -33,11 +64,13 @@ struct RepoSidebarView: View {
       SubmodulesSidebarSection(
         model: model,
         navigation: navigation,
+        expansion: expansion,
         searchText: searchText
       )
       TagsSidebarSection(
         model: model,
         navigation: navigation,
+        expansion: expansion,
         searchText: searchText
       )
     }
