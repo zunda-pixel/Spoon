@@ -24,7 +24,7 @@ struct RangeDiffSheet: View {
             Text(upstream).tag(BranchVersionBaseline.upstream)
           }
         }
-        .fixedSize()
+        .layoutPriority(1)
         Button("Done") { dismiss() }
           .keyboardShortcut(.cancelAction)
       }

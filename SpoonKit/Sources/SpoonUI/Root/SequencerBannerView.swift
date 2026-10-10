@@ -14,21 +14,9 @@ struct SequencerBannerView: View {
   }
 
   var body: some View {
-    // The banner lives in the content column, which can be narrow: fall back
-    // to stacking the actions under the message instead of squeezing it.
-    ViewThatFits(in: .horizontal) {
-      HStack(spacing: 12) {
-        message
-        Spacer(minLength: 0)
-        actions
-      }
-      VStack(alignment: .leading, spacing: 8) {
-        message
-        HStack(spacing: 8) {
-          Spacer(minLength: 0)
-          actions
-        }
-      }
+    AdaptiveActionsLayout {
+      message
+      WrappingLayout { actions }
     }
     .padding(.horizontal, 14)
     .padding(.vertical, 8)

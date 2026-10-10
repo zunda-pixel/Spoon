@@ -54,20 +54,17 @@ struct FileDiffListView: View {
   private static let collapseThreshold = 5_000
 
   var body: some View {
-    GeometryReader { geometry in
-      ScrollView([.horizontal, .vertical]) {
-        LazyVStack(alignment: .leading, spacing: 0, pinnedViews: .sectionHeaders) {
-          ForEach(diffs) { diff in
-            Section {
-              fileBody(diff)
-            } header: {
-              FileDiffHeaderView(diff: diff, actions: fileActions?(diff) ?? [])
-            }
+    DiffScrollView {
+      LazyVStack(alignment: .leading, spacing: 0, pinnedViews: .sectionHeaders) {
+        ForEach(diffs) { diff in
+          Section {
+            fileBody(diff)
+          } header: {
+            FileDiffHeaderView(diff: diff, actions: fileActions?(diff) ?? [])
           }
         }
-        .frame(minWidth: geometry.size.width, alignment: .leading)
-        .padding(.bottom, 12)
       }
+      .padding(.bottom, 12)
     }
     .background(.background)
   }
@@ -142,6 +139,24 @@ struct FileDiffListView: View {
   }
 }
 
+/// Observe only the viewport width, keeping resize updates out of the diff owner.
+/// A minimum width fills short patches without constraining horizontally scrolling code.
+private struct DiffScrollView<Content: View>: View {
+  @ViewBuilder var content: Content
+  @State private var viewportWidth: CGFloat = 0
+
+  var body: some View {
+    ScrollView([.horizontal, .vertical]) {
+      content.frame(minWidth: viewportWidth, alignment: .leading)
+    }
+    .onGeometryChange(for: CGFloat.self) { proxy in
+      proxy.size.width
+    } action: { width in
+      viewportWidth = width
+    }
+  }
+}
+
 @MainActor
 struct FileDiffHeaderView: View {
   let diff: FileDiff
@@ -182,7 +197,6 @@ struct FileDiffHeaderView: View {
         }
         .menuStyle(.borderlessButton)
         .menuIndicator(.hidden)
-        .fixedSize()
         .help("Actions for \(diff.path)")
         .accessibilityLabel("Actions for \(diff.path)")
       }
@@ -247,6 +261,17 @@ struct HunkView: View {
   let onDiscardHunk: (() -> Void)?
   let highlightsWordChanges: Bool
   @State private var isExpanded: Bool
+  @State private var highlights: HighlightResult?
+
+  private struct HighlightInput: Equatable {
+    let hunk: Hunk
+    let isEnabled: Bool
+  }
+
+  private struct HighlightResult {
+    let input: HighlightInput
+    let ranges: [Int: [Range<Int>]]
+  }
 
   init(
     diff: FileDiff,
@@ -312,7 +337,8 @@ struct HunkView: View {
       .background(.quaternary.opacity(0.5))
 
       if isExpanded {
-        let wordChanges = highlightsWordChanges ? InlineChanges.ranges(in: hunk) : [:]
+        let input = HighlightInput(hunk: hunk, isEnabled: highlightsWordChanges)
+        let wordChanges = highlights?.input == input ? highlights?.ranges ?? [:] : [:]
         ForEach(Array(hunk.lines.enumerated()), id: \.offset) { offset, line in
           DiffLineRow(
             line: line,
@@ -328,6 +354,18 @@ struct HunkView: View {
     }
     .accessibilityElement(children: .contain)
     .accessibilityLabel("Diff hunk")
+    // Selecting lines and expanding/collapsing a hunk must not repeat word matching.
+    .task(id: HighlightInput(hunk: hunk, isEnabled: highlightsWordChanges)) {
+      let changes = highlightsWordChanges ? await Self.highlightRanges(in: hunk) : [:]
+      guard !Task.isCancelled else { return }
+      highlights = HighlightResult(
+        input: HighlightInput(hunk: hunk, isEnabled: highlightsWordChanges), ranges: changes)
+    }
+  }
+
+  @concurrent
+  private static func highlightRanges(in hunk: Hunk) async -> [Int: [Range<Int>]] {
+    InlineChanges.ranges(in: hunk)
   }
 
   private var selectionKey: (String, Hunk.ID) { (diff.id, hunk.id) }

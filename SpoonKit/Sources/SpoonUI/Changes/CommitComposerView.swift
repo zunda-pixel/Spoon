@@ -47,16 +47,9 @@ struct CommitComposerView: View {
         CoAuthorChips(model: model)
       }
 
-      // The options move to their own row when the column is too narrow.
-      ViewThatFits(in: .horizontal) {
-        HStack {
-          options
-          actions
-        }
-        VStack(alignment: .leading, spacing: 8) {
-          HStack { options }
-          HStack { actions }
-        }
+      AdaptiveActionsLayout {
+        WrappingLayout { options }
+        HStack { actions }
       }
     }
     .padding(10)
@@ -80,14 +73,11 @@ struct CommitComposerView: View {
   private var options: some View {
     Toggle("Amend", isOn: $amend)
       .toggleStyle(.checkbox)
-      .fixedSize()
     Toggle("Sign Off", isOn: $model.commitSignsOff)
       .toggleStyle(.checkbox)
-      .fixedSize()
       .help("Add a Signed-off-by trailer with your name and email. Remembered for this repository.")
     Toggle("Sign", isOn: $sign)
       .toggleStyle(.checkbox)
-      .fixedSize()
       .disabled(signing?.canSign == false && !sign)
       .help(signingHelp)
     coAuthorMenu
@@ -121,11 +111,11 @@ struct CommitComposerView: View {
       }
     } label: {
       Label(
-        model.commitCoAuthors.isEmpty ? "Co-authors" : "Co-authors (\(model.commitCoAuthors.count))",
+        model.commitCoAuthors.isEmpty
+          ? "Co-authors" : "Co-authors (\(model.commitCoAuthors.count))",
         systemImage: "person.2")
     }
     .menuStyle(.borderlessButton)
-    .fixedSize()
     .help("Credit others with Co-authored-by: lines, which GitHub and GitLab show as co-authors")
   }
 
@@ -155,7 +145,6 @@ struct CommitComposerView: View {
       }
     }
     .menuStyle(.borderlessButton)
-    .fixedSize()
     .disabled(model.aiActivity != nil || (model.status?.stagedEntries.isEmpty ?? true))
     .help("Generate a commit message from the staged changes")
 
@@ -300,7 +289,8 @@ struct AddCoAuthorSheet: View {
   var body: some View {
     SheetFormLayout(
       title: "Add Co-author",
-      subtitle: "Credited with a Co-authored-by: line on the next commit. Use the email their GitHub account knows."
+      subtitle:
+        "Credited with a Co-authored-by: line on the next commit. Use the email their GitHub account knows."
     ) {
       Form {
         TextField("Name", text: $name, prompt: Text("Ada Lovelace"))

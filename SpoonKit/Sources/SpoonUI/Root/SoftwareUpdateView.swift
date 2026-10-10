@@ -47,30 +47,31 @@ public struct SoftwareUpdateView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     case .available(let release):
       releaseNotes(release)
-      HStack {
-        Button("Skip This Version") {
-          updater.skip(release)
-          dismissWindow(id: softwareUpdateWindowID)
+      AdaptiveActionsLayout {
+        WrappingLayout {
+          Button("Skip This Version") {
+            updater.skip(release)
+            dismissWindow(id: softwareUpdateWindowID)
+          }
+          Button("View on GitHub") { openURL(release.pageURL) }
         }
-        Button("View on GitHub") { openURL(release.pageURL) }
-        Spacer()
-        Button("Remind Me Later") {
-          updater.dismiss()
-          dismissWindow(id: softwareUpdateWindowID)
-        }
-        .keyboardShortcut(.cancelAction)
-        Button("Install and Relaunch") {
-          Task {
-            await updater.install(release)
-            if case .readyToRelaunch = updater.state {
-              AppRelauncher.relaunch(updater.appURL)
+        WrappingLayout {
+          Button("Remind Me Later") {
+            updater.dismiss()
+            dismissWindow(id: softwareUpdateWindowID)
+          }
+          .keyboardShortcut(.cancelAction)
+          Button("Install and Relaunch") {
+            Task {
+              await updater.install(release)
+              if case .readyToRelaunch = updater.state {
+                AppRelauncher.relaunch(updater.appURL)
+              }
             }
           }
+          .keyboardShortcut(.defaultAction)
         }
-        .keyboardShortcut(.defaultAction)
       }
-      // Keep every button label whole rather than truncating it.
-      .fixedSize(horizontal: false, vertical: true)
     case .installing:
       ProgressView("Downloading and installing…")
         .frame(maxWidth: .infinity, maxHeight: .infinity)

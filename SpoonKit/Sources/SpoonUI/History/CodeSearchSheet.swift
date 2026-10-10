@@ -82,7 +82,7 @@ struct CodeSearchSheet: View {
             }
           }
         }
-        .fixedSize()
+        .layoutPriority(1)
         Toggle("Include Untracked", isOn: $includesUntracked)
           .disabled(revision != nil)
           .help("Also search files git doesn’t track yet")
@@ -171,7 +171,8 @@ struct CodeSearchSheet: View {
       Divider()
       Button("Blame…") { navigation.present(.blame(path: match.path)) }
       Button("Show History of This Line…") {
-        navigation.present(.lineHistory(path: match.path, lines: match.lineNumber...match.lineNumber))
+        navigation.present(
+          .lineHistory(path: match.path, lines: match.lineNumber...match.lineNumber))
       }
       .disabled(model.hasUncommittedChanges(at: match.path))
       .help(LineHistorySheet.uncommittedHelp)

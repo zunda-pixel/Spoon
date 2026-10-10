@@ -23,7 +23,7 @@ struct ContributorsSheet: View {
         }
         .pickerStyle(.segmented)
         .labelsHidden()
-        .fixedSize()
+        .layoutPriority(1)
         Button("Done") { dismiss() }
           .keyboardShortcut(.cancelAction)
       }
@@ -68,10 +68,13 @@ struct ContributorsSheet: View {
           Spacer(minLength: 12)
           Text(contributor.commitCount, format: .number)
             .monospacedDigit()
-          Text(Double(contributor.commitCount) / Double(max(total, 1)), format: .percent.precision(.fractionLength(0)))
-            .monospacedDigit()
-            .foregroundStyle(.secondary)
-            .frame(width: 44, alignment: .trailing)
+          Text(
+            Double(contributor.commitCount) / Double(max(total, 1)),
+            format: .percent.precision(.fractionLength(0))
+          )
+          .monospacedDigit()
+          .foregroundStyle(.secondary)
+          .frame(width: 44, alignment: .trailing)
         }
         .contextMenu {
           Button("Copy Name and Email") {
