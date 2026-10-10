@@ -54,17 +54,20 @@ struct FileDiffListView: View {
   private static let collapseThreshold = 5_000
 
   var body: some View {
-    ScrollView([.vertical]) {
-      LazyVStack(alignment: .leading, spacing: 0, pinnedViews: .sectionHeaders) {
-        ForEach(diffs) { diff in
-          Section {
-            fileBody(diff)
-          } header: {
-            FileDiffHeaderView(diff: diff, actions: fileActions?(diff) ?? [])
+    GeometryReader { geometry in
+      ScrollView([.horizontal, .vertical]) {
+        LazyVStack(alignment: .leading, spacing: 0, pinnedViews: .sectionHeaders) {
+          ForEach(diffs) { diff in
+            Section {
+              fileBody(diff)
+            } header: {
+              FileDiffHeaderView(diff: diff, actions: fileActions?(diff) ?? [])
+            }
           }
         }
+        .frame(minWidth: geometry.size.width, alignment: .leading)
+        .padding(.bottom, 12)
       }
-      .padding(.bottom, 12)
     }
     .background(.background)
   }
@@ -397,6 +400,7 @@ struct DiffLineRow: View {
       Text(marker)
         .frame(width: 16)
       Text(highlightedText)
+        .fixedSize(horizontal: true, vertical: false)
         .frame(maxWidth: .infinity, alignment: .leading)
         .foregroundStyle(
           line.kind == .noNewlineMarker ? AnyShapeStyle(.secondary) : AnyShapeStyle(.primary))
