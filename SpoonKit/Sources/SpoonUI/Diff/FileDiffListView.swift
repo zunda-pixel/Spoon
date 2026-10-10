@@ -53,20 +53,57 @@ struct FileDiffListView: View {
   /// Files larger than this start with collapsed hunks.
   private static let collapseThreshold = 5_000
 
+  /// Files folded down to their header. Paths outlive reloads of the same
+  /// change, so a refresh keeps what the user already set aside.
+  @State private var collapsedFileIDs: Set<FileDiff.ID> = []
+
   var body: some View {
-    DiffScrollView {
-      LazyVStack(alignment: .leading, spacing: 0, pinnedViews: .sectionHeaders) {
-        ForEach(diffs) { diff in
-          Section {
-            fileBody(diff)
-          } header: {
-            FileDiffHeaderView(diff: diff, actions: fileActions?(diff) ?? [])
+    ScrollViewReader { scrollProxy in
+      DiffScrollView {
+        LazyVStack(alignment: .leading, spacing: 0, pinnedViews: .sectionHeaders) {
+          ForEach(diffs) { diff in
+            let isExpanded = !collapsedFileIDs.contains(diff.id)
+            Section {
+              if isExpanded {
+                fileBody(diff)
+              }
+            } header: {
+              FileDiffHeaderView(
+                diff: diff,
+                isExpanded: isExpanded,
+                actions: fileActions?(diff) ?? []
+              ) { expand, allFiles, headerWasPinned in
+                setExpanded(
+                  expand, diff, allFiles: allFiles, headerWasPinned: headerWasPinned,
+                  scrollProxy: scrollProxy)
+              }
+            }
           }
         }
+        .padding(.bottom, 12)
       }
-      .padding(.bottom, 12)
     }
     .background(.background)
+  }
+
+  /// Folds or unfolds `diff`, or every file when `allFiles`.
+  private func setExpanded(
+    _ isExpanded: Bool, _ diff: FileDiff, allFiles: Bool, headerWasPinned: Bool,
+    scrollProxy: ScrollViewProxy
+  ) {
+    let ids = allFiles ? diffs.map(\.id) : [diff.id]
+    if isExpanded {
+      collapsedFileIDs.subtract(ids)
+    } else {
+      collapsedFileIDs.formUnion(ids)
+    }
+    // Folding the file under a pinned header would leave the viewport deep in
+    // later files, and folding every file moves the clicked one; bring its
+    // header to the top. Until the fold is laid out the pinned header still
+    // counts as visible, so scroll on the next turn.
+    if allFiles || (!isExpanded && headerWasPinned) {
+      Task { scrollProxy.scrollTo(diff.id, anchor: .topLeading) }
+    }
   }
 
   /// What makes a hunk row current: its file and its exact content.
@@ -160,34 +197,65 @@ private struct DiffScrollView<Content: View>: View {
 @MainActor
 struct FileDiffHeaderView: View {
   let diff: FileDiff
+  let isExpanded: Bool
   var actions: [FileDiffAction] = []
+  /// Folds or unfolds the file, or every file when `allFiles` (Option-click).
+  /// `headerWasPinned` reports that the file's top had scrolled above the
+  /// viewport, leaving this header pinned over its lines.
+  let setExpanded: (_ isExpanded: Bool, _ allFiles: Bool, _ headerWasPinned: Bool) -> Void
+
+  /// At the top of the viewport, where a pinned header sits over its file.
+  @State private var isPinned = false
 
   var body: some View {
     HStack(spacing: 8) {
-      Image(systemName: icon)
-        .foregroundStyle(iconColor)
-      VStack(alignment: .leading, spacing: 0) {
-        Text(diff.path)
-          .fontWeight(.medium)
-          .lineLimit(1)
-          .truncationMode(.middle)
-        if let oldPath = diff.oldPath {
-          Text("from \(oldPath)")
-            .font(.caption)
+      Button {
+        setExpanded(!isExpanded, NSEvent.modifierFlags.contains(.option), isPinned)
+      } label: {
+        HStack(spacing: 8) {
+          // One rotated symbol keeps the paths aligned between folded and
+          // unfolded files; the two chevrons differ in width.
+          Image(systemName: "chevron.right")
+            .font(.caption2)
             .foregroundStyle(.secondary)
-            .lineLimit(1)
-            .truncationMode(.middle)
+            .rotationEffect(.degrees(isExpanded ? 90 : 0))
+          Image(systemName: icon)
+            .foregroundStyle(iconColor)
+          VStack(alignment: .leading, spacing: 0) {
+            Text(diff.path)
+              .fontWeight(.medium)
+              .lineLimit(1)
+              .truncationMode(.middle)
+            if let oldPath = diff.oldPath {
+              Text("from \(oldPath)")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .truncationMode(.middle)
+            }
+          }
+          Spacer()
+          if diff.additionCount > 0 {
+            Text("+\(diff.additionCount)")
+              .foregroundStyle(.green)
+          }
+          if diff.deletionCount > 0 {
+            Text("−\(diff.deletionCount)")
+              .foregroundStyle(.red)
+          }
         }
+        .contentShape(Rectangle())
       }
-      Spacer()
-      if diff.additionCount > 0 {
-        Text("+\(diff.additionCount)")
-          .foregroundStyle(.green)
-      }
-      if diff.deletionCount > 0 {
-        Text("−\(diff.deletionCount)")
-          .foregroundStyle(.red)
-      }
+      .buttonStyle(.plain)
+      .help(
+        isExpanded
+          ? "Click to collapse; ⌥click collapses all files"
+          : "Click to expand; ⌥click expands all files"
+      )
+      .accessibilityLabel(diff.path)
+      .accessibilityValue(accessibilityValue)
+      .accessibilityHint("Shows or hides the changes in this file")
+
       if !actions.isEmpty {
         Menu {
           actionButtons
@@ -202,15 +270,30 @@ struct FileDiffHeaderView: View {
       }
     }
     .contextMenu {
-      actionButtons
+      Button(isExpanded ? "Collapse" : "Expand") {
+        setExpanded(!isExpanded, false, isPinned)
+      }
+      Button("Collapse All") {
+        setExpanded(false, true, isPinned)
+      }
+      Button("Expand All") {
+        setExpanded(true, true, isPinned)
+      }
+      if !actions.isEmpty {
+        Divider()
+        actionButtons
+      }
     }
     .font(.callout.monospacedDigit())
     .padding(.horizontal, 12)
     .padding(.vertical, 6)
     .background(.bar)
-    .accessibilityElement(children: .ignore)
-    .accessibilityLabel(diff.path)
-    .accessibilityValue(accessibilityValue)
+    .onGeometryChange(for: Bool.self) { proxy in
+      proxy.frame(in: .scrollView).minY <= 0
+    } action: { isAtTop in
+      isPinned = isAtTop
+    }
+    .accessibilityElement(children: .contain)
   }
 
   private var accessibilityValue: String {
@@ -220,6 +303,7 @@ struct FileDiffHeaderView: View {
     }
     components.append("\(diff.additionCount) additions")
     components.append("\(diff.deletionCount) deletions")
+    components.append(isExpanded ? "Expanded" : "Collapsed")
     return components.joined(separator: ", ")
   }
 
