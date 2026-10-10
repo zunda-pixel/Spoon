@@ -29,12 +29,12 @@ struct WorkspaceSidebarSection: View {
 struct StashesSidebarSection: View {
   let model: RepositoryModel
   let navigation: RepositoryNavigationState
+  @Bindable var expansion: SidebarExpansionState
   let searchText: String
-  @State private var isExpanded = true
 
   var body: some View {
     if !model.stashes.isEmpty {
-      Section(isExpanded: $isExpanded) {
+      Section(isExpanded: $expansion.stashes) {
         if filteredStashes.isEmpty {
           Label("No matching stashes", systemImage: "magnifyingglass")
             .foregroundStyle(.tertiary)
@@ -69,7 +69,7 @@ struct StashesSidebarSection: View {
       }
       .onChange(of: searchText) {
         if searchText.hasSidebarSearchQuery {
-          isExpanded = true
+          expansion.stashes = true
         }
       }
     }
@@ -87,12 +87,12 @@ struct StashesSidebarSection: View {
 struct TagsSidebarSection: View {
   let model: RepositoryModel
   let navigation: RepositoryNavigationState
+  @Bindable var expansion: SidebarExpansionState
   let searchText: String
-  @State private var isExpanded = false
 
   var body: some View {
     if !model.tags.isEmpty {
-      Section(isExpanded: $isExpanded) {
+      Section(isExpanded: $expansion.tags) {
         if filteredTags.isEmpty {
           Label("No matching tags", systemImage: "magnifyingglass")
             .foregroundStyle(.tertiary)
@@ -112,7 +112,7 @@ struct TagsSidebarSection: View {
       }
       .onChange(of: searchText) {
         if searchText.hasSidebarSearchQuery {
-          isExpanded = true
+          expansion.tags = true
         }
       }
     }

@@ -133,15 +133,19 @@ struct RepositorySplitView: View {
   let isSwitching: Bool
   let switchRepository: (Repository.ID) -> Void
   @State private var switchWorktreeErrorMessage: String?
+  @State private var sidebarExpansion = SidebarExpansionState()
 
   var body: some View {
     // The split view and toolbar persist across worktree switches; each
     // column's contents are keyed by repository so per-view state (search
-    // text, confirmations, loaded diffs) never carries over.
+    // text, confirmations, loaded diffs) never carries over. Sidebar
+    // expansion is the exception: worktrees share their branches, so it
+    // lives here and folders stay as the user left them.
     NavigationSplitView {
       RepoSidebarView(
         model: model,
         navigation: navigation,
+        expansion: sidebarExpansion,
         openWorktree: { switchToWorktree(at: $0.path) }
       )
       .id(model.repository.id)
