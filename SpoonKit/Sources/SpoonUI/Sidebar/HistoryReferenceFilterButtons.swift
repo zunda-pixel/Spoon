@@ -17,23 +17,35 @@ struct HistoryReferenceFilterButtons: View {
       .foregroundStyle(
         style(isOn: model.isHistoryReferenceFocused(referenceID))
       )
-      .help(model.isHistoryReferenceFocused(referenceID) ? "Stop showing only this reference" : "Show only this reference")
-      .accessibilityLabel(model.isHistoryReferenceFocused(referenceID) ? "Stop showing only this reference" : "Show only this reference")
+      .help(
+        model.isHistoryReferenceFocused(referenceID)
+          ? "Stop showing only this reference" : "Show only this reference"
+      )
+      .accessibilityLabel(
+        model.isHistoryReferenceFocused(referenceID)
+          ? "Stop showing only this reference" : "Show only this reference")
 
       Button {
         Task { await model.toggleHistoryHidden(referenceID) }
       } label: {
-        Image(systemName: model.isHistoryReferenceHidden(referenceID) ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
+        Image(
+          systemName: model.isHistoryReferenceHidden(referenceID)
+            ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
       }
       .buttonStyle(.borderless)
       .foregroundStyle(
         style(isOn: model.isHistoryReferenceHidden(referenceID))
       )
-      .help(model.isHistoryReferenceHidden(referenceID) ? "Show this reference in history" : "Hide this reference from history")
-      .accessibilityLabel(model.isHistoryReferenceHidden(referenceID) ? "Show this reference in history" : "Hide this reference from history")
+      .help(
+        model.isHistoryReferenceHidden(referenceID)
+          ? "Show this reference in history" : "Hide this reference from history"
+      )
+      .accessibilityLabel(
+        model.isHistoryReferenceHidden(referenceID)
+          ? "Show this reference in history" : "Hide this reference from history")
     }
     .font(.caption)
-    .fixedSize()
+    .layoutPriority(1)
   }
 
   /// An active button shows its filled symbol in the primary color: the

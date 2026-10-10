@@ -73,7 +73,9 @@ struct ConflictsResolvedBar: View {
       if model.rerereResolvedPaths.contains(path) {
         Label("Resolved from a recorded resolution", systemImage: "arrow.triangle.2.circlepath")
           .foregroundStyle(.green)
-          .help("rerere applied how this conflict was resolved before; review it, then mark it resolved")
+          .help(
+            "rerere applied how this conflict was resolved before; review it, then mark it resolved"
+          )
         Button("Forget Resolution…") { confirmingForget = true }
           .disabled(model.isBusy)
           .confirmationDialog(
@@ -86,7 +88,9 @@ struct ConflictsResolvedBar: View {
               }
             }
           } message: {
-            Text("The conflict markers come back so you can resolve it again; the new resolution is recorded instead.")
+            Text(
+              "The conflict markers come back so you can resolve it again; the new resolution is recorded instead."
+            )
           }
       } else {
         Label("No conflict markers left", systemImage: "checkmark.circle")
@@ -163,17 +167,9 @@ private struct ConflictBlockView: View {
   }
 
   private var header: some View {
-    // Buttons move under the title when the column is too narrow for both.
-    ViewThatFits(in: .horizontal) {
-      HStack(spacing: 8) {
-        title
-        Spacer(minLength: 8)
-        buttons
-      }
-      VStack(alignment: .leading, spacing: 6) {
-        title
-        HStack(spacing: 8) { buttons }
-      }
+    AdaptiveActionsLayout(spacing: 8, rowSpacing: 6) {
+      title
+      WrappingLayout { buttons }
     }
     .controlSize(.small)
     .disabled(isDisabled)
@@ -190,20 +186,16 @@ private struct ConflictBlockView: View {
       Text("Line \(block.startLine)")
         .foregroundStyle(.secondary)
     }
-    .fixedSize()
   }
 
   @ViewBuilder
   private var buttons: some View {
     let ours = FileStatusEntry.ConflictSide.ours.shortName(during: kind)
     Button("Use \(ours)") { resolve(.ours) }
-      .fixedSize()
     Button("Use \(FileStatusEntry.ConflictSide.theirs.shortName(during: kind))") {
       resolve(.theirs)
     }
-    .fixedSize()
     Button("Use Both") { resolve(.both) }
-      .fixedSize()
       .help("Keep both versions, \(ours.lowercased()) first")
   }
 

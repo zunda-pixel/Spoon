@@ -11,20 +11,9 @@ struct BisectBannerView: View {
   @State private var confirmingReset = false
 
   var body: some View {
-    ViewThatFits(in: .horizontal) {
-      HStack(spacing: 12) {
-        message
-        Spacer(minLength: 0)
-        actions.fixedSize()
-      }
-      VStack(alignment: .leading, spacing: 8) {
-        message
-        HStack(spacing: 8) {
-          Spacer(minLength: 0)
-          // Whole labels; the row fits the column once below the message.
-          actions.fixedSize()
-        }
-      }
+    AdaptiveActionsLayout {
+      message
+      WrappingLayout { actions }
     }
     .padding(.horizontal, 14)
     .padding(.vertical, 8)

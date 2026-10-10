@@ -19,7 +19,7 @@ struct HistorySearchBar: View {
         Text("Changed Lines (Regex)").tag(HistorySearch.Field.changedLines)
       }
       .labelsHidden()
-      .fixedSize()
+      .layoutPriority(1)
       .help(
         "Search commit messages, authors, commits that add or remove the text, or commits whose changed lines match a regular expression"
       )

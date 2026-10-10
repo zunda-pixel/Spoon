@@ -61,17 +61,9 @@ struct StashDetailView: View {
   }
 
   private func header(_ stash: Stash) -> some View {
-    // The buttons move under the message when the column is too narrow.
-    ViewThatFits(in: .horizontal) {
-      HStack(spacing: 10) {
-        title(stash)
-        Spacer()
-        actions(stash)
-      }
-      VStack(alignment: .leading, spacing: 8) {
-        title(stash)
-        HStack { actions(stash) }
-      }
+    AdaptiveActionsLayout(spacing: 10) {
+      title(stash)
+      WrappingLayout { actions(stash) }
     }
     .disabled(model.isBusy)
     .padding(12)
@@ -108,7 +100,6 @@ struct StashDetailView: View {
         confirmingDrop = true
       }
     }
-    .fixedSize()
   }
 
   @ViewBuilder
