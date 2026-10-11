@@ -12,7 +12,9 @@ Diffs need a minimum viewport width while retaining natural code widths for
 horizontal scrolling. `DiffScrollView` observes only width with
 `onGeometryChange` and owns that state locally. A fixed container-relative width
 would constrain long lines; observing full frames would also react to irrelevant
-position/height changes.
+position/height changes. The minimum-width frame aligns its content to the top:
+the `LazyVStack` height estimate keeps changing as rows load and files fold, and
+a vertically centered frame left a gap above the first file of half that change.
 
 The remaining `fixedSize` modifiers are deliberate:
 
