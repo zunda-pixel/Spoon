@@ -184,7 +184,9 @@ private struct DiffScrollView<Content: View>: View {
 
   var body: some View {
     ScrollView([.horizontal, .vertical]) {
-      content.frame(minWidth: viewportWidth, alignment: .leading)
+      // Top-aligned: the lazy stack's height estimate shifts as rows load or
+      // files fold, and centering moved every file down by half the change.
+      content.frame(minWidth: viewportWidth, alignment: .topLeading)
     }
     .onGeometryChange(for: CGFloat.self) { proxy in
       proxy.size.width
