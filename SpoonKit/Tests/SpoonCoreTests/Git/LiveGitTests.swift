@@ -471,6 +471,62 @@ struct LiveGitTests {
     #expect(changed.sorted() == ["6", "SIX"])
   }
 
+  @Test func lineStageAddsOnlySelectedLinesToTheIndex() async throws {
+    let root = try await makeTemporaryRepo()
+    defer { try? FileManager.default.removeItem(at: root) }
+
+    let file = root.appending(path: "file.txt")
+    let numbers = (1...9).map(String.init)
+    try await LiveRepoFixture.commitFile(
+      "file.txt",
+      content: numbers.joined(separator: "\n") + "\n",
+      message: "base",
+      in: root,
+      runner: runner
+    )
+
+    // One hunk: line 4 replaced, a line inserted after 5, line 7 deleted.
+    var edited = numbers
+    edited[3] = "FOUR"
+    edited.insert("five-and-a-half", at: 5)
+    edited.remove(at: 7)
+    let worktree = edited.joined(separator: "\n") + "\n"
+    try Data(worktree.utf8).write(to: file)
+
+    let client = SystemGitClient(repositoryRoot: root, git: git, runner: runner)
+    let diff = try #require(try await client.diffWorkingTree(path: "file.txt", staged: false).first)
+    let hunk = try #require(diff.hunks.first)
+    #expect(diff.hunks.count == 1)
+
+    // Stage the inserted line and the deletion of 7, but not the FOUR edit.
+    let offsets = Set(
+      hunk.lines.indices.filter {
+        let line = hunk.lines[$0]
+        return (line.kind == .addition && line.text == "five-and-a-half")
+          || (line.kind == .deletion && line.text == "7")
+      }
+    )
+    #expect(offsets.count == 2)
+    let patch = try #require(
+      DiffPatchBuilder.stagePatch(for: diff, hunkID: hunk.id, selectedOffsets: offsets)
+    )
+    try await client.applyPatch(patch, reverse: false, toIndex: true)
+
+    // The index has those two changes only; the working tree is untouched.
+    var expectedIndex = numbers
+    expectedIndex.insert("five-and-a-half", at: 5)
+    expectedIndex.remove(at: 7)
+    let index = try await client.fileContents(path: "file.txt", at: .index)
+    #expect(String(decoding: index, as: UTF8.self) == expectedIndex.joined(separator: "\n") + "\n")
+    #expect(try String(contentsOf: file, encoding: .utf8) == worktree)
+
+    // What's left unstaged is the FOUR edit.
+    let after = try #require(
+      try await client.diffWorkingTree(path: "file.txt", staged: false).first)
+    let changed = after.hunks.flatMap(\.lines).filter { $0.kind != .context }.map(\.text)
+    #expect(changed.sorted() == ["4", "FOUR"])
+  }
+
   @Test func renameDetectionRoundTrip() async throws {
     let root = try await makeTemporaryRepo()
     defer { try? FileManager.default.removeItem(at: root) }

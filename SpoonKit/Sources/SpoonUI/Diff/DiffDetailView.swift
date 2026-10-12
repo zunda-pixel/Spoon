@@ -165,6 +165,13 @@ struct DiffDetailView: View {
       onDeselect: { self.lineSelection = nil },
       actions: {
         if selection.area == .unstaged {
+          Button("Stage Selected Lines") {
+            guard let diff = diffs.first(where: { $0.id == lineSelection.fileID }) else { return }
+            self.lineSelection = nil
+            Task {
+              await model.stageLines(lineSelection.offsets, of: lineSelection.hunkID, in: diff)
+            }
+          }
           Button("Discard Selected Lines…", role: .destructive) {
             guard let diff = diffs.first(where: { $0.id == lineSelection.fileID }) else { return }
             pendingDiscard = .lines(diff, lineSelection.hunkID, lineSelection.offsets)

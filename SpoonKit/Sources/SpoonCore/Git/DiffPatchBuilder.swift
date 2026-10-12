@@ -108,6 +108,68 @@ public enum DiffPatchBuilder {
     return text
   }
 
+  /// Builds a patch that adds only the selected changed lines of an
+  /// unstaged hunk to the index when applied with `git apply --cached`.
+  ///
+  /// The synthetic hunk's old side must match the index exactly, so
+  /// unselected deletions demote to context (they are in the index and
+  /// stay) and unselected additions are omitted (not in the index and
+  /// staying out). Same selection rules and `nil` cases as `discardPatch`.
+  public static func stagePatch(
+    for diff: FileDiff,
+    hunkID: Hunk.ID,
+    selectedOffsets: Set<Int>
+  ) -> String? {
+    guard
+      !diff.isBinary,
+      diff.kind == .modified,
+      let hunk = diff.hunks.first(where: { $0.id == hunkID }),
+      !hunk.lines.contains(where: { $0.kind == .noNewlineMarker })
+    else { return nil }
+
+    let selection = selectedOffsets.filter { offset in
+      hunk.lines.indices.contains(offset) && hunk.lines[offset].kind != .context
+    }
+    guard !selection.isEmpty else { return nil }
+
+    var body = ""
+    var indexCount = 0  // a side: the index as it is now
+    var resultCount = 0  // b side: the index after staging
+    for (offset, line) in hunk.lines.enumerated() {
+      switch line.kind {
+      case .context:
+        body += " \(line.text)\n"
+        indexCount += 1
+        resultCount += 1
+      case .addition:
+        if selection.contains(offset) {
+          body += "+\(line.text)\n"
+          resultCount += 1
+        }
+      case .deletion:
+        if selection.contains(offset) {
+          body += "-\(line.text)\n"
+          indexCount += 1
+        } else {
+          body += " \(line.text)\n"
+          indexCount += 1
+          resultCount += 1
+        }
+      case .noNewlineMarker:
+        return nil  // unreachable (guarded above)
+      }
+    }
+
+    // A side with no lines anchors after `oldStart`; see `patch(for:including:)`.
+    let newStart = indexCount == 0 ? hunk.oldStart + 1 : hunk.oldStart
+    var text = "diff --git a/\(diff.path) b/\(diff.path)\n"
+    text += "--- a/\(diff.path)\n"
+    text += "+++ b/\(diff.path)\n"
+    text += "@@ -\(hunk.oldStart),\(indexCount) +\(newStart),\(resultCount) @@\n"
+    text += body
+    return text
+  }
+
   /// All selectable (changed) line offsets of a hunk — the "discard whole
   /// hunk" selection.
   public static func changedLineOffsets(of hunk: Hunk) -> Set<Int> {
