@@ -16,7 +16,12 @@ extension SystemGitClient {
     ])
     // HEAD/upstream fields are empty for remote refs; the parser maps them
     // to isCurrent=false / upstream=nil, which is exactly right here.
-    return try GitRefParser.parseBranches(result.standardOutput)
+    // `refs/remotes/<remote>/HEAD` only points at the remote's default
+    // branch, and shortens to the bare remote name ("origin"), so it would
+    // otherwise be listed as a branch of that name.
+    return try GitRefParser.parseBranches(result.standardOutput).filter {
+      $0.name != remoteName && $0.name != "\(remoteName)/HEAD"
+    }
   }
 
   public func addRemote(name: String, url: String) async throws {
