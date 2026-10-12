@@ -1,3 +1,4 @@
+public import Foundation
 public import MemberwiseInit
 
 /// One path in `git status` output.
@@ -85,5 +86,30 @@ public struct WorkingTreeStatus: Sendable, Hashable {
 
   public var isClean: Bool {
     entries.allSatisfy(\.isIgnored)
+  }
+
+  /// Leaves out this repository's own linked worktrees that sit inside its
+  /// folder (such as `.claude/worktrees/<name>/`). git lists each as an
+  /// untracked folder, but it is a checkout of this repository, not a
+  /// change to it.
+  public func excludingWorktrees(_ worktrees: [Worktree], root: URL) -> WorkingTreeStatus {
+    let worktreePaths = Set(worktrees.filter { !$0.isMain }.map { Self.canonicalPath($0.path) })
+    guard !worktreePaths.isEmpty else { return self }
+    var status = self
+    status.entries.removeAll { entry in
+      entry.isUntracked
+        && worktreePaths.contains(Self.canonicalPath(root.appending(path: entry.path)))
+    }
+    return status
+  }
+
+  /// Compares paths whatever their spelling: symlinks such as `/tmp`
+  /// resolved, and no trailing slash.
+  private static func canonicalPath(_ url: URL) -> String {
+    var path = url.resolvingSymlinksInPath().standardizedFileURL.path(percentEncoded: false)
+    while path.count > 1, path.hasSuffix("/") {
+      path.removeLast()
+    }
+    return path
   }
 }

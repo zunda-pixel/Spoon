@@ -50,14 +50,15 @@ public struct RepositoryGitSnapshot: Sendable, Hashable {
       from: gitClient
     )
 
+    let loadedWorktrees = try await worktrees
     return try await Self(
-      status: status,
+      status: status.excludingWorktrees(loadedWorktrees, root: gitClient.repositoryRoot),
       branches: branches,
       remotes: loadedRemotes,
       remoteBranchesByRemote: remoteBranchesByRemote,
       stashes: stashes,
       tags: tags,
-      worktrees: worktrees,
+      worktrees: loadedWorktrees,
       submodules: submodules ?? [],
       sequencerState: sequencerState,
       bisectState: bisectState ?? nil,

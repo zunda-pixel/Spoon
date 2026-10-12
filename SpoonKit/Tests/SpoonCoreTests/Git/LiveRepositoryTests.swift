@@ -849,6 +849,27 @@ struct LiveRepositoryTests {
     }
   }
 
+  /// A linked worktree inside the repository folder (Claude Code's
+  /// `.claude/worktrees/<name>/`) is a checkout, not an untracked change.
+  @Test func linkedWorktreesInsideTheRepositoryAreNotUntrackedChanges() async throws {
+    let root = try await LiveRepoFixture.makeTemporaryRepo(
+      commits: [.init(file: "base.txt", content: "base\n", message: "base")],
+      runner: runner
+    )
+    defer { try? FileManager.default.removeItem(at: root) }
+    try await LiveRepoFixture.run(
+      ["worktree", "add", "-b", "agent", ".claude/worktrees/agent"], in: root, runner: runner)
+    try Data("new\n".utf8).write(to: root.appending(path: "notes.txt"))
+    let client = makeClient(root)
+
+    let raw = try await client.status().untrackedEntries.map(\.path)
+    let snapshot = try await RepositoryGitSnapshot.load(from: client)
+
+    #expect(raw.sorted() == [".claude/worktrees/agent/", "notes.txt"])
+    #expect(snapshot.status.untrackedEntries.map(\.path) == ["notes.txt"])
+    #expect(snapshot.worktrees.contains { $0.branch == "agent" })
+  }
+
   @Test func squashAndRebaseMergedBranchesCountAsMerged() async throws {
     let root = try await LiveRepoFixture.makeTemporaryRepo(
       commits: [.init(file: "base.txt", content: "base\n", message: "base")],
