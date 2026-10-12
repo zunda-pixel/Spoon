@@ -29,6 +29,10 @@ struct SpoonApp: App {
     // application(_:open:) otherwise suppresses the default window on
     // argument-carrying launches.
     .defaultLaunchBehavior(.presented)
+    // RepositoryWindowSession reopens repository windows and their tabs
+    // itself, even when macOS closes windows at quit; SwiftUI restoring
+    // them too would open each one twice.
+    .restorationBehavior(.disabled)
     .commands {
       SpoonCommands(appModel: appModel)
     }

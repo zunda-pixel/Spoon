@@ -26,8 +26,15 @@ public struct RootView: View {
         WelcomeView { repositoryID = $0 }
       }
     }
+    .background(
+      WindowReader { [repositoryID] window in
+        RepositoryWindowSession.shared.update(window: window, repositoryID: repositoryID)
+      }
+    )
     .task {
       uiLogger.info("RootView appeared, repositoryID=\(repositoryID ?? "nil", privacy: .public)")
+      RepositoryWindowSession.shared.start(appModel: appModel)
+      restoreWindows()
       consumeExternalOpenRequest()
       await appModel.updater.checkAtLaunchIfNeeded()
     }
@@ -45,6 +52,22 @@ public struct RootView: View {
     .onOpenURL { url in
       guard url.isFileURL else { return }
       appModel.submitExternalOpenRequest(url)
+    }
+  }
+
+  /// Reopens the repository windows open at the last quit, once per launch:
+  /// the first tab in this window when it shows Welcome, the rest in new
+  /// windows that the session then regroups into their tabs.
+  private func restoreWindows() {
+    let windows = appModel.takeWindowsToRestore()
+    guard !windows.isEmpty else { return }
+    RepositoryWindowSession.shared.expect(windows)
+    var ids = windows.flatMap(\.tabs)
+    if repositoryID == nil {
+      repositoryID = ids.removeFirst()
+    }
+    for id in ids where id != repositoryID {
+      openWindow(value: id)
     }
   }
 

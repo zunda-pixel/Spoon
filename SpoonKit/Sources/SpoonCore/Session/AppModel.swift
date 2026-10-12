@@ -31,6 +31,7 @@ public final class AppModel {
   public let updater: AppUpdater
   private let runner: any CommandRunning
   private static let maxRecents = 20
+  @ObservationIgnored private var didTakeWindowsToRestore = false
 
   public init(runner: any CommandRunning = SubprocessCommandRunner()) {
     self.runner = runner
@@ -127,6 +128,37 @@ public final class AppModel {
       .codex: CodexProvider(runner: runner, toolLocator: toolLocator),
     ]
     return model
+  }
+
+  // MARK: - Window restoration
+
+  /// Records the repository windows open at quit, back to front.
+  public func saveOpenWindows(_ windows: [RestorableWindow]) {
+    Defaults[.openRepositoryWindows] = windows.filter { !$0.tabs.isEmpty }
+  }
+
+  /// The windows saved at the last quit, handed out once per launch.
+  /// Repositories that no longer exist on disk are left out.
+  public func takeWindowsToRestore() -> [RestorableWindow] {
+    guard !didTakeWindowsToRestore else { return [] }
+    didTakeWindowsToRestore = true
+    return Self.restorableWindows(
+      Defaults[.openRepositoryWindows],
+      exists: { FileManager.default.fileExists(atPath: $0) }
+    )
+  }
+
+  /// Drops missing repositories, repeats, and windows left without tabs.
+  static func restorableWindows(
+    _ windows: [RestorableWindow],
+    exists: (Repository.ID) -> Bool
+  ) -> [RestorableWindow] {
+    var seen: Set<Repository.ID> = []
+    return windows.compactMap { window in
+      var window = window
+      window.tabs = window.tabs.filter { exists($0) && seen.insert($0).inserted }
+      return window.tabs.isEmpty ? nil : window
+    }
   }
 
   public func removeRecent(_ repository: Repository) {

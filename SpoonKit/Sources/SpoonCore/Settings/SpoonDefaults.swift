@@ -4,6 +4,12 @@ extension Defaults.Keys {
   /// Most-recently-opened first, canonical root paths.
   public static let recentRepositoryPaths = Key<[String]>("recentRepositoryPaths", default: [])
 
+  /// Repository windows open when the app last quit, back to front.
+  public static let openRepositoryWindows = Key<[RestorableWindow]>(
+    "openRepositoryWindows",
+    default: []
+  )
+
   /// Per-tool absolute path overrides, keyed by `ExternalTool.rawValue`.
   public static let toolPathOverrides = Key<[String: String]>("toolPathOverrides", default: [:])
 
@@ -55,3 +61,6 @@ extension Defaults.Keys {
 
 /// Stored as JSON through its Codable conformance.
 extension CoAuthor: Defaults.Serializable {}
+
+/// Stored as JSON through its Codable conformance.
+extension RestorableWindow: Defaults.Serializable {}

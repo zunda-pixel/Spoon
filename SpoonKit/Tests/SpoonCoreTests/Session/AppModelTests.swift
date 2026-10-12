@@ -62,4 +62,20 @@ struct AppModelTests {
       ]
     )
   }
+
+  @Test func restorableWindowsDropMissingAndRepeatedRepositories() {
+    let windows = [
+      RestorableWindow(tabs: ["/repos/a", "/repos/gone", "/repos/b"], frame: "frame"),
+      RestorableWindow(tabs: ["/repos/gone"]),
+      RestorableWindow(tabs: ["/repos/b", "/repos/c"]),
+    ]
+
+    let restorable = AppModel.restorableWindows(windows) { $0 != "/repos/gone" }
+
+    #expect(
+      restorable == [
+        RestorableWindow(tabs: ["/repos/a", "/repos/b"], frame: "frame"),
+        RestorableWindow(tabs: ["/repos/c"]),
+      ])
+  }
 }
