@@ -800,6 +800,31 @@ struct LiveRepositoryTests {
     }
   }
 
+  /// Binary previews read each side byte-for-byte: committed, staged, and
+  /// on disk.
+  @Test func fileContentsReadEveryVersionOfABinaryFile() async throws {
+    let root = try await LiveRepoFixture.makeTemporaryRepo(runner: runner)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let file = root.appending(path: "image.bin")
+    let committed = Data([0x89, 0x50, 0x4E, 0x47, 0x00, 0x01])
+    let staged = Data([0x89, 0x50, 0x4E, 0x47, 0x00, 0x02])
+    let onDisk = Data([0x89, 0x50, 0x4E, 0x47, 0x00, 0x03])
+    try committed.write(to: file)
+    try await LiveRepoFixture.run(["add", "image.bin"], in: root, runner: runner)
+    try await LiveRepoFixture.run(["commit", "-m", "add image"], in: root, runner: runner)
+    try staged.write(to: file)
+    try await LiveRepoFixture.run(["add", "image.bin"], in: root, runner: runner)
+    try onDisk.write(to: file)
+    let client = makeClient(root)
+
+    #expect(try await client.fileContents(path: "image.bin", at: .revision("HEAD")) == committed)
+    #expect(try await client.fileContents(path: "image.bin", at: .index) == staged)
+    #expect(try await client.fileContents(path: "image.bin", at: .workingTree) == onDisk)
+    await #expect(throws: (any Error).self) {
+      try await client.fileContents(path: "missing.bin", at: .revision("HEAD"))
+    }
+  }
+
   @Test func squashAndRebaseMergedBranchesCountAsMerged() async throws {
     let root = try await LiveRepoFixture.makeTemporaryRepo(
       commits: [.init(file: "base.txt", content: "base\n", message: "base")],

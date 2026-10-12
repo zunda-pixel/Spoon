@@ -1,3 +1,4 @@
+public import Foundation
 public import MemberwiseInit
 
 extension RepositoryModel {
@@ -55,6 +56,11 @@ extension RepositoryModel {
     case .untracked:
       [try await gitClient.untrackedFileDiff(path: selection.path)]
     }
+  }
+
+  /// The raw bytes of `path` at `version`, for previewing binary diffs.
+  public func fileContents(path: String, at version: FileVersion) async throws -> Data {
+    try await gitClient.fileContents(path: path, at: version)
   }
 
   public func commitDetail(_ oid: ObjectID) async throws -> CommitDetail {

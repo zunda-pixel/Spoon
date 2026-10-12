@@ -33,6 +33,8 @@ struct FileDiffListView: View {
   var fileActions: ((FileDiff) -> [FileDiffAction])?
   /// Highlight the changed words within modified lines.
   var highlightsWordChanges: Bool
+  /// Reads binary images so they can be previewed; `nil` keeps "Binary file".
+  var imageLoader: DiffImageLoader?
 
   init(
     diffs: [FileDiff],
@@ -40,9 +42,11 @@ struct FileDiffListView: View {
     lineSelection: Binding<DiffLineSelection?>? = nil,
     onDiscardHunk: ((FileDiff, Hunk) -> Void)? = nil,
     fileActions: ((FileDiff) -> [FileDiffAction])? = nil,
-    highlightsWordChanges: Bool = false
+    highlightsWordChanges: Bool = false,
+    imageLoader: DiffImageLoader? = nil
   ) {
     self.highlightsWordChanges = highlightsWordChanges
+    self.imageLoader = imageLoader
     self.diffs = diffs
     self.hunkAction = hunkAction
     self.lineSelection = lineSelection
@@ -86,7 +90,9 @@ struct FileDiffListView: View {
 
   @ViewBuilder
   private func fileBody(_ diff: FileDiff) -> some View {
-    if diff.isBinary {
+    if let imageLoader, DiffImageLoader.isImage(diff) {
+      ImageDiffView(diff: diff, loader: imageLoader)
+    } else if diff.isBinary {
       Label("Binary file", systemImage: "doc.zipper")
         .foregroundStyle(.secondary)
         .padding(12)
