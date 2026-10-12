@@ -79,7 +79,6 @@ final class RepositoryNavigationState {
     case moveBranch(Branch, to: Commit)
     case tag(Commit)
     case reset(target: ObjectID, description: String)
-    case review(ReviewReport)
     case deleteBranches([Branch])
 
     var id: String {
@@ -160,8 +159,6 @@ final class RepositoryNavigationState {
         "tag:\(commit.id)"
       case .reset(let target, _):
         "reset:\(target.rawValue)"
-      case .review(let report):
-        "review:\(report.hashValue)"
       case .deleteBranches(let branches):
         "delete-branches:\(branches.map(\.id).joined(separator: "\u{0}"))"
       }

@@ -387,8 +387,6 @@ public protocol GitReviewClient: Sendable {
   func mergeBase(_ a: String, _ b: String) async throws -> ObjectID
   /// Unified diff between two refs (e.g. merge-base..HEAD for reviews).
   func diff(from: String, to: String) async throws -> [FileDiff]
-  /// Raw unified diff text between two refs, for AI prompts.
-  func diffText(from: String, to: String) async throws -> String
   /// How the commits of `new` correspond to those of `old`
   /// (`git range-diff <oldBase>..<oldTip> <newBase>..<newTip>`).
   func rangeDiff(

@@ -19,11 +19,6 @@ extension SystemGitClient {
     return try GitDiffParser.parse(result.standardOutput)
   }
 
-  public func diffText(from: String, to: String) async throws -> String {
-    let result = try await run(["diff", "--patch", "--find-renames", "\(from)..\(to)", "--"])
-    return result.standardOutputText
-  }
-
   public func stagedDiffText() async throws -> String {
     let result = try await run(["diff", "--cached", "--patch", "--find-renames", "--"])
     return result.standardOutputText

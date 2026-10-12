@@ -34,63 +34,13 @@ public struct CommitMessageProposal: Sendable, Hashable, Codable {
   }
 }
 
-/// One review finding. `anchorSnippet` is the robustness key: models are
-/// unreliable about line numbers but reliable about quoting the line
-/// verbatim, so we re-locate findings by snippet after decoding.
-@MemberwiseInit(.public)
-public struct ReviewFinding: Sendable, Hashable, Codable, Identifiable {
-  public enum Severity: String, Sendable, Codable, CaseIterable {
-    case blocker, high, medium, low, nit
-
-    public var sortOrder: Int {
-      switch self {
-      case .blocker: 0
-      case .high: 1
-      case .medium: 2
-      case .low: 3
-      case .nit: 4
-      }
-    }
-  }
-
-  public var file: String
-  public var line: Int? = nil
-  public var anchorSnippet: String? = nil
-  public var severity: Severity
-  public var title: String
-  public var body: String
-  public var suggestion: String? = nil
-
-  public var id: String { "\(file):\(line ?? 0):\(title)" }
-
-  // Lenient decoding: unknown severity strings become .medium instead of
-  // failing the whole report.
-  public init(from decoder: any Decoder) throws {
-    let container = try decoder.container(keyedBy: CodingKeys.self)
-    file = try container.decode(String.self, forKey: .file)
-    line = try? container.decodeIfPresent(Int.self, forKey: .line)
-    anchorSnippet = try? container.decodeIfPresent(String.self, forKey: .anchorSnippet)
-    let rawSeverity = (try? container.decode(String.self, forKey: .severity)) ?? ""
-    severity = Severity(rawValue: rawSeverity.lowercased()) ?? .medium
-    title = try container.decode(String.self, forKey: .title)
-    body = (try? container.decode(String.self, forKey: .body)) ?? ""
-    suggestion = try? container.decodeIfPresent(String.self, forKey: .suggestion)
-  }
-}
-
-@MemberwiseInit(.public)
-public struct ReviewReport: Sendable, Hashable, Codable {
-  public var summary: String
-  public var findings: [ReviewFinding]
-}
-
 @MemberwiseInit(.public)
 public struct AIError: Error, Sendable, LocalizedError {
   public enum Kind: Sendable, Equatable {
     case notInstalled(AIProviderID)
     case cliFailed(exitCode: Int32, stderrExcerpt: String)
     case outputUnparseable
-    case nothingToReview
+    case noChanges
     case timedOut
   }
 
@@ -106,7 +56,7 @@ public struct AIError: Error, Sendable, LocalizedError {
       "The AI CLI exited with code \(code).\n\(stderr)"
     case .outputUnparseable:
       "Could not parse the AI's response."
-    case .nothingToReview:
+    case .noChanges:
       "There are no changes to work with."
     case .timedOut:
       "The AI run timed out."

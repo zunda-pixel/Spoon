@@ -1,4 +1,4 @@
-public import Foundation
+import Foundation
 public import MemberwiseInit
 
 /// Builds the prompts and JSON schemas for AI tasks. Pure — snapshot-testable.
@@ -38,85 +38,8 @@ public enum PromptBuilder {
     return prompt
   }
 
-  @MemberwiseInit(.public)
-  public struct ReviewContext: Sendable {
-    public var branchName: String?
-    public var baseReference: String
-    public var diff: String
-    public var guidelines: String?
-  }
-
-  public static func reviewPrompt(_ context: ReviewContext) -> String {
-    var prompt = """
-      You are reviewing the changes on branch \(context.branchName ?? "HEAD") \
-      against \(context.baseReference).
-
-      You MAY use your read-only tools to read surrounding code, callers, and
-      tests to verify suspicions before reporting them.
-
-      Review rules:
-      - Report ONLY problems introduced or worsened by this diff. Ignore
-        pre-existing issues.
-      - Prioritize: correctness bugs, data races / concurrency violations,
-        security issues, API misuse. Style only when it violates the project
-        guidelines below.
-      - For each finding include `anchorSnippet`: the exact verbatim source
-        line the finding is about, copied from the diff.
-      - `suggestion` must be drop-in replacement code, or omitted.
-      - At most 20 findings, ordered by severity (blocker, high, medium, low, nit).
-      - If the change is fine, return an empty findings array and say so in
-        `summary` — do not manufacture findings.
-
-      """
-    if let guidelines = context.guidelines, !guidelines.isEmpty {
-      prompt += "<project_guidelines>\n\(String(guidelines.prefix(8_000)))\n</project_guidelines>\n"
-    }
-    prompt += "<diff>\n\(budgeted(context.diff))\n</diff>\n"
-    return prompt
-  }
-
-  /// JSON schema shared by both CLIs' structured-output flags.
-  public static let reviewSchema = """
-    {
-      "type": "object",
-      "properties": {
-        "summary": { "type": "string" },
-        "findings": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "properties": {
-              "file": { "type": "string" },
-              "line": { "type": ["integer", "null"] },
-              "anchorSnippet": { "type": ["string", "null"] },
-              "severity": { "type": "string", "enum": ["blocker", "high", "medium", "low", "nit"] },
-              "title": { "type": "string" },
-              "body": { "type": "string" },
-              "suggestion": { "type": ["string", "null"] }
-            },
-            "required": ["file", "severity", "title", "body"],
-            "additionalProperties": true
-          }
-        }
-      },
-      "required": ["summary", "findings"],
-      "additionalProperties": true
-    }
-    """
-
   static func budgeted(_ diff: String) -> String {
     guard diff.count > diffBudget else { return diff }
     return diff.prefix(diffBudget) + "\n…(diff truncated at \(diffBudget) characters)"
-  }
-
-  /// First guidelines file found in the repo, for review prompts.
-  public static func guidelines(in root: URL) -> String? {
-    for name in ["CLAUDE.md", "AGENTS.md", "CONTRIBUTING.md", ".spoon/review-guidelines.md"] {
-      let url = root.appending(path: name)
-      if let content = try? String(contentsOf: url, encoding: .utf8), !content.isEmpty {
-        return content
-      }
-    }
-    return nil
   }
 }

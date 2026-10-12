@@ -87,10 +87,7 @@ public final class RepositoryModel {
       repositoryID: repository.id,
       gitHub: gitHub
     )
-    self.aiStore = AIStore(
-      repositoryURL: repository.rootURL,
-      gitClient: gitClient
-    )
+    self.aiStore = AIStore(gitClient: gitClient)
     self.focusedHistoryReferenceIDs = Set(
       Defaults[.historyFocusedReferenceIDs][repository.id] ?? []
     )
