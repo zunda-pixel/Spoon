@@ -1,4 +1,4 @@
-public import Foundation
+import Foundation
 
 /// OpenAI Codex via `codex exec`. The final agent message is read from the
 /// `-o` artifact file — the most stable surface of the CLI — while stderr
@@ -30,23 +30,6 @@ public struct CodexProvider: CodingAgentProvider {
       throw AIError(kind: .outputUnparseable, rawOutput: output)
     }
     return message
-  }
-
-  public func review(prompt: String, repository: URL) async throws -> ReviewReport {
-    let schemaFile = temporaryFile(suffix: "schema.json")
-    try Data(PromptBuilder.reviewSchema.utf8).write(to: schemaFile)
-    defer { try? FileManager.default.removeItem(at: schemaFile) }
-
-    let output = try await run(
-      prompt: prompt,
-      extraArguments: [
-        "--cd", repository.path(percentEncoded: false),
-        "--output-schema", schemaFile.path(percentEncoded: false),
-      ],
-      workingDirectory: repository,
-      timeout: .seconds(600)
-    )
-    return try AgentCLI.decodeReport(from: output)
   }
 
   // MARK: - Helpers

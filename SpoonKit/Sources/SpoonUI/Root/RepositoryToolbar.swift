@@ -63,25 +63,6 @@ struct RepositoryToolbar: ToolbarContent {
       .disabled(model.isBusy || model.isSequencing)
     }
     ToolbarItemGroup {
-      Menu {
-        ForEach(AIProviderID.allCases) { provider in
-          Button("Review with \(provider.displayName)") {
-            Task {
-              await model.runReview(with: provider)
-              if let report = model.reviewReport {
-                navigation.present(.review(report))
-              }
-            }
-          }
-        }
-      } label: {
-        Label(model.aiActivity == nil ? "AI Review" : "Reviewing…", systemImage: "sparkles")
-      }
-      .disabled(model.aiActivity != nil)
-      .help("Review this branch with Claude Code or Codex")
-      .accessibilityHint("Choose a coding agent to review this branch")
-      .accessibilityValue(model.aiActivity == nil ? "Idle" : "Review in progress")
-
       // One item whose label changes: swapping the button for a separate
       // progress item on every refresh made AppKit rebuild and re-lay out
       // the whole toolbar, which stalled the window in large repositories.

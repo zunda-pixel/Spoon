@@ -8,11 +8,7 @@ struct RepositorySheetHost: ViewModifier {
   let switchToWorktree: (URL) -> Void
 
   func body(content: Content) -> some View {
-    content.sheet(item: $navigation.activeSheet) {
-      if model.reviewReport != nil {
-        model.dismissReview()
-      }
-    } content: { sheet in
+    content.sheet(item: $navigation.activeSheet) { sheet in
       switch sheet {
       case .newBranch(let startPoint):
         NewBranchSheet(model: model, startPoint: startPoint)
@@ -100,11 +96,6 @@ struct RepositorySheetHost: ViewModifier {
         TagCommitSheet(model: model, commit: commit)
       case .reset(let target, let description):
         ResetSheet(model: model, target: target, targetDescription: description)
-      case .review(let report):
-        ReviewFindingsView(report: report) {
-          model.dismissReview()
-          navigation.activeSheet = nil
-        }
       }
     }
   }

@@ -70,5 +70,5 @@ external CLI. Before a release, exercise a disposable repository:
    color alone.
 8. Check light and dark appearances, Increased Contrast, Reduce Transparency,
    and keyboard-only navigation.
-9. If configured, sync GitHub PRs and run Claude Code/Codex commit generation
-   and branch review. Confirm failures do not block local git workflows.
+9. If configured, sync GitHub PRs and run Claude Code/Codex commit generation.
+   Confirm failures do not block local git workflows.

@@ -64,14 +64,6 @@ struct PRDetailView: View {
           } label: {
             Label("Open on GitHub", systemImage: "safari")
           }
-
-          // AI review lands in the next milestone; the seam is already here.
-          Button {
-          } label: {
-            Label("Review with AI", systemImage: "sparkles")
-          }
-          .disabled(true)
-          .help("AI review arrives in a later milestone")
         }
       }
       .padding(16)

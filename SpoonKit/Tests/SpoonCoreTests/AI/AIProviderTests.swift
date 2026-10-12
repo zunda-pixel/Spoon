@@ -3,60 +3,6 @@ import Testing
 
 @testable import SpoonCore
 
-@Suite("AI JSON extraction")
-struct AIJSONExtractionTests {
-  private let validReport = """
-    {"summary": "Looks good", "findings": [
-      {"file": "a.swift", "line": 12, "anchorSnippet": "let x = 1",
-       "severity": "high", "title": "Bug", "body": "Details", "suggestion": "let x = 2"}
-    ]}
-    """
-
-  @Test func decodesPlainJSON() throws {
-    let report = try AgentCLI.decodeReport(from: validReport)
-    #expect(report.summary == "Looks good")
-    #expect(report.findings.count == 1)
-    #expect(report.findings[0].severity == .high)
-    #expect(report.findings[0].anchorSnippet == "let x = 1")
-  }
-
-  @Test func decodesFencedJSON() throws {
-    let report = try AgentCLI.decodeReport(
-      from: "Here you go:\n```json\n\(validReport)\n```\nDone.")
-    #expect(report.findings.count == 1)
-  }
-
-  @Test func decodesProseWrappedJSON() throws {
-    let report = try AgentCLI.decodeReport(
-      from: "The review result is \(validReport) — hope that helps!")
-    #expect(report.summary == "Looks good")
-  }
-
-  @Test func unknownSeverityBecomesMedium() throws {
-    let report = try AgentCLI.decodeReport(
-      from:
-        #"{"summary": "s", "findings": [{"file": "a", "severity": "CATASTROPHIC", "title": "t", "body": "b"}]}"#
-    )
-    #expect(report.findings[0].severity == .medium)
-  }
-
-  @Test func emptyFindingsIsValid() throws {
-    let report = try AgentCLI.decodeReport(from: #"{"summary": "All clear", "findings": []}"#)
-    #expect(report.findings.isEmpty)
-  }
-
-  @Test func garbageThrowsWithRawPreserved() {
-    do {
-      _ = try AgentCLI.decodeReport(from: "I could not produce JSON, sorry.")
-      Issue.record("expected throw")
-    } catch let error as AIError {
-      #expect(error.rawOutput?.contains("sorry") == true)
-    } catch {
-      Issue.record("unexpected error type")
-    }
-  }
-}
-
 @Suite("AI provider argv")
 struct AIProviderArgvTests {
   private func makeLocator(_ runner: FakeCommandRunner) -> ToolLocator {
@@ -90,30 +36,6 @@ struct AIProviderArgvTests {
 
     let command = try #require(runner.invocations.first)
     #expect(command.standardInput == Data("PROMPT".utf8))
-  }
-
-  @Test func claudeReviewRestrictsToolsAndUsesSchema() async throws {
-    let runner = FakeCommandRunner()
-    runner.stub(
-      arguments: [
-        "-p",
-        "--output-format", "json",
-        "--json-schema", PromptBuilder.reviewSchema,
-        "--allowedTools", "Read", "Grep", "Glob",
-        "--disallowedTools", "Bash", "Write", "Edit", "NotebookEdit", "WebFetch", "WebSearch",
-        "--permission-mode", "dontAsk",
-        "--setting-sources", "user",
-        "--strict-mcp-config",
-        "--no-session-persistence",
-      ],
-      stdout: #"{"result": "{\"summary\": \"ok\", \"findings\": []}"}"#
-    )
-    let provider = ClaudeCodeProvider(runner: runner, toolLocator: makeLocator(runner))
-    let report = try await provider.review(prompt: "P", repository: URL(filePath: "/tmp/x"))
-    #expect(report.summary == "ok")
-
-    let command = try #require(runner.invocations.first)
-    #expect(command.workingDirectory == URL(filePath: "/tmp/x"))
   }
 
   @Test func codexGenerateUsesReadOnlySandbox() async throws {

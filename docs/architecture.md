@@ -54,8 +54,7 @@ Longer-lived feature state is delegated to focused stores:
 - `HistoryStore` owns history pagination, graph rows, and history errors.
 - `PullRequestStore` owns GitHub synchronization, cached snapshots, and
   branch-to-PR linking. GitHub failures do not replace local git state.
-- `AIStore` owns provider registration, activity, generated review output, and
-  coding-agent errors.
+- `AIStore` owns provider registration, activity, and coding-agent errors.
 
 `RepositoryModel` exposes the UI-facing values and operations while preserving
 store ownership. `RepoWatcher` feeds filesystem changes back into `refresh`;

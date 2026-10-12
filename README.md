@@ -33,8 +33,8 @@ An AI-first git client for macOS, built with SwiftUI for macOS 26 or later.
   objects when supported; configure cone-mode sparse checkout.
 - **Pull requests** — branches display their open GitHub PR with review and
   CI status; a PR list and detail view come from the GitHub GraphQL API.
-- **AI** — generate commit messages and review branches with Claude Code or
-  Codex, running the CLIs you already have installed.
+- **AI** — generate commit messages with Claude Code or Codex, running the
+  CLIs you already have installed.
 - **Shortcuts** — App Intents for “Open Repository” and “Stash Changes”.
 - Auto-refresh via FSEvents, repository-titled windows and tabs.
 
@@ -70,7 +70,7 @@ available, to our knowledge).
 | Image diffs / side-by-side diff | ✅ | — |
 | GitHub integration | Notifications | PR badges on branches, PR list & details (CI + reviews) |
 | AI commit messages (Claude Code / Codex) | ✅ | ✅ |
-| AI branch review (Claude Code / Codex) | ✅ | ✅ |
+| AI branch review (Claude Code / Codex) | ✅ | — |
 | Shortcuts / App Intents | — | ✅ |
 
 ## Git features not in Spoon (yet)
@@ -128,7 +128,7 @@ are **not exposed** in Spoon’s UI or `GitClient` API today.
 - Optional, for the matching features:
   - [`gh`](https://cli.github.com) — GitHub authentication for PR sync
   - [`claude`](https://claude.com/claude-code) and/or `codex` — AI commit
-    messages and reviews
+    messages
 
 ## Building
 

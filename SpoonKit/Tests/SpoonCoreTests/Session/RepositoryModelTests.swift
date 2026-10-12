@@ -2053,7 +2053,6 @@ private actor FakeRepositoryGitClient: GitClient {
     return oid
   }
   func diff(from: String, to: String) async throws -> [FileDiff] { [] }
-  func diffText(from: String, to: String) async throws -> String { "" }
   func stagedDiffText() async throws -> String { "" }
   func rangeDiff(
     oldBase: ObjectID, oldTip: ObjectID, newBase: ObjectID, newTip: ObjectID
