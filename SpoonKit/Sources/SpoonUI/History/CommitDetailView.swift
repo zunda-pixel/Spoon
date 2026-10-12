@@ -40,7 +40,12 @@ struct CommitDetailView: View {
             diffs: detail.diffs,
             lineSelection: $lineSelection,
             fileActions: { restoreActions(for: $0, in: detail.commit) },
-            highlightsWordChanges: model.diffHighlightsWordChanges
+            highlightsWordChanges: model.diffHighlightsWordChanges,
+            imageLoader: .revisions(
+              model: model,
+              old: detail.commit.parents.first?.rawValue,
+              new: detail.commit.oid.rawValue
+            )
           )
         }
       } else if let errorMessage {

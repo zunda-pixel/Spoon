@@ -1,4 +1,4 @@
-import Foundation
+public import Foundation
 
 extension SystemGitClient {
 
@@ -61,6 +61,13 @@ extension SystemGitClient {
     }
     let data = try Data(contentsOf: url)
     return UntrackedDiffBuilder.make(path: path, data: data)
+  }
+
+  public func fileContents(path: String, at version: FileVersion) async throws -> Data {
+    guard let objectName = version.objectName(path: path) else {
+      return try Data(contentsOf: repositoryRoot.appending(path: path))
+    }
+    return try await run(["cat-file", "blob", objectName]).standardOutput
   }
 
   // MARK: - Mutations

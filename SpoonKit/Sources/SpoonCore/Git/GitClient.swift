@@ -14,6 +14,8 @@ public protocol GitWorkingTreeClient: Sendable {
   func diffWorkingTree(path: String?, staged: Bool, options: DiffOptions) async throws -> [FileDiff]
   /// Synthesized all-added diff for an untracked file.
   func untrackedFileDiff(path: String) async throws -> FileDiff
+  /// The raw bytes of `path` at `version`, e.g. to preview a binary diff.
+  func fileContents(path: String, at version: FileVersion) async throws -> Data
   /// Metadata, full message, and first-parent patch for one commit.
   /// Stages whole paths (also marks conflicted paths resolved).
   func stage(paths: [String]) async throws
