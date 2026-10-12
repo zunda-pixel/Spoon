@@ -23,6 +23,42 @@ struct RepositoryModelTests {
     #expect(model.lastErrorMessage == nil)
   }
 
+  @Test func automaticFetchRunsOnceAndStaysQuietWhenItFails() async {
+    let client = FakeRepositoryGitClient()
+    let oid = makeOID("11111111")
+    await client.configure(
+      status: makeStatus(oid: oid, branch: "main"),
+      branches: [makeBranch("main", oid: oid, isCurrent: true)],
+      remotes: [Remote(name: "origin", fetchURL: "https://example.com/r.git")]
+    )
+    await client.setFetchFails(true)
+    let model = makeModel(client)
+    await model.refresh()
+
+    await model.fetchAutomatically()
+    // The activation that follows launch must not fetch again right away.
+    await model.fetchAutomatically()
+
+    #expect(await client.fetchCount == 1)
+    #expect(model.lastErrorMessage == nil)
+    #expect(!model.isBusy)
+  }
+
+  @Test func automaticFetchSkipsRepositoriesWithoutRemotes() async {
+    let client = FakeRepositoryGitClient()
+    let oid = makeOID("11111111")
+    await client.configure(
+      status: makeStatus(oid: oid, branch: "main"),
+      branches: [makeBranch("main", oid: oid, isCurrent: true)]
+    )
+    let model = makeModel(client)
+    await model.refresh()
+
+    await model.fetchAutomatically()
+
+    #expect(await client.fetchCount == 0)
+  }
+
   @Test func historyReferenceModesAreExclusiveAndSupportMultipleFocuses() async {
     let client = FakeRepositoryGitClient()
     let mainOID = makeOID("a1a1a1a1")
@@ -1900,7 +1936,14 @@ private actor FakeRepositoryGitClient: GitClient {
   func publishBranch(_ branch: String, to remoteName: String) async throws {
     mutationCalls.append("publish:\(remoteName):\(branch)")
   }
-  func fetch() async throws { throw Failure.unimplemented }
+  private(set) var fetchCount = 0
+  /// Every fetch fails, like it does offline, once this is set.
+  private var fetchFails = false
+  func setFetchFails(_ fails: Bool) { fetchFails = fails }
+  func fetch() async throws {
+    fetchCount += 1
+    if fetchFails { throw Failure.refresh }
+  }
   private var currentShallow = false
   func setShallow(_ shallow: Bool) { currentShallow = shallow }
   func isShallowRepository() async throws -> Bool { currentShallow }

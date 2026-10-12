@@ -541,6 +541,21 @@ extension RepositoryModel {
     await syncPullRequests(force: true)
   }
 
+  /// Fetches every remote without being asked, when a repository opens or
+  /// the app becomes active. Skipped while another operation runs, without
+  /// remotes, or within a few seconds of the last one. Failures, such as
+  /// being offline, are not reported: the user didn't start this fetch.
+  public func fetchAutomatically() async {
+    let now = ContinuousClock.now
+    if let lastAutomaticFetch, now - lastAutomaticFetch < .seconds(10) { return }
+    guard !isBusy, !remotes.isEmpty else { return }
+    lastAutomaticFetch = now
+    isBusy = true
+    try? await gitClient.fetch()
+    isBusy = false
+    await refresh()
+  }
+
   /// Whether `backfillEstimate` can measure this repository.
   public var canEstimateBackfill: Bool {
     gitCapabilities.supportsRemoteObjectInfo && partialCloneRemote != nil
