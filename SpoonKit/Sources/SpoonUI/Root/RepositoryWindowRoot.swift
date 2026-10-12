@@ -1,3 +1,4 @@
+import AppKit
 import OrderedCollections
 import SpoonCore
 import SwiftUI
@@ -39,6 +40,13 @@ struct RepositoryWindowRoot: View {
     .navigationTitle(windowTitle)
     .task(id: repositoryID) {
       await load()
+    }
+    .task {
+      for await _ in NotificationCenter.default.notifications(
+        named: NSApplication.didBecomeActiveNotification
+      ) {
+        await activeModel?.fetchAutomatically()
+      }
     }
     .onDisappear {
       for model in cachedModels.values {
@@ -82,6 +90,7 @@ struct RepositoryWindowRoot: View {
       model.startWatching()
       activeModel = model
       await model.syncPullRequests()
+      await model.fetchAutomatically()
     } catch {
       loadErrorMessage = error.localizedDescription
     }

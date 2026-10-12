@@ -68,6 +68,9 @@ public final class RepositoryModel {
   /// history load). Background errors clear automatically once the read
   /// recovers; mutation errors stay until the user dismisses them.
   var lastErrorIsFromBackgroundRead = false
+  /// When `fetchAutomatically` last started, so the launch and the app
+  /// activation that comes with it fetch once.
+  @ObservationIgnored var lastAutomaticFetch: ContinuousClock.Instant?
 
   let gitClient: any GitClient
   let historyStore: HistoryStore
