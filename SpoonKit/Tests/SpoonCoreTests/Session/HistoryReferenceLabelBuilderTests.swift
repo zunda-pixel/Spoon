@@ -140,6 +140,39 @@ struct HistoryReferenceLabelBuilderTests {
     #expect(reference.gitReference == "refs/remotes/origin/topic")
   }
 
+  @Test func localBranchesAbsorbTheirUpstreamAtTheSameCommit() throws {
+    let shared = try #require(ObjectID(rawValue: String(repeating: "c", count: 40)))
+    let behind = try #require(ObjectID(rawValue: String(repeating: "d", count: 40)))
+    var main = branch(name: "main", oid: shared)
+    main.upstream = "origin/main"
+    var topic = branch(name: "topic", oid: shared)
+    topic.upstream = "origin/topic"
+    var stale = branch(name: "stale", oid: shared)
+    stale.upstream = "origin/stale"
+
+    let labels = HistoryReferenceLabelBuilder.build(
+      branches: [main, topic, stale],
+      remoteBranchesByRemote: [
+        "origin": [
+          branch(name: "origin/main", oid: shared),
+          branch(name: "origin/topic", oid: shared),
+          branch(name: "origin/stale", oid: behind),
+        ]
+      ],
+      worktrees: [],
+      tags: [Tag(name: "0.0.27", target: shared, isAnnotated: false, createdAt: nil)],
+      stashes: []
+    )
+
+    let commitLabels = try #require(labels[shared])
+    #expect(commitLabels.map(\.name) == ["main", "stale", "topic", "0.0.27"])
+    #expect(commitLabels.first { $0.name == "main" }?.syncedUpstream == "origin/main")
+    #expect(commitLabels.first { $0.name == "topic" }?.syncedUpstream == "origin/topic")
+    // Its upstream is on another commit, so nothing is folded in.
+    #expect(commitLabels.first { $0.name == "stale" }?.syncedUpstream == nil)
+    #expect(labels[behind]?.map(\.name) == ["origin/stale"])
+  }
+
   private func branch(name: String, oid: ObjectID) -> Branch {
     Branch(
       name: name,

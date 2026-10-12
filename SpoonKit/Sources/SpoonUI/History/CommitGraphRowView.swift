@@ -25,14 +25,8 @@ struct CommitGraphRowView: View {
 
       VStack(alignment: .leading, spacing: 2) {
         HStack(spacing: 6) {
-          ForEach(referenceLabels.prefix(2)) { referenceLabel in
+          ForEach(referenceLabels) { referenceLabel in
             referenceBadge(referenceLabel)
-          }
-          if referenceLabels.count > 2 {
-            Text("+\(referenceLabels.count - 2)")
-              .font(.caption2.monospacedDigit())
-              .foregroundStyle(.secondary)
-              .help(allReferencesHelp)
           }
           if row.commit.isMerge {
             Image(systemName: "arrow.triangle.merge")
@@ -140,10 +134,18 @@ struct CommitGraphRowView: View {
   }
 
   private func referenceBadgeLabel(_ referenceLabel: HistoryReferenceLabel) -> some View {
-    Label(
-      referenceLabel.name,
-      systemImage: symbolName(for: referenceLabel)
-    )
+    Label {
+      HStack(spacing: 3) {
+        Text(referenceLabel.name)
+        if referenceLabel.syncedUpstream != nil {
+          // The upstream sits on this commit too; its own label is folded in.
+          Image(systemName: "network")
+            .imageScale(.small)
+        }
+      }
+    } icon: {
+      Image(systemName: symbolName(for: referenceLabel))
+    }
     .font(.caption2)
     .fontWeight(referenceLabel.isCurrent ? .semibold : nil)
     .lineLimit(1)
@@ -212,11 +214,8 @@ struct CommitGraphRowView: View {
       case .stash:
         "Stash"
       }
-    return "\(prefix) \(label.name)\(isSelected(label) ? ", selected focus" : "")"
-  }
-
-  private var allReferencesHelp: String {
-    referenceLabels.map(accessibilityDescription).joined(separator: "\n")
+    let synced = label.syncedUpstream.map { ", same as \($0)" } ?? ""
+    return "\(prefix) \(label.name)\(synced)\(isSelected(label) ? ", selected focus" : "")"
   }
 
   private var graphCanvas: some View {
