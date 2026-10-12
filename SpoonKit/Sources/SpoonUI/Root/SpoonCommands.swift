@@ -29,6 +29,8 @@ public struct SpoonCommands: Commands {
   @FocusedValue(\.repositoryModel) private var model
   @FocusedValue(\.repositoryNavigationState) private var navigation
   @Environment(\.openWindow) private var openWindow
+  @AppStorage(SidebarVisibilityKey.showsReflog) private var showsReflog = true
+  @AppStorage(SidebarVisibilityKey.showsPullRequests) private var showsPullRequests = true
   private let appModel: AppModel
 
   public init(appModel: AppModel) {
@@ -255,19 +257,27 @@ public struct SpoonCommands: Commands {
       .keyboardShortcut("2", modifiers: .command)
       .disabled(navigation == nil)
 
-      Button("Show Reflog") {
-        navigation?.select(.reflog)
+      if showsReflog {
+        Button("Show Reflog") {
+          navigation?.select(.reflog)
+        }
+        .keyboardShortcut("3", modifiers: .command)
+        .disabled(navigation == nil)
       }
-      .keyboardShortcut("3", modifiers: .command)
-      .disabled(navigation == nil)
 
-      if model?.gitHubRepoRef != nil {
+      if showsPullRequests, model?.gitHubRepoRef != nil {
         Button("Show Pull Requests") {
           navigation?.select(.pullRequests)
         }
         .keyboardShortcut("4", modifiers: .command)
         .disabled(navigation == nil)
       }
+
+      Menu("Show in Sidebar") {
+        SidebarVisibilityToggles()
+      }
+
+      Divider()
     }
   }
 
