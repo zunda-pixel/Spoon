@@ -72,13 +72,13 @@ struct RepositoryDetailColumn: View {
       if let selectedCommitID = navigation.selectedCommitID,
         let oid = ObjectID(rawValue: selectedCommitID)
       {
-        CommitDetailView(model: model, oid: oid)
+        CommitDetailView(model: model, oid: oid, navigation: navigation)
       } else {
         SelectionPlaceholder()
       }
     case .reflog:
       if let oid = navigation.selectedReflogOID {
-        CommitDetailView(model: model, oid: oid)
+        CommitDetailView(model: model, oid: oid, navigation: navigation)
       } else {
         SelectionPlaceholder()
       }

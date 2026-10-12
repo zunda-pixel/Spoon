@@ -7,6 +7,9 @@ import SwiftUI
 struct CommitDetailView: View {
   let model: RepositoryModel
   let oid: ObjectID
+  /// Opens file history and blame from each file's menu; `nil` leaves
+  /// them out, e.g. inside a sheet that can't present another.
+  var navigation: RepositoryNavigationState?
 
   @State private var detail: CommitDetail?
   @State private var errorMessage: String?
@@ -17,9 +20,10 @@ struct CommitDetailView: View {
   /// Signed tags on the commit, with their verification.
   @State private var tagSignatures: (oid: ObjectID, values: [(tag: Tag, signature: CommitSignature)])?
 
-  init(model: RepositoryModel, oid: ObjectID) {
+  init(model: RepositoryModel, oid: ObjectID, navigation: RepositoryNavigationState? = nil) {
     self.model = model
     self.oid = oid
+    self.navigation = navigation
   }
 
   var body: some View {
@@ -39,7 +43,7 @@ struct CommitDetailView: View {
           FileDiffListView(
             diffs: detail.diffs,
             lineSelection: $lineSelection,
-            fileActions: { restoreActions(for: $0, in: detail.commit) },
+            fileActions: { fileActions(for: $0) + restoreActions(for: $0, in: detail.commit) },
             highlightsWordChanges: model.diffHighlightsWordChanges,
             imageLoader: .revisions(
               model: model,
@@ -96,6 +100,26 @@ struct CommitDetailView: View {
         errorMessage = error.localizedDescription
       }
     }
+  }
+
+  /// File history follows renames, so it starts from the path the file
+  /// has in this commit. Blame reads the working-tree copy.
+  private func fileActions(for diff: FileDiff) -> [FileDiffAction] {
+    guard let navigation else { return [] }
+    var actions = [
+      FileDiffAction(title: "Show File History…") {
+        navigation.present(.fileHistory(path: diff.path))
+      }
+    ]
+    let fileURL = model.repository.rootURL.appending(path: diff.path)
+    if FileManager.default.fileExists(atPath: fileURL.path(percentEncoded: false)) {
+      actions.append(
+        FileDiffAction(title: "Blame…") {
+          navigation.present(.blame(path: diff.path))
+        }
+      )
+    }
+    return actions
   }
 
   private func restoreActions(for diff: FileDiff, in commit: Commit) -> [FileDiffAction] {
