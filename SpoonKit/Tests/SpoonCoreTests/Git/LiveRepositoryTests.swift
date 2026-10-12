@@ -800,6 +800,30 @@ struct LiveRepositoryTests {
     }
   }
 
+  /// A clone's `origin/HEAD` points at the default branch and shortens to
+  /// "origin"; it must not be listed as a branch named "origin".
+  @Test func remoteBranchesLeaveOutTheRemoteHeadPointer() async throws {
+    let bare = try await LiveRepoFixture.makeBareRepo(runner: runner)
+    let root = try await LiveRepoFixture.makeTemporaryRepo(
+      commits: [.init(file: "base.txt", content: "base\n", message: "base")],
+      runner: runner
+    )
+    defer {
+      for url in [bare, root] { try? FileManager.default.removeItem(at: url) }
+    }
+    func git(_ arguments: [String]) async throws {
+      try await LiveRepoFixture.run(arguments, in: root, runner: runner)
+    }
+    try await git(["remote", "add", "origin", bare.path])
+    try await git(["push", "origin", "main", "main:feature"])
+    try await git(["fetch", "origin"])
+    try await git(["remote", "set-head", "origin", "main"])
+
+    let names = try await makeClient(root).remoteBranches(of: "origin").map(\.name)
+
+    #expect(names.sorted() == ["origin/feature", "origin/main"])
+  }
+
   @Test func squashAndRebaseMergedBranchesCountAsMerged() async throws {
     let root = try await LiveRepoFixture.makeTemporaryRepo(
       commits: [.init(file: "base.txt", content: "base\n", message: "base")],
