@@ -35,6 +35,10 @@ public struct HistoryReferenceLabel: Sendable, Hashable, Identifiable {
   public let isCheckedOutInWorktree: Bool
   @Init(default: nil)
   public let referenceIdentity: HistoryReferenceIdentity?
+  /// The upstream (such as `origin/main`) of a local branch whose tip it
+  /// shares. Its own label is folded into this one.
+  @Init(default: nil)
+  public var syncedUpstream: String?
 }
 
 /// Builds deterministic commit-to-reference mappings independently of SwiftUI.
@@ -117,6 +121,34 @@ public enum HistoryReferenceLabelBuilder {
           kind: .stash
         )
       )
+    }
+
+    // A local branch and its upstream at the same commit show as one label,
+    // unless the upstream is the focused reference.
+    let upstreamByLocalLabelID = Dictionary(
+      uniqueKeysWithValues: branches.compactMap { branch in
+        branch.upstream.map { ("local:\(branch.name)", $0) }
+      }
+    )
+    labelsByOID = labelsByOID.mapValues { labels in
+      let remoteNames = Set(
+        labels.filter {
+          $0.kind == .remoteBranch && $0.referenceIdentity != selectedReference
+        }.map(\.name)
+      )
+      var folded: Set<String> = []
+      var merged = labels.map { label in
+        var label = label
+        if label.kind == .localBranch, let upstream = upstreamByLocalLabelID[label.id],
+          remoteNames.contains(upstream)
+        {
+          label.syncedUpstream = upstream
+          folded.insert(upstream)
+        }
+        return label
+      }
+      merged.removeAll { $0.kind == .remoteBranch && folded.contains($0.name) }
+      return merged
     }
 
     return labelsByOID.mapValues { labels in
