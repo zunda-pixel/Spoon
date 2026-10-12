@@ -181,6 +181,33 @@ struct DiffPatchBuilderTests {
     )
   }
 
+  @Test func stageSelectedAdditionOmitsUnselectedAdditions() throws {
+    let diff = try twoChangeDiff
+    let hunk = diff.hunks[0]
+    // Select only "+four" (offset 2: [ctx, -FOUR, +four, ...]).
+    let patch = try #require(
+      DiffPatchBuilder.stagePatch(for: diff, hunkID: hunk.id, selectedOffsets: [2])
+    )
+    // Unselected deletions stay as context; unselected +six is left out.
+    #expect(patch.contains(" FOUR\n+four\n"))
+    #expect(patch.contains(" SIX\n"))
+    #expect(!patch.contains("+six"))
+    // Index side: three,FOUR,five,SIX,seven = 5; staged result adds four = 6.
+    #expect(patch.contains("@@ -3,5 +3,6 @@"))
+  }
+
+  @Test func stagePairReplacesTheLineInTheIndex() throws {
+    let diff = try twoChangeDiff
+    let hunk = diff.hunks[0]
+    let patch = try #require(
+      DiffPatchBuilder.stagePatch(for: diff, hunkID: hunk.id, selectedOffsets: [1, 2])
+    )
+    #expect(patch.contains("-FOUR\n+four\n"))
+    #expect(patch.contains(" SIX\n"))
+    #expect(patch.contains("@@ -3,5 +3,5 @@"))
+    #expect(DiffPatchBuilder.stagePatch(for: diff, hunkID: hunk.id, selectedOffsets: [0]) == nil)
+  }
+
   @Test func changedLineOffsetsSkipsContext() throws {
     let diff = try twoChangeDiff
     #expect(DiffPatchBuilder.changedLineOffsets(of: diff.hunks[0]) == [1, 2, 4, 5])

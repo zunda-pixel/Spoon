@@ -93,6 +93,14 @@ extension RepositoryModel {
     await discardLines(DiffPatchBuilder.changedLineOffsets(of: hunk), of: hunkID, in: diff)
   }
 
+  public func stageLines(_ offsets: Set<Int>, of hunkID: Hunk.ID, in diff: FileDiff) async {
+    guard
+      let patch = DiffPatchBuilder.stagePatch(
+        for: diff, hunkID: hunkID, selectedOffsets: offsets)
+    else { return }
+    await perform { try await $0.applyPatch(patch, reverse: false, toIndex: true) }
+  }
+
   public func unstageLines(_ offsets: Set<Int>, of hunkID: Hunk.ID, in diff: FileDiff) async {
     guard
       let patch = DiffPatchBuilder.discardPatch(
