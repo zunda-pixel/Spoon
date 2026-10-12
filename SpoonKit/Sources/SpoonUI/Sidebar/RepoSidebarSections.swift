@@ -4,6 +4,8 @@ import SwiftUI
 @MainActor
 struct WorkspaceSidebarSection: View {
   let model: RepositoryModel
+  @AppStorage(SidebarVisibilityKey.showsReflog) private var showsReflog = true
+  @AppStorage(SidebarVisibilityKey.showsPullRequests) private var showsPullRequests = true
 
   var body: some View {
     Section("Workspace") {
@@ -11,16 +13,36 @@ struct WorkspaceSidebarSection: View {
         .badge(model.pendingChangeCount)
         .tag(SidebarItem.changes)
         .accessibilityValue("\(model.pendingChangeCount) pending change(s)")
+        .contextMenu { visibilityMenu }
       Label("History", systemImage: "clock")
         .tag(SidebarItem.history)
-      Label("Reflog", systemImage: "clock.arrow.trianglehead.counterclockwise.rotate.90")
-        .tag(SidebarItem.reflog)
-      if model.gitHubRepoRef != nil {
+        .contextMenu { visibilityMenu }
+      if showsReflog {
+        Label("Reflog", systemImage: "clock.arrow.trianglehead.counterclockwise.rotate.90")
+          .tag(SidebarItem.reflog)
+          .contextMenu {
+            Button("Hide Reflog") { showsReflog = false }
+            Divider()
+            visibilityMenu
+          }
+      }
+      if showsPullRequests, model.gitHubRepoRef != nil {
         Label("Pull Requests", systemImage: "arrow.triangle.pull")
           .badge(model.openPullRequests.count)
           .tag(SidebarItem.pullRequests)
           .accessibilityValue("\(model.openPullRequests.count) open pull request(s)")
+          .contextMenu {
+            Button("Hide Pull Requests") { showsPullRequests = false }
+            Divider()
+            visibilityMenu
+          }
       }
+    }
+  }
+
+  private var visibilityMenu: some View {
+    Menu("Show in Sidebar") {
+      SidebarVisibilityToggles()
     }
   }
 }

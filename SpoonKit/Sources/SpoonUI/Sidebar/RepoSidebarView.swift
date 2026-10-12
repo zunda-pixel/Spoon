@@ -34,6 +34,8 @@ struct RepoSidebarView: View {
   @State private var removingWorktree: Worktree?
   @State private var deletingRemoteBranch: RemoteBranchSelection?
   @State private var searchText = ""
+  @AppStorage(SidebarVisibilityKey.showsReflog) private var showsReflog = true
+  @AppStorage(SidebarVisibilityKey.showsPullRequests) private var showsPullRequests = true
 
   var body: some View {
     List(selection: $navigation.sidebarSelections) {
@@ -75,6 +77,12 @@ struct RepoSidebarView: View {
       )
     }
     .listStyle(.sidebar)
+    .onChange(of: showsReflog, initial: true) {
+      if !showsReflog { deselect(.reflog) }
+    }
+    .onChange(of: showsPullRequests, initial: true) {
+      if !showsPullRequests { deselect(.pullRequests) }
+    }
     .onDeleteCommand {
       let branches = model.branches.filter { navigation.selectedBranchNames.contains($0.name) }
       guard !branches.isEmpty, !model.isBusy else { return }
@@ -117,6 +125,17 @@ struct RepoSidebarView: View {
     } message: {
       Text(
         "The remote branch will be permanently deleted. A matching local branch is not affected.")
+    }
+  }
+
+  /// Moves the selection off a row that was just hidden.
+  private func deselect(_ item: SidebarItem) {
+    guard navigation.sidebarSelections.contains(item) else { return }
+    let remaining = navigation.sidebarSelections.subtracting([item])
+    if remaining.isEmpty {
+      navigation.select(.history)
+    } else {
+      navigation.sidebarSelections = remaining
     }
   }
 
