@@ -431,16 +431,32 @@ struct HunkView: View {
       if isExpanded {
         let input = HighlightInput(hunk: hunk, isEnabled: highlightsWordChanges)
         let wordChanges = highlights?.input == input ? highlights?.ranges ?? [:] : [:]
-        ForEach(Array(hunk.lines.enumerated()), id: \.offset) { offset, line in
-          DiffLineRow(
-            line: line,
-            changedRanges: wordChanges[offset] ?? [],
-            isSelectable: lineSelection != nil && line.kind != .context,
-            isSelected: isSelected(offset),
-            onSelect: lineSelection != nil && line.kind != .context
-              ? { handleTap(offset) }
-              : nil
-          )
+        let lines = Array(hunk.lines.enumerated())
+        // The gutter selects whole lines (stage, discard, copy lines); the
+        // code beside it selects text character by character.
+        HStack(alignment: .top, spacing: 0) {
+          VStack(alignment: .leading, spacing: 0) {
+            ForEach(lines, id: \.offset) { offset, line in
+              DiffLineGutter(
+                line: line,
+                isSelected: isSelected(offset),
+                onSelect: lineSelection != nil && line.kind != .context
+                  ? { handleTap(offset) }
+                  : nil
+              )
+            }
+          }
+          DiffCodeText(lines: hunk.lines, changedRanges: wordChanges)
+        }
+        .padding(.horizontal, 12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(alignment: .topLeading) {
+          VStack(spacing: 0) {
+            ForEach(lines, id: \.offset) { offset, line in
+              DiffLineGutter.background(for: line, isSelected: isSelected(offset))
+                .frame(height: DiffTextMetrics.rowHeight)
+            }
+          }
         }
       }
     }
@@ -497,12 +513,11 @@ struct HunkView: View {
   }
 }
 
+/// Line numbers and the +/− marker of one diff line. Clicking it selects
+/// the line when the diff allows line selection.
 @MainActor
-struct DiffLineRow: View {
+struct DiffLineGutter: View {
   let line: DiffLine
-  /// Character ranges of `line.text` that changed against the paired line.
-  var changedRanges: [Range<Int>] = []
-  var isSelectable = false
   var isSelected = false
   var onSelect: (() -> Void)?
 
@@ -510,7 +525,7 @@ struct DiffLineRow: View {
 
   @ViewBuilder
   var body: some View {
-    if isSelectable, let onSelect {
+    if let onSelect {
       Button(action: onSelect) {
         content
       }
@@ -523,24 +538,27 @@ struct DiffLineRow: View {
     }
   }
 
+  static func background(for line: DiffLine, isSelected: Bool) -> Color {
+    if isSelected { return Color.accentColor.opacity(0.28) }
+    return switch line.kind {
+    case .addition: .green.opacity(0.12)
+    case .deletion: .red.opacity(0.12)
+    case .context, .noNewlineMarker: .clear
+    }
+  }
+
   private var content: some View {
     HStack(alignment: .top, spacing: 0) {
       lineNumber(line.oldLine)
       lineNumber(line.newLine)
       Text(marker)
         .frame(width: 16)
-      Text(highlightedText)
-        .fixedSize(horizontal: true, vertical: false)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .foregroundStyle(
-          line.kind == .noNewlineMarker ? AnyShapeStyle(.secondary) : AnyShapeStyle(.primary))
     }
-    .font(.callout.monospaced())
+    .font(Font(DiffTextMetrics.font))
     .lineLimit(1)
-    .padding(.horizontal, 12)
-    .background(isSelected ? Color.accentColor.opacity(0.28) : background)
+    .frame(height: DiffTextMetrics.rowHeight)
     .contentShape(Rectangle())
-    .help(isSelectable ? "Click to select; ⇧click extends, ⌘click toggles" : "")
+    .help(onSelect != nil ? "Click to select the line; ⇧click extends, ⌘click toggles" : "")
     .accessibilityElement(children: .ignore)
     .accessibilityLabel(accessibilityLabel)
     .accessibilityValue(isSelected ? "Selected" : "")
@@ -551,20 +569,6 @@ struct DiffLineRow: View {
       .frame(width: Self.numberWidth, alignment: .trailing)
       .foregroundStyle(.tertiary)
       .padding(.trailing, 6)
-  }
-
-  private var highlightedText: AttributedString {
-    var text = AttributedString(line.text.isEmpty ? " " : line.text)
-    guard !changedRanges.isEmpty else { return text }
-    let tint: Color = line.kind == .deletion ? .red : .green
-    for range in changedRanges {
-      let characters = text.characters
-      guard range.upperBound <= characters.count else { continue }
-      let lower = characters.index(characters.startIndex, offsetBy: range.lowerBound)
-      let upper = characters.index(characters.startIndex, offsetBy: range.upperBound)
-      text[lower..<upper].backgroundColor = tint.opacity(0.35)
-    }
-    return text
   }
 
   private var marker: String {
@@ -593,14 +597,6 @@ struct DiffLineRow: View {
     case .deletion: "Deletion"
     case .context: "Context"
     case .noNewlineMarker: "No newline at end of file"
-    }
-  }
-
-  private var background: Color {
-    switch line.kind {
-    case .addition: .green.opacity(0.12)
-    case .deletion: .red.opacity(0.12)
-    case .context, .noNewlineMarker: .clear
     }
   }
 }
