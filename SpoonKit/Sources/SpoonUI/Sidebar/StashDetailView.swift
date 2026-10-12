@@ -108,7 +108,11 @@ struct StashDetailView: View {
       if diffs.isEmpty {
         ContentUnavailableView("Empty Stash", systemImage: "tray")
       } else {
-        FileDiffListView(diffs: diffs, highlightsWordChanges: model.diffHighlightsWordChanges)
+        FileDiffListView(
+          diffs: diffs,
+          highlightsWordChanges: model.diffHighlightsWordChanges,
+          imageLoader: imageLoader
+        )
       }
     } else if let loadErrorMessage {
       ContentUnavailableView(
@@ -119,6 +123,19 @@ struct StashDetailView: View {
     } else {
       ProgressView()
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+  }
+
+  /// A stash commit's first parent is where it was made; untracked files
+  /// live in its third parent.
+  private var imageLoader: DiffImageLoader? {
+    guard let stash = loadedStash else { return nil }
+    let target = stash.target.rawValue
+    return DiffImageLoader(model: model) { diff in
+      DiffImageLoader.Versions(
+        old: diff.kind == .added ? [] : [.revision("\(target)^1")],
+        new: diff.kind == .deleted ? [] : [.revision(target), .revision("\(target)^3")]
+      )
     }
   }
 

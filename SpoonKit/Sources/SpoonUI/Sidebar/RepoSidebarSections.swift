@@ -4,6 +4,8 @@ import SwiftUI
 @MainActor
 struct WorkspaceSidebarSection: View {
   let model: RepositoryModel
+  @AppStorage(SidebarVisibilityKey.showsReflog) private var showsReflog = true
+  @AppStorage(SidebarVisibilityKey.showsPullRequests) private var showsPullRequests = true
 
   var body: some View {
     Section("Workspace") {
@@ -11,16 +13,36 @@ struct WorkspaceSidebarSection: View {
         .badge(model.pendingChangeCount)
         .tag(SidebarItem.changes)
         .accessibilityValue("\(model.pendingChangeCount) pending change(s)")
+        .contextMenu { visibilityMenu }
       Label("History", systemImage: "clock")
         .tag(SidebarItem.history)
-      Label("Reflog", systemImage: "clock.arrow.trianglehead.counterclockwise.rotate.90")
-        .tag(SidebarItem.reflog)
-      if model.gitHubRepoRef != nil {
+        .contextMenu { visibilityMenu }
+      if showsReflog {
+        Label("Reflog", systemImage: "clock.arrow.trianglehead.counterclockwise.rotate.90")
+          .tag(SidebarItem.reflog)
+          .contextMenu {
+            Button("Hide Reflog") { showsReflog = false }
+            Divider()
+            visibilityMenu
+          }
+      }
+      if showsPullRequests, model.gitHubRepoRef != nil {
         Label("Pull Requests", systemImage: "arrow.triangle.pull")
           .badge(model.openPullRequests.count)
           .tag(SidebarItem.pullRequests)
           .accessibilityValue("\(model.openPullRequests.count) open pull request(s)")
+          .contextMenu {
+            Button("Hide Pull Requests") { showsPullRequests = false }
+            Divider()
+            visibilityMenu
+          }
       }
+    }
+  }
+
+  private var visibilityMenu: some View {
+    Menu("Show in Sidebar") {
+      SidebarVisibilityToggles()
     }
   }
 }
@@ -29,12 +51,12 @@ struct WorkspaceSidebarSection: View {
 struct StashesSidebarSection: View {
   let model: RepositoryModel
   let navigation: RepositoryNavigationState
+  @Bindable var expansion: SidebarExpansionState
   let searchText: String
-  @State private var isExpanded = true
 
   var body: some View {
     if !model.stashes.isEmpty {
-      Section(isExpanded: $isExpanded) {
+      Section(isExpanded: $expansion.stashes) {
         if filteredStashes.isEmpty {
           Label("No matching stashes", systemImage: "magnifyingglass")
             .foregroundStyle(.tertiary)
@@ -69,7 +91,7 @@ struct StashesSidebarSection: View {
       }
       .onChange(of: searchText) {
         if searchText.hasSidebarSearchQuery {
-          isExpanded = true
+          expansion.stashes = true
         }
       }
     }
@@ -87,12 +109,12 @@ struct StashesSidebarSection: View {
 struct TagsSidebarSection: View {
   let model: RepositoryModel
   let navigation: RepositoryNavigationState
+  @Bindable var expansion: SidebarExpansionState
   let searchText: String
-  @State private var isExpanded = false
 
   var body: some View {
     if !model.tags.isEmpty {
-      Section(isExpanded: $isExpanded) {
+      Section(isExpanded: $expansion.tags) {
         if filteredTags.isEmpty {
           Label("No matching tags", systemImage: "magnifyingglass")
             .foregroundStyle(.tertiary)
@@ -112,7 +134,7 @@ struct TagsSidebarSection: View {
       }
       .onChange(of: searchText) {
         if searchText.hasSidebarSearchQuery {
-          isExpanded = true
+          expansion.tags = true
         }
       }
     }

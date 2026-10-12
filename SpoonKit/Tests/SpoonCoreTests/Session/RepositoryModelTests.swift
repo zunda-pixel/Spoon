@@ -1753,6 +1753,9 @@ private actor FakeRepositoryGitClient: GitClient {
     -> [FileDiff]
   { [] }
   func untrackedFileDiff(path: String) async throws -> FileDiff { throw Failure.unimplemented }
+  func fileContents(path: String, at version: FileVersion) async throws -> Data {
+    throw Failure.unimplemented
+  }
   func unstage(paths: [String]) async throws { throw Failure.unimplemented }
   func applyPatch(_ patch: String, reverse: Bool, toIndex: Bool) async throws {
     throw Failure.unimplemented

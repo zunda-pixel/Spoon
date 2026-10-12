@@ -96,7 +96,8 @@ struct DiffDetailView: View {
               onDiscardHunk: selection.area == .unstaged && canEditHunks
                 ? { diff, hunk in pendingDiscard = .hunk(diff, hunk) }
                 : nil,
-              highlightsWordChanges: model.diffHighlightsWordChanges
+              highlightsWordChanges: model.diffHighlightsWordChanges,
+              imageLoader: imageLoader
             )
           }
         }
@@ -197,6 +198,25 @@ struct DiffDetailView: View {
 
   /// Reload when the selected file, its area, or the underlying status
   /// snapshot changes (e.g. after staging from another view).
+  /// Staged diffs compare HEAD with the index, unstaged ones the index
+  /// with the working tree, and conflicted ones HEAD with the working tree.
+  private var imageLoader: DiffImageLoader {
+    let area = selection.area
+    return DiffImageLoader(model: model, contentID: taskKey) { diff in
+      let old: [FileVersion] =
+        switch area {
+        case .staged, .conflicted: [.revision("HEAD")]
+        case .unstaged: [.index]
+        case .untracked: []
+        }
+      let new: [FileVersion] = area == .staged ? [.index] : [.workingTree]
+      return DiffImageLoader.Versions(
+        old: diff.kind == .added ? [] : old,
+        new: diff.kind == .deleted ? [] : new
+      )
+    }
+  }
+
   private var taskKey: String {
     "\(selection.area)|\(selection.path)|\(model.status.hashValue)|\(model.diffIgnoresWhitespace)|\(conflictReload)"
   }

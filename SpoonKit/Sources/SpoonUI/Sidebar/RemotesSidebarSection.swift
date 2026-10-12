@@ -6,17 +6,15 @@ import SwiftUI
 struct RemotesSidebarSection: View {
   let model: RepositoryModel
   let navigation: RepositoryNavigationState
+  @Bindable var expansion: SidebarExpansionState
   @Binding var removingRemote: Remote?
   @Binding var removingWorktree: Worktree?
   @Binding var deletingRemoteBranch: RemoteBranchSelection?
   let searchText: String
   let openWorktree: (Worktree) -> Void
-  @State private var isExpanded = true
-  @State private var expandedRemoteNames: Set<String> = []
-  @State private var expandedFolderPaths: Set<String> = []
 
   var body: some View {
-    Section(isExpanded: $isExpanded) {
+    Section(isExpanded: $expansion.remotes) {
       if filteredRemotes.isEmpty {
         Label(
           searchText.hasSidebarSearchQuery ? "No matching remotes or branches" : "No remotes",
@@ -39,7 +37,7 @@ struct RemotesSidebarSection: View {
               model: model,
               navigation: navigation,
               isSearching: searchText.hasSidebarSearchQuery,
-              expandedFolderPaths: $expandedFolderPaths,
+              expandedFolderPaths: $expansion.remoteFolderPaths,
               removingWorktree: $removingWorktree,
               deletingRemoteBranch: $deletingRemoteBranch,
               openWorktree: openWorktree
@@ -73,7 +71,7 @@ struct RemotesSidebarSection: View {
     }
     .onChange(of: searchText) {
       if searchText.hasSidebarSearchQuery {
-        isExpanded = true
+        expansion.remotes = true
       }
     }
   }
@@ -117,12 +115,12 @@ struct RemotesSidebarSection: View {
       return .constant(true)
     }
     return Binding(
-      get: { expandedRemoteNames.contains(remote.name) },
+      get: { expansion.remoteNames.contains(remote.name) },
       set: { expanded in
         if expanded {
-          expandedRemoteNames.insert(remote.name)
+          expansion.remoteNames.insert(remote.name)
         } else {
-          expandedRemoteNames.remove(remote.name)
+          expansion.remoteNames.remove(remote.name)
         }
       }
     )
